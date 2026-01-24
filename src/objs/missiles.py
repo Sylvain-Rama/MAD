@@ -2,6 +2,7 @@ import math
 from utils import shortest_angle
 from common_schemas import Position, Velocity
 from targets import Target
+from planets import Planet
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -24,6 +25,7 @@ class MissileConfig:
     cruise_thrust_ratio: float = 0.6
     cruise_duration: float = 2.0
     terminal_guidance: bool = True
+    correction_factor: float = 0.02
 
 
 class Missile:
@@ -48,17 +50,17 @@ class Missile:
         angle_error = shortest_angle(missile_angle, target_angle)
         return 1.0 if angle_error > 0 else -1.0
 
-    def step(self, dt, gravity_func, atmosphere_func, planet_radius):
+    def step(self, dt: float, planet: Planet):
         if not self.alive:
             return
 
         r = self.pos.distance_to_core()
         nx, ny = self.pos.x / r, self.pos.y / r  # radial
         tx, ty = -ny, nx  # tangent
-        altitude = r - planet_radius
+        altitude = r - planet.radius
 
-        gx, gy = gravity_func(self.x, self.y)
-        drag_x, drag_y = atmosphere_func(self.x, self.y, self.vx, self.vy, self.config.drag_coeff)
+        gx, gy = planet.gravity(self.pos)
+        drag_x, drag_y = planet.atmosphere(self.pos, self.vel, self.config.drag_coeff)
 
         thrust_x = thrust_y = 0.0
 
@@ -82,24 +84,26 @@ class Missile:
 
         elif self.state == MissileState.BALLISTIC and self.config.terminal_guidance:
 
-            dx = self.config.target.x - self.x
-            dy = self.config.target.y - self.y
+            dx = self.config.target.x - self.pos.x
+            dy = self.config.target.y - self.pos.y
             dist = math.hypot(dx, dy)
             if dist > 1e-3:
                 nx_t = dx / dist
                 ny_t = dy / dist
-                correction_factor = 0.02  # réglable
-                thrust_x += nx_t * self.config.thrust * correction_factor
-                thrust_y += ny_t * self.config.thrust * correction_factor
+
+                thrust_x += nx_t * self.config.thrust * self.config.correction_factor
+                thrust_y += ny_t * self.config.thrust * self.config.correction_factor
+
+        else:
+            raise ValueError(f"Missile state not recognised: {self.state}")
 
         ax = gx + drag_x + thrust_x
         ay = gy + drag_y + thrust_y
 
-        self.vx += ax * dt
-        self.vy += ay * dt
-        self.x += self.vx * dt
-        self.y += self.vy * dt
+        self.vel.vx += ax * dt
+        self.vel.vy += ay * dt
+        self.pos.x += self.vel.vx * dt
+        self.pos.y += self.vel.vy * dt
 
-        # Sauvegarde
         self.history.append(self.pos.to_tuple())
         self.time += dt
