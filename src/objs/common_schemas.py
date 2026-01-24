@@ -8,7 +8,8 @@ class Position:
     y: float
 
     def distance_to_core(self) -> float:
-        return math.hypot(self.x, self.y)
+        dist = math.hypot(self.x, self.y)
+        return 1e-10 if dist == 0 else dist
 
     def altitude(self, radius: float) -> float:
         r = self.distance_to_core()
