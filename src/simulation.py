@@ -3,46 +3,22 @@ import matplotlib.pyplot as plt
 
 from objs.missiles import Missile
 from objs.targets import Target
+from objs.planets import Planet
 
 
 class Simulation:
-    def __init__(self, planet_radius=100.0, mu=2.0e5, atmosphere_height=80.0, dt=0.005, max_steps=80000):
-        self.R = planet_radius
-        self.mu = mu
-        self.atmosphere_height = atmosphere_height
+    def __init__(self, dt=0.005, max_steps=80000):
+
         self.dt = dt
         self.max_steps = max_steps
 
         self.missiles = []
+        self.planet: Planet | None = None
         self.target = None
 
-    # =========================
-    # Gravité et atmosphère
-    # =========================
-    def gravity(self, x, y):
-        r = math.hypot(x, y)
-        gx = -self.mu * x / (r**3)
-        gy = -self.mu * y / (r**3)
-        return gx, gy
-
-    def atmosphere(self, x, y, vx, vy, drag_coeff):
-        r = math.hypot(x, y)
-        altitude = max(0.0, r - self.R)
-        rho = math.exp(-altitude / self.atmosphere_height)
-        v = math.hypot(vx, vy)
-        drag_x = -drag_coeff * rho * v * vx
-        drag_y = -drag_coeff * rho * v * vy
-        return drag_x, drag_y
-
-    # =========================
-    # Définir la cible
-    # =========================
     def set_target(self, surface_angle_deg):
-        self.target = Target(surface_angle_deg, self.R)
+        self.target = Target(surface_angle_deg, self.planet.radius)
 
-    # =========================
-    # Ajouter un missile
-    # =========================
     def add_missile(
         self,
         surface_angle_deg,
@@ -76,9 +52,6 @@ class Simulation:
 
         self.missiles.append(missile)
 
-    # =========================
-    # Boucle de simulation
-    # =========================
     def run(self):
         for _ in range(self.max_steps):
             any_alive = False

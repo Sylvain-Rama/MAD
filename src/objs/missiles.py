@@ -1,5 +1,6 @@
 import math
 from utils import shortest_angle
+from dataclasses import dataclass
 
 
 class Missile:
@@ -37,11 +38,14 @@ class Missile:
         self.xs = [self.x]
         self.ys = [self.y]
 
+    def distance_to_center(self):
+        return math.hypot(self.x, self.y)
+
     def step(self, dt, gravity_func, atmosphere_func, planet_radius):
         if not self.alive:
             return
 
-        r = math.hypot(self.x, self.y)
+        r = self.distance_to_center()
         nx, ny = self.x / r, self.y / r  # radial
         tx, ty = -ny, nx  # tangent
         altitude = r - planet_radius
@@ -87,9 +91,6 @@ class Missile:
                 thrust_x += nx_t * self.thrust * correction_factor
                 thrust_y += ny_t * self.thrust * correction_factor
 
-        # =========================
-        # Intégration
-        # =========================
         ax = gx + drag_x + thrust_x
         ay = gy + drag_y + thrust_y
 
