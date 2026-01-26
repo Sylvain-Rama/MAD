@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from common_schemas import Position, Velocity
+from objs.common_schemas import Position, Velocity
 
 
 class Planet:

@@ -1,8 +1,8 @@
 import math
 from utils import shortest_angle
-from common_schemas import Position, Velocity
-from targets import Target
-from planets import Planet
+from objs.common_schemas import Position, Velocity
+from objs.targets import Target
+from objs.planets import Planet
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -17,19 +17,22 @@ class MissileState(StrEnum):
 @dataclass
 class MissileConfig:
 
-    thrust: float
-    burn_time: float
-    drag_coeff: float
-    cruise_altitude: float
     target: Target
+    thrust: float = 20
+    burn_time: float = 1
+    drag_coeff: float = 0.008
+    cruise_altitude: float = 150
     cruise_thrust_ratio: float = 0.6
     cruise_duration: float = 2.0
     terminal_guidance: bool = True
     correction_factor: float = 0.02
+    name: str = "Mis-1"
 
 
 class Missile:
-    def __init__(self, config: MissileConfig, position: Position, velocity: Velocity):
+    def __init__(
+        self, config: MissileConfig, position: Position = Position(0.0, 0.0), velocity: Velocity = Velocity(0.0, 0.0)
+    ):
         self.config = config
         self.pos = position
         self.vel = velocity
@@ -37,12 +40,13 @@ class Missile:
         self.state: MissileState = MissileState.ASCENT
 
         self.history = [self.pos.to_tuple()]
+        self.time = 0.0
 
     def __repr__(self):
         if self.alive:
-            return f"Missile - {self.pos}, {self.vel}, {self.state} mode."
+            return f"Missile {self.config.name} - {self.pos}, {self.vel}, {self.state} mode."
         else:
-            return f"Crashed missile - {self.pos}."
+            return f"Crashed missile {self.config.name} - {self.pos}."
 
     def get_direction(self, target: Target) -> float:
         missile_angle = math.atan2(self.pos.y, self.pos.x)

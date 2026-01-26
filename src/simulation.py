@@ -13,80 +13,52 @@ class Simulation:
         self.max_steps = max_steps
 
         self.missiles = []
+        self.targets = []
         self.planet: Planet | None = None
-        self.target = None
 
-    def set_target(self, surface_angle_deg):
-        self.target = Target(surface_angle_deg, self.planet.radius)
+    def add_target(self, angle: float = 120):
+        if not self.planet:
+            raise ValueError("Please add a planet first.")
+        self.targets.append(Target(surface_angle_deg=angle, planet_radius=self.planet.radius))
 
-    def add_missile(
-        self,
-        surface_angle_deg,
-        thrust,
-        burn_time,
-        drag_coeff,
-        target_altitude,
-        cruise_thrust_ratio=0.6,
-        cruise_duration=2.0,
-        name="Missile",
-    ):
-        if self.target is None:
-            raise ValueError("Définir une cible avant d'ajouter un missile.")
+    def add_planet(self, planet: Planet):
+        self.planet = planet
 
-        a = math.radians(surface_angle_deg)
-        x = self.R * math.cos(a)
-        y = self.R * math.sin(a)
-
-        missile = Missile(
-            position=(x, y),
-            thrust=thrust,
-            burn_time=burn_time,
-            drag_coeff=drag_coeff,
-            target_altitude=target_altitude,
-            target=self.target,
-            cruise_thrust_ratio=cruise_thrust_ratio,
-            cruise_duration=cruise_duration,
-            terminal_guidance=True,
-            name=name,
-        )
-
+    def add_missile(self, missile: Missile):
         self.missiles.append(missile)
 
     def run(self):
         for _ in range(self.max_steps):
-            any_alive = False
             for missile in self.missiles:
                 if not missile.alive:
                     continue
-                missile.step(self.dt, self.gravity, self.atmosphere, self.R)
-                if math.hypot(missile.x, missile.y) <= self.R:
-                    missile.alive = False
-                else:
-                    any_alive = True
-            if not any_alive:
-                break
+                missile.step(self.dt, self.planet)
 
-    # =========================
-    # Affichage
-    # =========================
     def plot(self):
         fig, ax = plt.subplots(figsize=(6, 6))
         # Planète
-        planet = plt.Circle((0, 0), self.R, fill=False)
+        planet = plt.Circle((0, 0), self.planet.radius, fill=False)
         ax.add_artist(planet)
 
-        # Cible
-        if self.target is not None:
-            ax.scatter(self.target.x, self.target.y, marker="X", s=100, c="red", label="Cible")
+        for target in self.targets:
+            ax.scatter(target.x, target.y, marker="X", s=100, c="red", label="Cible")
 
-        # Missiles
+        max_x = min_x = max_y = min_y = 0
         for missile in self.missiles:
-            ax.plot(missile.xs, missile.ys, label=missile.name)
-            ax.scatter(missile.xs[0], missile.ys[0])
+            xs = [item[0] for item in missile.history]
+            ys = [item[1] for item in missile.history]
+            ax.plot(xs, ys, label=missile.config.name)
+            max_x = max(max_x, max(xs))
+            min_x = min(min_x, min(xs))
+
+            max_y = max(max_y, max(ys))
+            min_y = min(min_y, min(ys))
+
+            ax.scatter(xs[0], ys[0])
 
         ax.set_aspect("equal")
-        ax.set_xlim(-260, 260)
-        ax.set_ylim(-260, 260)
+        ax.set_xlim(min_x, max_x)
+        ax.set_ylim(min_y, max_y)
         ax.set_title("Simulation missiles balistiques avec guidage vers la cible")
         ax.grid(True)
         ax.legend()
