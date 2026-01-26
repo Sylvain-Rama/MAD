@@ -7,6 +7,13 @@ class Position:
     x: float
     y: float
 
+    @classmethod
+    def from_angle_radius(cls, angle, radius):
+        x = radius * math.cos(angle)
+        y = radius * math.sin(angle)
+
+        return cls(x, y)
+
     def distance_to_core(self) -> float:
         dist = math.hypot(self.x, self.y)
         return 1e-10 if dist == 0 else dist

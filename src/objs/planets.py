@@ -61,7 +61,7 @@ class Planet:
 
 
 if __name__ == "__main__":
-    planet = Planet(radius=20, mu=200, atmosphere_height=5)
+    planet = Planet(radius=100, mu=2.0e5, atmosphere_height=80)
 
     fig = planet.show_characteristics()
 

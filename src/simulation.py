@@ -7,7 +7,7 @@ from objs.planets import Planet
 
 
 class Simulation:
-    def __init__(self, dt=0.005, max_steps=80000):
+    def __init__(self, dt=0.005, max_steps=8000):
 
         self.dt = dt
         self.max_steps = max_steps
@@ -29,37 +29,38 @@ class Simulation:
 
     def run(self):
         for _ in range(self.max_steps):
-            for missile in self.missiles:
+            for missile in [missile for missile in self.missiles if missile.alive]:
                 if not missile.alive:
                     continue
                 missile.step(self.dt, self.planet)
 
     def plot(self):
         fig, ax = plt.subplots(figsize=(6, 6))
-        # Planète
+
         planet = plt.Circle((0, 0), self.planet.radius, fill=False)
         ax.add_artist(planet)
 
         for target in self.targets:
-            ax.scatter(target.x, target.y, marker="X", s=100, c="red", label="Cible")
+            ax.scatter(target.x, target.y, marker="X", s=100, c="red", label="Target")
 
         max_x = min_x = max_y = min_y = 0
         for missile in self.missiles:
             xs = [item[0] for item in missile.history]
             ys = [item[1] for item in missile.history]
             ax.plot(xs, ys, label=missile.config.name)
-            max_x = max(max_x, max(xs))
-            min_x = min(min_x, min(xs))
+            max_x = max(max_x, max(xs), self.planet.radius)
+            min_x = min(min_x, min(xs), -self.planet.radius)
 
-            max_y = max(max_y, max(ys))
-            min_y = min(min_y, min(ys))
+            max_y = max(max_y, max(ys), self.planet.radius)
+            min_y = min(min_y, min(ys), -self.planet.radius)
 
             ax.scatter(xs[0], ys[0])
 
         ax.set_aspect("equal")
-        ax.set_xlim(min_x, max_x)
-        ax.set_ylim(min_y, max_y)
-        ax.set_title("Simulation missiles balistiques avec guidage vers la cible")
+        padding = 20
+        ax.set_xlim(min_x - padding, max_x + padding)
+        ax.set_ylim(min_y - padding, max_y + padding)
+
         ax.grid(True)
         ax.legend()
         plt.show()

@@ -18,21 +18,19 @@ class MissileState(StrEnum):
 class MissileConfig:
 
     target: Target
-    thrust: float = 20
+    thrust: float = 100
     burn_time: float = 1
-    drag_coeff: float = 0.008
-    cruise_altitude: float = 150
-    cruise_thrust_ratio: float = 0.6
-    cruise_duration: float = 2.0
+    drag_coeff: float = 0.03
+    cruise_altitude: float = 40
+    cruise_thrust_ratio: float = 0.5
+    cruise_duration: float = 1.0
     terminal_guidance: bool = True
     correction_factor: float = 0.02
     name: str = "Mis-1"
 
 
 class Missile:
-    def __init__(
-        self, config: MissileConfig, position: Position = Position(0.0, 0.0), velocity: Velocity = Velocity(0.0, 0.0)
-    ):
+    def __init__(self, config: MissileConfig, position: Position, velocity: Velocity):
         self.config = config
         self.pos = position
         self.vel = velocity
@@ -63,6 +61,10 @@ class Missile:
         tx, ty = -ny, nx  # tangent
         altitude = r - planet.radius
 
+        if altitude < 0:
+            self.alive = False
+            return
+
         gx, gy = planet.gravity(self.pos)
         drag_x, drag_y = planet.atmosphere(self.pos, self.vel, self.config.drag_coeff)
 
@@ -71,8 +73,8 @@ class Missile:
         direction = self.get_direction(self.config.target)
 
         if self.state == MissileState.ASCENT:
-            thrust_x = nx * self.config.thrust
-            thrust_y = ny * self.config.thrust
+            thrust_x = nx * self.config.thrust * direction
+            thrust_y = ny * self.config.thrust * direction
             if altitude >= self.config.cruise_altitude or self.time >= self.config.burn_time:
                 self.state = MissileState.CRUISE
                 self.cruise_time = 0.0
