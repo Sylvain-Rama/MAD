@@ -61,7 +61,8 @@ class Missile:
         tx, ty = -ny, nx  # tangent
         altitude = r - planet.radius
 
-        if altitude < 0:
+        if altitude < -1:
+            print("crashed")
             self.alive = False
             return
 
@@ -73,16 +74,56 @@ class Missile:
         direction = self.get_direction(self.config.target)
 
         if self.state == MissileState.ASCENT:
-            thrust_x = nx * self.config.thrust * direction
-            thrust_y = ny * self.config.thrust * direction
+            thrust_x = nx * self.config.thrust
+            thrust_y = ny * self.config.thrust
             if altitude >= self.config.cruise_altitude or self.time >= self.config.burn_time:
                 self.state = MissileState.CRUISE
+                print("Cruise mode!")
                 self.cruise_time = 0.0
 
         elif self.state == MissileState.CRUISE:
 
-            thrust_x = tx * self.config.thrust * self.config.cruise_thrust_ratio * direction
-            thrust_y = ty * self.config.thrust * self.config.cruise_thrust_ratio * direction
+            kp = 2.0
+            kd = 1.2
+
+            vr = self.vel.vx * nx + self.vel.vy * ny
+            altitude_error = altitude - self.config.cruise_altitude
+
+            radial_correction = -kp * altitude_error - kd * vr
+            max_radial = self.config.thrust * 0.6
+            radial_correction = max(-max_radial, min(max_radial, radial_correction))
+
+            tangential_thrust = self.config.thrust * self.config.cruise_thrust_ratio * direction
+
+            thrust_x = nx * radial_correction + tx * tangential_thrust
+            thrust_y = ny * radial_correction + ty * tangential_thrust
+
+            # --- Transition balistique PHYSIQUE ---
+            vt = self.vel.vx * tx + self.vel.vy * ty
+
+            dx = self.config.target.x - self.pos.x
+            dy = self.config.target.y - self.pos.y
+            dist = math.hypot(dx, dy)
+
+            missile_angle = math.atan2(self.pos.y, self.pos.x)
+            target_angle = math.atan2(self.config.target.y, self.config.target.x)
+
+            surface_angle = abs(shortest_angle(missile_angle, target_angle))
+            surface_distance = surface_angle * planet.radius
+
+            angle_error = abs(shortest_angle(missile_angle, target_angle))
+
+            if surface_distance < 25:
+                print("Balistic mode")
+                self.state = MissileState.BALLISTIC
+
+            if angle_error < math.radians(30):
+                if self.prev_angle_error is not None:
+                    if angle_error > self.prev_angle_error:
+                        print("Balistic mode")
+                        self.state = MissileState.BALLISTIC
+
+            self.prev_angle_error = angle_error
 
             self.cruise_time += dt
             if self.cruise_time >= self.config.cruise_duration or self.time >= self.config.burn_time:
