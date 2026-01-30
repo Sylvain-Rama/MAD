@@ -1,5 +1,31 @@
 from dataclasses import dataclass
 import math
+import numpy as np
+from numpy.typing import NDArray
+
+
+@dataclass
+class MovableObject:
+    position: NDArray[np.floating]
+    velocity: NDArray[np.floating]
+
+    active: bool = True
+
+    @property
+    def magnitude(self) -> np.floating:
+        return np.sqrt(np.sum(np.square(self.position)))
+
+    @property
+    def norm(self) -> NDArray[np.floating]:
+        return self.position / self.magnitude
+
+    @classmethod
+    def from_list(cls, pos: list[float], vel: list[float]) -> "MovableObject":
+        return cls(np.array(pos), np.array(vel))
+
+    def __repr__(self):
+        a = "active" if self.active else "inactive"
+        return f"Movable at {self.position}, velocity {self.velocity}, {a}."
 
 
 @dataclass
@@ -36,3 +62,10 @@ class Velocity:
 
     def __repr__(self) -> str:
         return f"Velocity {self.vx:4.2f}, {self.vy:4.2f}"
+
+
+if __name__ == "__main__":
+    obj = MovableObject(position=np.array([3, 3, 0]), velocity=np.array([0, 0, 0]))
+
+    print(obj.magnitude)
+    print(obj.norm)
