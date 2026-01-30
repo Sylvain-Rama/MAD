@@ -1,15 +1,15 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import numpy as np
 from numpy.typing import NDArray
 
 
-@dataclass
 class MovableObject:
-    position: NDArray[np.floating]
-    velocity: NDArray[np.floating]
+    def __init__(self, position: list[float], velocity: list[float] = [0.0, 0.0, 0.0]):
 
-    active: bool = True
+        self.position = np.asarray(position)
+        self.velocity = np.asarray(velocity)
+        self.active: bool = True
 
     @property
     def magnitude(self) -> np.floating:
@@ -18,10 +18,6 @@ class MovableObject:
     @property
     def norm(self) -> NDArray[np.floating]:
         return self.position / self.magnitude
-
-    @classmethod
-    def from_list(cls, pos: list[float], vel: list[float]) -> "MovableObject":
-        return cls(np.array(pos), np.array(vel))
 
     def __repr__(self):
         a = "active" if self.active else "inactive"
