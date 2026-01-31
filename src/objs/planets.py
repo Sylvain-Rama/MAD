@@ -1,8 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from objs.common_schemas import MovableObject
-from numpy.typing import NDArray
-from objs.constants import G, EARTH_SETTINGS
+from objs.constants import G
 from dataclasses import dataclass, asdict
 
 
@@ -27,6 +25,16 @@ class Planet(MovableObject):
         self.spin_rate = config.spin_rate
         self.name = config.name
 
+    @property
+    def escape_velocity(self):
+        return np.sqrt(2 * G * self.mass / self.radius)
+
+    @property
+    def gravity_at_surface(self):
+        surf_obj = MovableObject(position=[self.radius, 0, 0])
+
+        return self.gravity(surf_obj)
+
     def atmosphere(self, obj: MovableObject, drag_coeff: float) -> float:
         altitude = obj.magnitude - self.radius
         # rho = math.exp(-altitude / self.atmosphere_height)
@@ -37,11 +45,3 @@ class Planet(MovableObject):
 
     def __repr__(self):
         return f"Planet {self.name} at {self.position}, mass {self.mass}, radius {self.radius}."
-
-
-if __name__ == "__main__":
-    earth = Planet(PlanetConfig(**EARTH_SETTINGS))
-    obj = MovableObject(position=[earth.radius, 0, 0])
-
-    print(earth)
-    print(f"Gravity at surface: {earth.gravity(obj):4.2f}")
