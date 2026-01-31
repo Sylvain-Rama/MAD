@@ -25,14 +25,14 @@ class MovableObject:
         return self.position / self.magnitude
 
     def distance(self, other: "MovableObject"):
-        # if not isinstance(other, type(self)):
-        #     raise ValueError(f"Distance can only be calculated between two MovableObject, got {type(other)}")
+        if not isinstance(other, type(self)):
+            raise ValueError(f"Distance can only be calculated between two MovableObject, got {type(other)}")
 
         return np.sqrt(np.sum(np.square(self.position - other.position)))
 
     def gravity(self, other: "MovableObject") -> float:
-        # if not isinstance(other, type(self)):
-        #     raise ValueError(f"Gravity can only be calculated between two MovableObject, got {type(other)}")
+        if not isinstance(other, type(self)):
+            raise ValueError(f"Gravity can only be calculated between two MovableObject, got {type(other)}")
 
         dist = self.distance(other)
         grav = G * self.mass * other.mass / dist**2
@@ -41,14 +41,3 @@ class MovableObject:
     def __repr__(self):
         a = "active" if self.active else "inactive"
         return f"Movable at {self.position}, velocity {self.velocity}, {a}."
-
-
-if __name__ == "__main__":
-    obj1 = MovableObject(position=[1, 1])
-    obj2 = MovableObject(position=[1, 1])
-
-    print(obj1)
-    print(obj1.magnitude)
-    print(obj1.norm)
-
-    print(obj1.distance(obj2))
