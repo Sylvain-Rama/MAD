@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from constants import G
+from objs.constants import G
 
 
 class MovableObject:
@@ -44,8 +44,8 @@ class MovableObject:
 
 
 if __name__ == "__main__":
-    obj1 = MovableObject(position=[1, 1, 0])
-    obj2 = MovableObject(position=[1, 1, 1])
+    obj1 = MovableObject(position=[1, 1])
+    obj2 = MovableObject(position=[1, 1])
 
     print(obj1)
     print(obj1.magnitude)

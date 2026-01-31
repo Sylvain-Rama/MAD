@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from common_schemas import MovableObject
+from objs.common_schemas import MovableObject
 from numpy.typing import NDArray
-from constants import G, EARTH_SETTINGS
+from objs.constants import G, EARTH_SETTINGS
 from dataclasses import dataclass, asdict
 
 
