@@ -1,6 +1,6 @@
 import numpy as np
 from objs.common_schemas import MovableObject
-from objs.constants import G
+from constants import G
 from dataclasses import dataclass, asdict
 
 
@@ -20,10 +20,9 @@ class PlanetConfig:
 
 class Planet(MovableObject):
     def __init__(self, config: PlanetConfig):
-        super().__init__(config.position, config.velocity, config.mass)
+        super().__init__(config.position, config.velocity, config.mass, config.name)
         self.radius = config.radius
         self.spin_rate = config.spin_rate
-        self.name = config.name
 
     @property
     def escape_velocity(self):

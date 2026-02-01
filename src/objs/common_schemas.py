@@ -1,10 +1,12 @@
 import numpy as np
 from numpy.typing import NDArray
-from objs.constants import G
+from constants import G
 
 
 class MovableObject:
-    def __init__(self, position: list[float], velocity: list[float] | None = None, mass: float = 1.0):
+    def __init__(
+        self, position: list[float], velocity: list[float] | None = None, mass: float = 1.0, name: str = "MovableObject"
+    ):
 
         self.position = np.asarray(position)  # m
         if velocity:
@@ -13,6 +15,7 @@ class MovableObject:
             self.velocity = np.zeros_like(self.position)
         self.mass = mass  # kg
         self.active: bool = True
+        self.name = name
 
     @property
     def magnitude(self) -> np.floating:
@@ -25,14 +28,14 @@ class MovableObject:
         return self.position / self.magnitude
 
     def distance(self, other: "MovableObject"):
-        if not isinstance(other, type(self)):
-            raise ValueError(f"Distance can only be calculated between two MovableObject, got {type(other)}")
+        # if not isinstance(other, type(self)):
+        #     raise ValueError(f"Distance can only be calculated between two MovableObject, got {type(other)}")
 
         return np.sqrt(np.sum(np.square(self.position - other.position)))
 
     def gravity(self, other: "MovableObject") -> float:
-        if not isinstance(other, type(self)):
-            raise ValueError(f"Gravity can only be calculated between two MovableObject, got {type(other)}")
+        # if not isinstance(other, type(self)):
+        #     raise ValueError(f"Gravity can only be calculated between two MovableObject, got {type(other)}")
 
         dist = self.distance(other)
         grav = G * self.mass * other.mass / dist**2
@@ -40,4 +43,4 @@ class MovableObject:
 
     def __repr__(self):
         a = "active" if self.active else "inactive"
-        return f"Movable at {self.position}, velocity {self.velocity}, {a}."
+        return f"{self.name} at {self.position}, velocity {self.velocity}, {a}."
