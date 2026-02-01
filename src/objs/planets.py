@@ -30,7 +30,9 @@ class Planet(MovableObject):
 
     @property
     def gravity_at_surface(self):
-        surf_obj = MovableObject(position=[self.radius, 0, 0])
+        surface_pos = np.zeros_like(self.position)
+        surface_pos[0] = self.radius
+        surf_obj = MovableObject(position=list(surface_pos))
 
         return self.gravity(surf_obj)
 
