@@ -33,13 +33,18 @@ class MovableObject:
 
         return np.sqrt(np.sum(np.square(self.position - other.position)))
 
-    def gravity(self, other: "MovableObject") -> float:
+    def gravity_v(self, other: "MovableObject") -> float:
         # if not isinstance(other, type(self)):
         #     raise ValueError(f"Gravity can only be calculated between two MovableObject, got {type(other)}")
 
         dist = self.distance(other)
         grav = G * self.mass * other.mass / dist**2
         return grav
+
+    def gravity_acc(self, other: "MovableObject") -> NDArray:
+        r_vec = self.position - other.position
+        dist = np.linalg.norm(r_vec)
+        return -G * other.mass * r_vec / dist**3
 
     def __repr__(self):
         a = "active" if self.active else "inactive"
