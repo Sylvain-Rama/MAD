@@ -1,14 +1,16 @@
 
 services:
-  dev:
+  app:
     build:
       context: .
+    container_name: mad-app
     volumes:
-      - .:/app
+      - .:/app                   # project source
+      - uv_venv:/root/.uv        # container-only uv venv
     stdin_open: true
     tty: true
 
-  prod:
-    build:
-      context: .
-      target: prod
+volumes:
+  uv_venv:
+
+
