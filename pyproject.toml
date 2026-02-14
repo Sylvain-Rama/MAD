@@ -9,11 +9,11 @@ dependencies = [
     "matplotlib",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "black",
     "ruff",
-    "mypy",
+    "pyrefly",
     "pytest",
 ]
 

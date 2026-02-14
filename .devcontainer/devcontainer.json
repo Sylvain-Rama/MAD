@@ -1,0 +1,24 @@
+{
+  "name": "MAD Dev",
+
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "app",
+
+  "workspaceFolder": "/app",
+
+  "shutdownAction": "stopCompose",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/app/.venv/bin/python",
+        "python.terminal.activateEnvironment": false
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff"
+      ]
+    }
+  }
+}
