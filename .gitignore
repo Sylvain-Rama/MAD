@@ -207,4 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 src/tests/
-src/notebooks/*.*
+notebooks/
+
+.mypy_cache
+.ruff_cache
+.pytest_cache

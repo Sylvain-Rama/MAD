@@ -1,0 +1,32 @@
+[project]
+name = "MAD"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+]
+
+[dependency-groups]
+dev = [
+    "black",
+    "ruff",
+    "pyrefly",
+    "pytest",
+]
+
+[tool.uv]
+package = true
+
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
