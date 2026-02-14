@@ -1,24 +1,30 @@
 [project]
-name = "yourpkg"
+name = "MAD"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+]
 
 [project.optional-dependencies]
 dev = [
     "black",
     "ruff",
     "mypy",
+    "pytest",
 ]
 
 [tool.uv]
 package = true
 
 [tool.black]
-line-length = 100
+line-length = 120
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 
 [tool.mypy]
 python_version = "3.12"

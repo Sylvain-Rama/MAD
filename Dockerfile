@@ -53,4 +53,4 @@ RUN uv sync --frozen --no-dev
 
 COPY src ./src
 
-CMD ["uv", "run", "python", "-m", "yourpkg"]
+CMD ["uv", "run", "python", "-m", "MAD"]
