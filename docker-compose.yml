@@ -6,6 +6,8 @@ services:
       - .:/app
       - uv_venv:/app/.venv   # <- container-only storage
     command: sleep infinity
+    ports:
+    - "8888:8888"
 
 volumes:
   uv_venv:

@@ -9,12 +9,17 @@ dependencies = [
     "matplotlib",
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [dependency-groups]
 dev = [
     "black",
     "ruff",
     "pyrefly",
     "pytest",
+    "jupyterlab",
+    "ipykernel"
 ]
 
 [tool.uv]
