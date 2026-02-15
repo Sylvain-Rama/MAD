@@ -8,6 +8,11 @@
 
   "shutdownAction": "stopCompose",
 
+  "overrideCommand": false,
+  "forwardPorts": [8888],
+
+  "postStartCommand": "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token='' --ServerApp.password='' --ServerApp.disable_check_xsrf=True &",
+
   "customizations": {
     "vscode": {
       "settings": {
@@ -17,8 +22,15 @@
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "ms-toolsai.jupyter"
       ]
     }
   }
 }
+
+
+
+  
+
+  
