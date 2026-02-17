@@ -1,8 +1,8 @@
 import math
-from utils import shortest_angle
-from objs.common_schemas import Position, Velocity
-from objs.targets import Target
-from objs.planets import Planet
+from mad.utils import shortest_angle
+from mad.objs.common_schemas import Position, Velocity
+from mad.objs.targets import Target
+from mad.objs.planets import Planet
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -99,7 +99,7 @@ class Missile:
             thrust_y = ny * radial_correction + ty * tangential_thrust
 
             # --- Transition balistique PHYSIQUE ---
-            vt = self.vel.vx * tx + self.vel.vy * ty
+            _ = self.vel.vx * tx + self.vel.vy * ty
 
             dx = self.config.target.x - self.pos.x
             dy = self.config.target.y - self.pos.y

@@ -1,6 +1,8 @@
 import numpy as np
-from objs.common_schemas import MovableObject
-from constants import G
+from numpy.typing import NDArray
+import math
+from mad.objs.common_schemas import MovableObject
+from mad.objs.constants import G
 from dataclasses import dataclass, asdict
 
 
@@ -12,6 +14,7 @@ class PlanetConfig:
     spin_rate: float
     velocity: list[float] | None = None
     name: str = "Planet"
+    atmosphere_height: float = 800.0
 
     @property
     def to_dict(self):
@@ -23,6 +26,7 @@ class Planet(MovableObject):
         super().__init__(config.position, config.velocity, config.mass, config.name)
         self.radius = config.radius
         self.spin_rate = config.spin_rate
+        self.atmosphere_height = config.atmosphere_height
 
     @property
     def escape_velocity(self):
@@ -34,15 +38,15 @@ class Planet(MovableObject):
         surface_pos[0] = self.radius
         surf_obj = MovableObject(position=list(surface_pos))
 
-        return self.gravity(surf_obj)
+        return self.gravity_v(surf_obj)
 
-    def atmosphere(self, obj: MovableObject, drag_coeff: float) -> float:
+    def atmosphere(self, obj: MovableObject, drag_coeff: float) -> NDArray:
         altitude = obj.magnitude - self.radius
-        # rho = math.exp(-altitude / self.atmosphere_height)
-        # v = math.hypot(vel.vx, vel.vy)
-        # drag_x = -drag_coeff * rho * v * vel.vx
-        # drag_y = -drag_coeff * rho * v * vel.vy
-        return 0.0  # drag_x, drag_y
+        rho = math.exp(-altitude / self.atmosphere_height)
+        v = math.hypot(obj.velocity)
+        drag = -drag_coeff * rho * v * obj.velocity
+
+        return drag
 
     def __repr__(self):
         return f"Planet {self.name} at {self.position}, mass {self.mass}, radius {self.radius}."

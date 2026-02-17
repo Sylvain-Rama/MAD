@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from constants import G
+from mad.objs.constants import G
 
 
 class MovableObject:
@@ -19,7 +19,7 @@ class MovableObject:
 
     @property
     def magnitude(self) -> np.floating:
-        return np.sqrt(np.sum(np.square(self.position)))
+        return np.linalg.norm(self.position)
 
     @property
     def norm(self) -> NDArray[np.floating]:
