@@ -27,16 +27,21 @@ class MovableObject:
             return np.zeros_like(self.position)
         return self.position / self.magnitude
 
-    def distance(self, other: "MovableObject"):
-        # if not isinstance(other, type(self)):
-        #     raise ValueError(f"Distance can only be calculated between two MovableObject, got {type(other)}")
+    @property
+    def state_vector(self):
+        return np.concatenate([self.position, self.velocity])
 
-        return np.sqrt(np.sum(np.square(self.position - other.position)))
+    @classmethod
+    def from_state_vector(cls, vector: NDArray, mass: float, name: str) -> "MovableObject":
+        i_split = len(vector) // 2
+        pos, vel = vector[:i_split].tolist(), vector[i_split:].tolist()
 
-    def gravity_v(self, other: "MovableObject") -> float:
-        # if not isinstance(other, type(self)):
-        #     raise ValueError(f"Gravity can only be calculated between two MovableObject, got {type(other)}")
+        return cls(pos, vel, mass, name)
 
+    def distance(self, other: "MovableObject") -> np.floating:
+        return np.linalg.norm(self.position - other.position)
+
+    def gravity_v(self, other: "MovableObject") -> np.floating:
         dist = self.distance(other)
         grav = G * self.mass * other.mass / dist**2
         return grav
