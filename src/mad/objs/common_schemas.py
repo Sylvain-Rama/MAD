@@ -33,7 +33,7 @@ class MovableObject:
 
     @classmethod
     def from_state_vector(cls, vector: NDArray, mass: float, name: str) -> "MovableObject":
-        i_split = len(vector) // 2
+        i_split = vector.shape[0] // 2
         pos, vel = vector[:i_split].tolist(), vector[i_split:].tolist()
 
         return cls(pos, vel, mass, name)
