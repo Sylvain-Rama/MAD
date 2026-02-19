@@ -14,7 +14,8 @@ class PlanetConfig:
     spin_rate: float
     velocity: list[float] | None = None
     name: str = "Planet"
-    atmosphere_height: float = 800.0
+    atmosphere_height: float = 8000.0
+    rho0: float = 1.225
 
     @property
     def to_dict(self):
@@ -27,6 +28,7 @@ class Planet(MovableObject):
         self.radius = config.radius
         self.spin_rate = config.spin_rate
         self.atmosphere_height = config.atmosphere_height
+        self.rho0 = config.rho0
 
     @property
     def escape_velocity(self):
@@ -40,13 +42,13 @@ class Planet(MovableObject):
 
         return self.gravity_v(surf_obj)
 
-    def atmosphere(self, obj: MovableObject, drag_coeff: float) -> NDArray:
-        altitude = obj.magnitude - self.radius
-        rho = math.exp(-altitude / self.atmosphere_height)
-        v = math.hypot(obj.velocity)
-        drag = -drag_coeff * rho * v * obj.velocity
+    def atmosphere_rho(self, obj: MovableObject) -> float:
+        rho = 0.0
+        alt = self.distance(obj) - self.radius
+        if alt > 0:
+            rho = self.rho0 * np.exp(-alt / self.atmosphere_height)
 
-        return drag
+        return rho
 
     def __repr__(self):
         return f"Planet {self.name} at {self.position}, mass {self.mass}, radius {self.radius}."
