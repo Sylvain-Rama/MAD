@@ -1,6 +1,12 @@
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.constants import G
+from dataclasses import dataclass, field
+
+
+@dataclass
+class History:
+    position: list = field(default_factory=list)
+    velocity: list = field(default_factory=list)
 
 
 class MovableObject:
@@ -40,17 +46,6 @@ class MovableObject:
 
     def distance(self, other: "MovableObject") -> np.floating:
         return np.linalg.norm(self.position - other.position)
-
-    def gravity_v(self, other: "MovableObject") -> np.floating:
-        dist = self.distance(other)
-        grav = G * self.mass * other.mass / dist**2
-        return grav
-
-    def gravity_acc(self, other: "MovableObject") -> NDArray:
-        r_vec = self.position - other.position
-        dist = np.linalg.norm(r_vec)
-
-        return -G * self.mass * r_vec / dist**3
 
     def __repr__(self):
         a = "active" if self.active else "inactive"

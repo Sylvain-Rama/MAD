@@ -7,5 +7,5 @@ EARTH_SETTINGS = {
     "spin_rate": 7.0882359e-5,  # rad / s
     "name": "Earth",
     "rho0": 1.225,  # kg / m^3
-    "altitude_height": 8500.0,  # m
+    "atmosphere_height": 8500.0,  # m
 }

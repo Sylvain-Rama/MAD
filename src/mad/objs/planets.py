@@ -1,6 +1,5 @@
 import numpy as np
 from numpy.typing import NDArray
-import math
 from mad.objs.common_schemas import MovableObject
 from mad.objs.constants import G
 from dataclasses import dataclass, asdict
@@ -14,8 +13,8 @@ class PlanetConfig:
     spin_rate: float
     velocity: list[float] | None = None
     name: str = "Planet"
-    atmosphere_height: float = 8000.0
     rho0: float = 1.225
+    atmosphere_height: float = 8000.0
 
     @property
     def to_dict(self):
@@ -29,6 +28,7 @@ class Planet(MovableObject):
         self.spin_rate = config.spin_rate
         self.atmosphere_height = config.atmosphere_height
         self.rho0 = config.rho0
+        self.mu = self.mass * G
 
     @property
     def escape_velocity(self):
@@ -40,15 +40,24 @@ class Planet(MovableObject):
         surface_pos[0] = self.radius
         surf_obj = MovableObject(position=list(surface_pos))
 
-        return self.gravity_v(surf_obj)
+        return self.gravity(surf_obj)[0]
 
     def atmosphere_rho(self, obj: MovableObject) -> float:
         rho = 0.0
-        alt = self.distance(obj) - self.radius
+        alt = max(np.float(0.0), self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
+
         if alt > 0:
             rho = self.rho0 * np.exp(-alt / self.atmosphere_height)
 
         return rho
+
+    def gravity(self, other: "MovableObject") -> NDArray:
+        r_vec = other.position - self.position
+        dist = np.linalg.norm(r_vec)
+        if dist < 1e-6:
+            return np.zeros_like(other.position)
+
+        return -self.mu * r_vec / dist**3
 
     def __repr__(self):
         return f"Planet {self.name} at {self.position}, mass {self.mass}, radius {self.radius}."
