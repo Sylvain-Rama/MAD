@@ -44,7 +44,7 @@ class Planet(MovableObject):
 
     def atmosphere_rho(self, obj: MovableObject) -> float:
         rho = 0.0
-        alt = max(np.float(0.0), self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
+        alt = max(0.0, self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
 
         if alt > 0:
             rho = self.rho0 * np.exp(-alt / self.atmosphere_height)

@@ -31,32 +31,38 @@ class Projectile(MovableObject):
         self.history = History(position=[config.position], velocity=[config.velocity])
 
     def accelerations(self, planet):
-        dist = self.distance(planet)
         total_acc = np.zeros_like(self.velocity)
 
-        if dist > planet.radius:
-            gravity_acc = planet.gravity(self)
-            total_acc += gravity_acc
+        gravity_acc = planet.gravity(self)
+        total_acc += gravity_acc
 
-            v_mag = np.linalg.norm(self.velocity)
+        v_mag = np.linalg.norm(self.velocity)
 
-            if v_mag > 0:
-                rho = planet.atmosphere_rho(self)
-                drag_acc = -0.5 * rho * self.Cd * self.area * v_mag * self.velocity / self.mass
-                total_acc += drag_acc
-
-        else:
-            print(f"{self.name} landed on the ground!")
-            self.active = False
+        if v_mag > 0:
+            rho = planet.atmosphere_rho(self)
+            drag_acc = -0.5 * rho * self.Cd * self.area * v_mag * self.velocity / self.mass
+            total_acc += drag_acc
 
         return total_acc
 
     def step(self, dt: float, planet: Planet):
 
-        acc = self.accelerations(planet)
+        if self.distance(planet) <= planet.radius:
+            print(f"{self.name} landed on the ground!")
+            self.active = False
 
-        self.velocity += acc * dt
-        self.position += self.velocity * dt
+        else:
+            acc = self.accelerations(planet)
 
-        self.history.position.append(self.position.tolist())
-        self.history.velocity.append(self.velocity.tolist())
+            self.velocity += acc * dt
+            self.position += self.velocity * dt
+
+            # Velocity Verlet for solver.
+            a0 = self.accelerations(planet)
+            self.position += self.velocity * dt + 0.5 * a0 * dt**2
+            a1 = self.accelerations(planet)
+
+            self.velocity += 0.5 * (a0 + a1) * dt
+
+            self.history.position.append(self.position.tolist())
+            self.history.velocity.append(self.velocity.tolist())
