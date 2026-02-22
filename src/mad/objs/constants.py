@@ -1,4 +1,5 @@
 G: float = 6.67408e-11  # m^3/(kg*s^2)
+G0: float = 9.80665  # m/s²
 
 EARTH_SETTINGS = {
     "position": [0, 0, 0],  # center of the sim

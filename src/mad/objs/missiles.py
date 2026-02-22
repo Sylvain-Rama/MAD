@@ -16,7 +16,6 @@ class MissileStage:
     ):
         self.dry_mass = dry_mass
         self.propellant_mass = propellant_mass
-        self.initial_propellant = propellant_mass
 
         self.thrust = thrust
         self.burn_time = burn_time
