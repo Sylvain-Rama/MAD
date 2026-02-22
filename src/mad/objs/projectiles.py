@@ -6,9 +6,9 @@ from mad.objs.common_schemas import MovableObject, History
 
 @dataclass
 class ProjectileConfig:
-    position: list[float]
-    mass: float
-    velocity: list[float] | None = None
+    position: list[float]  # m
+    mass: float  # kg
+    velocity: list[float] | None = None  # m / s
     name: str = "Projectile"
     area: float = 0.01  # m^2
     Cd: float = 0.47  # sphere
@@ -24,7 +24,8 @@ class ProjectileConfig:
 
 class Projectile(MovableObject):
     def __init__(self, config: ProjectileConfig):
-        super().__init__(config.position, config.velocity, config.mass, config.name)
+        super().__init__(config.position, config.velocity, config.name)
+        self.mass = config.mass
         self.area = config.area
         self.Cd = config.Cd
         self.config = config

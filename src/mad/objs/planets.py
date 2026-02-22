@@ -23,7 +23,8 @@ class PlanetConfig:
 
 class Planet(MovableObject):
     def __init__(self, config: PlanetConfig):
-        super().__init__(config.position, config.velocity, config.mass, config.name)
+        super().__init__(config.position, config.velocity, config.name)
+        self.mass = config.mass
         self.radius = config.radius
         self.spin_rate = config.spin_rate
         self.atmosphere_height = config.atmosphere_height
