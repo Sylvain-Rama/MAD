@@ -7,6 +7,7 @@ dependencies = [
     "numpy",
     "scipy",
     "matplotlib",
+    "loguru",
 ]
 
 [tool.setuptools.packages.find]
@@ -35,3 +36,8 @@ line-length = 120
 python_version = "3.12"
 strict = true
 mypy_path = "src"
+
+[tool.pyrefly]
+exclude = [
+    "**/*.ipynb",
+]

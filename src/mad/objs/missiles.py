@@ -1,5 +1,3 @@
-from mad.objs.projectiles import Projectile
-
 import numpy as np
 
 
@@ -28,23 +26,23 @@ class MissileStage:
         self.active = True
         self.time_burning = 0.0
 
-        @property
-        def mass(self):
-            payload_mass = self.payload.mass if self.payload else 0.0
-            return self.dry_mass + self.propellant_mass + payload_mass
+    @property
+    def mass(self):
+        payload_mass = self.payload.mass if self.payload else 0.0
+        return self.dry_mass + self.propellant_mass + payload_mass
 
-        def update(self, dt: float):
-            if not self.active:
-                return
+    def update(self, dt: float):
+        if not self.active:
+            return
 
-            if self.propellant_mass > 0:
-                dm = self.burn_rate * dt
-                self.propellant_mass = max(0.0, self.propellant_mass - dm)
-                self.time_burning += dt
-            else:
-                self.active = False
+        if self.propellant_mass > 0:
+            dm = self.burn_rate * dt
+            self.propellant_mass = max(0.0, self.propellant_mass - dm)
+            self.time_burning += dt
+        else:
+            self.active = False
 
-        def thrust_force(self, direction: np.ndarray) -> np.ndarray:
-            if self.propellant_mass > 0:
-                return self.thrust * direction
-            return np.zeros_like(direction)
+    def thrust_force(self, direction: np.ndarray) -> np.ndarray:
+        if self.propellant_mass > 0:
+            return self.thrust * direction
+        return np.zeros_like(direction)
