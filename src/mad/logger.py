@@ -1,12 +1,18 @@
 from loguru import logger
 import sys
 
-SOURCE_COLORS = {"Simulation": "<black>", "Missile": "<blue>", "Physics": "<green>"}
+SOURCE_COLORS = {
+    "Simulation": "<black>",
+    "Missile": "<red>",
+    "Physics": "<green>",
+    "Projectile": "<blue>",
+    "Unknown": "<yellow>",
+}
 
 
 def formatter(record):
-    source = record["extra"].get("source", "unknown")
-    color = SOURCE_COLORS.get(source, "<cyan>")
+    source = record["extra"].get("source", "Unknown")
+    color = SOURCE_COLORS.get(source, "<yellow>")
 
     return "<green>{time:HH:mm:ss}</green> | " "<level>{level:<8}</level> | " f"{color}{source:<12}</> | " "{message}\n"
 
@@ -45,7 +51,7 @@ class _BoundSourceLogger:
 
 class SourceLogger:
 
-    def __init__(self, base_logger):
+    def __init__(self, base_logger=get_logger()):
         self._logger = base_logger
 
     def __getitem__(self, source: str):
@@ -54,7 +60,7 @@ class SourceLogger:
 
 if __name__ == "__main__":
 
-    madlogger = SourceLogger(get_logger())
+    madlogger = SourceLogger()
     madlogger["Simulation"].warning("test")
     madlogger["Missile"].info("info")
     madlogger["dfdsf"].critical("critical")

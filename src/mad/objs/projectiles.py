@@ -53,11 +53,6 @@ class Projectile(MovableObject):
             self.active = False
 
         else:
-            acc = self.accelerations(planet)
-
-            self.velocity += acc * dt
-            self.position += self.velocity * dt
-
             # Velocity Verlet for solver.
             a0 = self.accelerations(planet)
             self.position += self.velocity * dt + 0.5 * a0 * dt**2
