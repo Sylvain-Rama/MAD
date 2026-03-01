@@ -29,7 +29,6 @@ def get_logger():
 
 
 class _BoundSourceLogger:
-
     def __init__(self, base_logger, source: str):
         self._logger = base_logger.bind(source=source)
 
@@ -50,7 +49,6 @@ class _BoundSourceLogger:
 
 
 class SourceLogger:
-
     def __init__(self, base_logger=get_logger()):
         self._logger = base_logger
 

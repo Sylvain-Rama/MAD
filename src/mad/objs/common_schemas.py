@@ -1,6 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from mad.objs.planets import Planet
 
 
 @dataclass
@@ -36,3 +38,17 @@ class MovableObject:
     def __repr__(self):
         a = "active" if self.active else "inactive"
         return f"{self.name} at {self.position}, velocity {self.velocity}, {a}."
+
+
+class SimulationInterface(ABC):
+
+    @abstractmethod
+    def update(self, dt: float) -> MovableObject | None:
+        """This abstract method is dedicted to the update of the object itself.
+        It can return other Movable objects to be able to spawn elements in the simulation."""
+        pass
+
+    @abstractmethod
+    def step(self, dt: float, planet: Planet) -> None:
+        """This abstract method is dedicated to the update of the object position / velocity according to the selected planet."""
+        pass
