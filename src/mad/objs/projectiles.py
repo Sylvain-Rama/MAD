@@ -1,7 +1,10 @@
 from dataclasses import dataclass, asdict
 import numpy as np
-from mad.objs.planets import Planet
+from mad.objs.planets import Planet, SimulationInterface
 from mad.objs.common_schemas import MovableObject, History
+from mad.logger import SourceLogger
+
+logger = SourceLogger()
 
 
 @dataclass
@@ -22,7 +25,7 @@ class ProjectileConfig:
             self.velocity = [0.0] * len(self.position)
 
 
-class Projectile(MovableObject):
+class Projectile(SimulationInterface, MovableObject):
     def __init__(self, config: ProjectileConfig):
         super().__init__(config.position, config.velocity, config.name)
         self.mass = config.mass
@@ -49,7 +52,7 @@ class Projectile(MovableObject):
     def step(self, dt: float, planet: Planet):
 
         if self.distance(planet) <= planet.radius:
-            print(f"{self.name} landed on the ground!")
+            logger["Projectile"].info(f"{self.name} landed on the ground!")
             self.active = False
 
         else:
@@ -62,3 +65,6 @@ class Projectile(MovableObject):
 
             self.history.position.append(self.position.tolist())
             self.history.velocity.append(self.velocity.tolist())
+
+    def update(self, dt: float):
+        return None
