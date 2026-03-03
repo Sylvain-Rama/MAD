@@ -1,5 +1,6 @@
 from dataclasses import dataclass, asdict
 import numpy as np
+from numpy.typing import NDArray
 from mad.objs.planets import Planet, SimulationInterface
 from mad.objs.common_schemas import MovableObject, History
 from mad.logger import SourceLogger
@@ -34,37 +35,29 @@ class Projectile(SimulationInterface, MovableObject):
         self.config = config
         self.history = History(position=[config.position], velocity=[config.velocity])
 
-    def accelerations(self, planet):
-        total_acc = np.zeros_like(self.velocity)
-
-        gravity_acc = planet.gravity(self)
-        total_acc += gravity_acc
-
-        v_mag = np.linalg.norm(self.velocity)
-
-        if v_mag > 0:
-            rho = planet.atmosphere_rho(self)
-            drag_acc = -0.5 * rho * self.Cd * self.area * v_mag * self.velocity / self.mass
-            total_acc += drag_acc
-
-        return total_acc
-
-    def step(self, dt: float, planet: Planet):
+    def accelerations(self, planet) -> NDArray:
 
         if self.distance(planet) <= planet.radius:
             logger["Projectile"].info(f"{self.name} landed on the ground!")
             self.active = False
+            return np.zeros_like(self.velocity)
 
-        else:
-            # Velocity Verlet for solver.
-            a0 = self.accelerations(planet)
-            self.position += self.velocity * dt + 0.5 * a0 * dt**2
-            a1 = self.accelerations(planet)
+        gravity_acc = planet.gravity(self)
+        drag_acc = planet.drag(self)
 
-            self.velocity += 0.5 * (a0 + a1) * dt
+        return gravity_acc + drag_acc
 
-            self.history.position.append(self.position.tolist())
-            self.history.velocity.append(self.velocity.tolist())
+    def integrate(self, dt: float, planet: Planet) -> None:
+        # Velocity Verlet for solver.
+        a0 = self.accelerations(planet)
+        self.position += self.velocity * dt + 0.5 * a0 * dt**2
+        a1 = self.accelerations(planet)
+
+        self.velocity += 0.5 * (a0 + a1) * dt
+
+        self.history.position.append(self.position.tolist())
+        self.history.velocity.append(self.velocity.tolist())
 
     def update(self, dt: float):
+        # Nothing to update internally: it's a rock...
         return None
