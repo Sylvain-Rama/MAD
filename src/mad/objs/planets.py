@@ -44,16 +44,19 @@ class Planet(MovableObject):
 
         return self.gravity(surf_obj)[0]
 
-    def atmosphere_rho(self, obj: MovableObject) -> float:
-        rho = 0.0
+    def drag(self, obj: MovableObject) -> NDArray:
+        drag = np.zeros_like(obj.velocity)
         alt = max(0.0, self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
 
         if alt > 0:
             rho = self.rho0 * np.exp(-alt / self.atmosphere_height)
+            v_mag = np.linalg.norm(obj.velocity)
+            if v_mag > 0:
+                drag = -0.5 * rho * obj.Cd * obj.area * v_mag * obj.velocity / obj.mass
 
-        return rho
+        return drag
 
-    def gravity(self, other: "MovableObject") -> NDArray:
+    def gravity(self, other: MovableObject) -> NDArray:
         r_vec = other.position - self.position
         dist = np.linalg.norm(r_vec)
         if dist < 1e-6:
@@ -74,6 +77,17 @@ class SimulationInterface(ABC):
         pass
 
     @abstractmethod
-    def step(self, dt: float, planet: Planet) -> None:
+    def accelerations(self, planet: Planet) -> NDArray:
+        """Abstract method dedicated to the computation of accelerations: gravity, thrust, drag, etc..."""
+        pass
+
+    def integrate(self, dt: float, planet: Planet) -> None:
         """This abstract method is dedicated to the update of the object position / velocity according to the selected planet."""
         pass
+
+    def step(self, dt: float, planet: Planet) -> MovableObject | None:
+        """Convenience method if we want to run the object quickly through simulation."""
+        obj = self.update(dt)
+        self.integrate(dt, planet)
+
+        return obj if obj else None
