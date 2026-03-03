@@ -2,7 +2,7 @@ from loguru import logger
 import sys
 
 SOURCE_COLORS = {
-    "Simulation": "<black>",
+    "Simulation": "<white>",
     "Missile": "<red>",
     "Physics": "<green>",
     "Projectile": "<blue>",
