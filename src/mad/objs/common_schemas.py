@@ -30,6 +30,9 @@ class MovableObject:
             return np.zeros_like(self.position)
         return self.position / self.magnitude
 
+    def central_angle(self, other: "MovableObject"):
+        return np.arccos(np.clip(np.dot(self.norm, other.norm), -1, 1))
+
     def distance(self, other: "MovableObject") -> np.floating:
         return np.linalg.norm(self.position - other.position)
 
