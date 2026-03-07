@@ -5,8 +5,14 @@ from dataclasses import dataclass, field
 
 @dataclass
 class History:
+    time: list = field(default_factory=list)
     position: list = field(default_factory=list)
     velocity: list = field(default_factory=list)
+
+    def update(self, time: float, position: list, velocity: list):
+        self.time.append(time)
+        self.position.append(position)
+        self.velocity.append(velocity)
 
 
 class MovableObject:
@@ -38,11 +44,6 @@ class MovableObject:
         t_hat = target.position - np.dot(target.position, r_hat) * r_hat
         t_hat /= np.linalg.norm(t_hat)
         return r_hat, t_hat
-
-    def desired_direction(self, target: "MovableObject", gamma) -> NDArray:
-        r_hat, t_hat = self.local_frame(target)
-
-        return np.sin(gamma) * r_hat + np.cos(gamma) * t_hat
 
     def distance(self, other: "MovableObject") -> np.floating:
         return np.linalg.norm(self.position - other.position)

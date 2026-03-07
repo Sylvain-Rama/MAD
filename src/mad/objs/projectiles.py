@@ -27,13 +27,14 @@ class ProjectileConfig:
 
 
 class Projectile(SimulationInterface, MovableObject):
-    def __init__(self, config: ProjectileConfig):
+    def __init__(self, config: ProjectileConfig, t: float = 0.0):
         super().__init__(config.position, config.velocity, config.name)
         self.mass = config.mass
         self.area = config.area
         self.Cd = config.Cd
         self.config = config
-        self.history = History(position=[config.position], velocity=[config.velocity])
+        self.history = History(position=[self.position.tolist()], velocity=[self.velocity.tolist()], time=[t])
+        self.t = t
 
     def accelerations(self, planet) -> NDArray:
 
@@ -55,9 +56,9 @@ class Projectile(SimulationInterface, MovableObject):
 
         self.velocity += 0.5 * (a0 + a1) * dt
 
-        self.history.position.append(self.position.tolist())
-        self.history.velocity.append(self.velocity.tolist())
+        self.history.update(self.t, self.position.tolist(), self.velocity.tolist())
 
     def update(self, dt: float):
+        self.t += dt
         # Nothing to update internally: it's a rock...
         return None
