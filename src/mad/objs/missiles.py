@@ -1,8 +1,13 @@
-import numpy as np
 from dataclasses import dataclass, asdict
-from mad.objs.common_schemas import MovableObject
+import numpy as np
+from numpy.typing import NDArray
+from mad.objs.common_schemas import MovableObject, History
+from mad.objs.projectiles import ProjectileConfig, Projectile
+from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
 from mad.objs.constants import G0
+
+from copy import deepcopy
 
 logger = SourceLogger()
 
@@ -17,7 +22,7 @@ class Payload(MovableObject):
 class StageConfig:
     dry_mass: float  # kg
     propellant_mass: float  # kg
-    thrust: float  # N
+    thrust: float  # N = kg * m / s^2
     Isp: float  # s
     area: float  # m^2
     Cd: float
@@ -88,3 +93,135 @@ class MissileConfig:
     @property
     def to_dict(self):
         return asdict(self)
+
+
+class BallisticMissile(SimulationInterface, MovableObject):
+    def __init__(self, cfg: MissileConfig, t=0.0):
+        super().__init__(position=cfg.position, name=cfg.name)
+
+        self.stages = cfg.stages
+        self.guidance = cfg.guidance
+        self.t = t
+        self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
+        self.initial_mass = deepcopy(self.mass)
+        self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
+
+    @property
+    def mass(self):
+        return sum(stage.mass for stage in self.stages)
+
+    @property
+    def area(self):
+        return sum(stage.area for stage in self.stages)
+
+    @property
+    def Cd(self):
+        return sum(stage.Cd for stage in self.stages)
+
+    @property
+    def deltav(self):
+        dv_total = 0.0
+
+        for i, stage in enumerate(self.stages):
+            m0 = sum(s.mass for s in self.stages[i:])
+            mf = m0 - stage.propellant_mass
+            isp = stage.Isp
+            dv = isp * G0 * np.log(m0 / mf)
+            dv_total += dv
+
+        return dv_total
+
+    @property
+    def burned_fraction(self) -> float:
+        # Extremely imprecise, as it does not take into account we lose stages
+        return np.clip((self.initial_mass - self.mass) / (self.initial_mass - self.final_mass), 0, 1)
+
+    def ballistic_range(self, planet: Planet, gamma_deg: float = 30):
+        # Helper to quickly determine the range of the missile.
+        gamma = np.radians(gamma_deg)
+        # Taking 0.8 to estimate for drag / gravity / steering losses
+        deltav = 0.8 * self.deltav
+        num = deltav**2 * np.sin(gamma) * np.cos(gamma)
+        den = planet.mu / planet.radius - deltav**2 * np.sin(gamma) ** 2
+        central_angle = 2 * np.arctan(num / den)
+
+        return planet.radius * central_angle
+
+    def __repr__(self):
+        a = "active" if self.active else "inactive"
+        return f"BallisticMissile {self.name}, deltaV {self.deltav} m/s, {a}."
+
+    def optimal_gamma(self, planet: Planet, sigma: NDArray):
+        return np.arctan((self.deltav**2 - planet.mu / planet.radius) / self.deltav**2 * np.tan(sigma / 2))
+
+    def gravity_turn_direction(self, target: MovableObject, optimal_gamma: NDArray, burned_fraction: float):
+
+        r_hat, t_hat = self.local_frame(target)
+
+        # smooth rotation from vertical to target direction
+        theta = optimal_gamma * (1 - np.cos(np.pi / 2 * burned_fraction))
+
+        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+        return d / np.linalg.norm(d)
+
+    def get_guidance(self, planet: Planet) -> NDArray:
+
+        if self.guidance is not None:
+            sigma = self.central_angle(self.guidance.target)
+            gamma = self.optimal_gamma(planet, sigma)
+            return self.gravity_turn_direction(self.guidance.target, gamma, self.burned_fraction)
+
+        else:
+            # If no guidance, just continue straight
+            return self.norm
+
+    @property
+    def thrust_acc(self):
+        running_stage = self.stages[0]
+        if not running_stage.active:
+            return np.zeros_like(self.velocity)
+
+        return running_stage.thrust / self.mass
+
+    def update(self, dt: float) -> None | Projectile:
+        self.t += dt
+        running_stage = self.stages[0]
+        running_stage.update(dt)
+
+        if not running_stage.active:
+            stage_cfg = ProjectileConfig(
+                position=self.position.tolist(),
+                velocity=self.velocity.tolist(),
+                mass=running_stage.dry_mass,
+                name=running_stage.name,
+                area=running_stage.area,
+                Cd=running_stage.Cd,
+            )
+
+            del self.stages[0]
+            logger["Missile"].info(f"{self.name} - {running_stage.name} separated at {self.t:.2f}.")
+            if len(self.stages) == 0:
+                self.active = False
+                logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
+            return Projectile(stage_cfg, t=deepcopy(self.t))
+        else:
+            return None
+
+    def accelerations(self, planet: Planet) -> NDArray:
+        gravity = planet.gravity(self)
+        drag = planet.drag(self)
+
+        direction = self.get_guidance(planet)
+        thrust = self.thrust_acc * direction
+
+        return gravity + drag + thrust
+
+    def integrate(self, dt: float, planet: Planet) -> None:
+        # Velocity Verlet for solver.
+        a0 = self.accelerations(planet)
+        self.position += self.velocity * dt + 0.5 * a0 * dt**2
+        a1 = self.accelerations(planet)
+
+        self.velocity += 0.5 * (a0 + a1) * dt
+
+        self.history.update(self.t, self.position.tolist(), self.velocity.tolist())
