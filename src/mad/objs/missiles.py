@@ -1,48 +1,90 @@
 import numpy as np
+from dataclasses import dataclass, asdict
+from mad.objs.common_schemas import MovableObject
+from mad.logger import SourceLogger
+from mad.objs.constants import G0
+
+logger = SourceLogger()
+
+
+class Payload(MovableObject):
+    mass: float  # kg
+    area: float  # m^2
+    yield_kt: float  # kt
+
+
+@dataclass
+class StageConfig:
+    dry_mass: float  # kg
+    propellant_mass: float  # kg
+    thrust: float  # N
+    Isp: float  # s
+    area: float  # m^2
+    Cd: float
+    time_ECO: float  # s
+    time_sep: float  # s
+    payload: Payload | None = None
+    name: str = "Stage"
+
+    @property
+    def to_dict(self):
+        return asdict(self)
 
 
 class MissileStage:
-    def __init__(
-        self,
-        dry_mass: float,
-        propellant_mass: float,
-        thrust: float,  # N
-        burn_time: float,  # s
-        area: float,
-        Cd: float,
-        payload=None,  # another stage or None
-    ):
-        self.dry_mass = dry_mass
-        self.propellant_mass = propellant_mass
+    def __init__(self, cfg: StageConfig):
+        self.config = cfg
+        self.dry_mass = cfg.dry_mass
+        self.propellant_mass = cfg.propellant_mass
 
-        self.thrust = thrust
-        self.burn_time = burn_time
-        self.burn_rate = propellant_mass / burn_time if burn_time > 0 else 0.0
+        self.thrust = cfg.thrust
+        self.Isp = cfg.Isp
 
-        self.area = area
-        self.Cd = Cd
+        self.area = cfg.area
+        self.Cd = cfg.Cd
 
-        self.payload = payload
-        self.active = True
-        self.time_burning = 0.0
+        self.exhaust_velocity = cfg.Isp * G0
+        self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
+
+        self.active: bool = True
+        self.payload = cfg.payload
+        self.name = cfg.name
+        self.t = 0.0
 
     @property
-    def mass(self):
+    def mass(self) -> float:
         payload_mass = self.payload.mass if self.payload else 0.0
         return self.dry_mass + self.propellant_mass + payload_mass
 
-    def update(self, dt: float):
+    def thrust_force(self) -> float:
+        return self.thrust if self.propellant_mass > 0 else 0.0
+
+    def update(self, dt: float) -> None:
+        self.t += dt
         if not self.active:
             return
 
         if self.propellant_mass > 0:
-            dm = self.burn_rate * dt
+            dm = self.mass_flow_rate * dt
             self.propellant_mass = max(0.0, self.propellant_mass - dm)
-            self.time_burning += dt
         else:
+            logger["Missile"].info(f"{self.name} ran out of propellant at {self.t:.2f}.")
             self.active = False
 
-    def thrust_force(self, direction: np.ndarray) -> np.ndarray:
-        if self.propellant_mass > 0:
-            return self.thrust * direction
-        return np.zeros_like(direction)
+
+@dataclass
+class Guidance:
+    cruise_altitude: float
+    target: MovableObject
+
+
+@dataclass
+class MissileConfig:
+    stages: list[MissileStage]
+    position: list[float]
+    name: str = "MultiStageMissile"
+    guidance: Guidance | None = None
+
+    @property
+    def to_dict(self):
+        return asdict(self)

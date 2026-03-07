@@ -42,6 +42,7 @@ class Planet(MovableObject):
         surface_pos[0] = self.radius
         surf_obj = MovableObject(position=list(surface_pos))
 
+        # We take the first element as this is where distance = planet.radius.
         return self.gravity(surf_obj)[0]
 
     def drag(self, obj: MovableObject) -> NDArray:

@@ -30,8 +30,19 @@ class MovableObject:
             return np.zeros_like(self.position)
         return self.position / self.magnitude
 
-    def central_angle(self, other: "MovableObject"):
+    def central_angle(self, other: "MovableObject") -> NDArray:
         return np.arccos(np.clip(np.dot(self.norm, other.norm), -1, 1))
+
+    def local_frame(self, target: "MovableObject") -> tuple[NDArray, NDArray]:
+        r_hat = self.norm
+        t_hat = target.position - np.dot(target.position, r_hat) * r_hat
+        t_hat /= np.linalg.norm(t_hat)
+        return r_hat, t_hat
+
+    def desired_direction(self, target: "MovableObject", gamma) -> NDArray:
+        r_hat, t_hat = self.local_frame(target)
+
+        return np.sin(gamma) * r_hat + np.cos(gamma) * t_hat
 
     def distance(self, other: "MovableObject") -> np.floating:
         return np.linalg.norm(self.position - other.position)
