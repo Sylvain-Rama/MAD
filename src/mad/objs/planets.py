@@ -85,10 +85,3 @@ class SimulationInterface(ABC):
     def integrate(self, dt: float, planet: Planet) -> None:
         """This abstract method is dedicated to the update of the object position / velocity according to the selected planet."""
         pass
-
-    def step(self, dt: float, planet: Planet) -> MovableObject | None:
-        """Convenience method if we want to run the object quickly through simulation."""
-        obj = self.update(dt)
-        self.integrate(dt, planet)
-
-        return obj if obj else None
