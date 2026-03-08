@@ -1,5 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 from mad.objs.common_schemas import MovableObject
 from mad.objs.constants import G
 from dataclasses import dataclass, asdict
@@ -64,6 +66,61 @@ class Planet(MovableObject):
             return np.zeros_like(other.position)
 
         return -self.mu * r_vec / dist**3
+
+    def surface_distance(self, obj1: MovableObject, obj2: MovableObject) -> float:
+        # Will give the linear distance (m) between 2 objects placed at the surface.
+
+        cos_angle = np.dot(obj1.position, obj2.position) / (
+            np.linalg.norm(obj1.position) * np.linalg.norm(obj2.position)
+        )
+
+        angle = np.arccos(np.clip(cos_angle, -1, 1))
+
+        return self.radius * angle
+
+    def create_random_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObject:
+        # Create a random object at the surface (+ altitude) of the planet.
+
+        v = np.random.normal(size=self.position.shape[0])
+        v /= np.linalg.norm(v)
+
+        return MovableObject(position=(self.radius + altitude) * v, name=name)
+
+    def create_random_point_at_distance(self, obj: MovableObject, distance: float, name="RangedObj") -> MovableObject:
+        # Create a new random object at set distance from another point on the planet.
+
+        u = obj.norm
+        sigma = distance / self.radius
+
+        # random orthogonal direction
+        v = np.random.normal(size=self.position.shape[0])
+        v -= np.dot(v, u) * u
+        v /= np.linalg.norm(v)
+
+        point = np.cos(sigma) * u + np.sin(sigma) * v
+
+        return MovableObject(position=self.radius * point, name=name)
+
+    def plot_2D_with_points(self, points: list[MovableObject] | None, ax=None) -> mpl.figure.Figure | None:
+        plot_fig = False
+        if ax is None:
+            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(4, 4))
+            plot_fig = True
+
+        planet_body = mpl.patches.Circle(
+            self.position, radius=self.radius, ec="black", fill=False, label=self.name, ls="--"
+        )
+        ax.add_patch(planet_body)
+
+        if points is not None:
+            for point in points:
+                ax.scatter(x=point.position[0], y=point.position[1], s=50, label=point.name)
+
+        ax.set_aspect("equal")
+        ax.legend()
+        ax.grid()
+
+        return fig if plot_fig else None  # type: ignore
 
     def __repr__(self):
         return f"Planet {self.name} at {self.position}, mass {self.mass}, radius {self.radius}."
