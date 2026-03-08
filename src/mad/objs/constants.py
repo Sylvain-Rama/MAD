@@ -16,9 +16,9 @@ EARTH_SETTINGS = {
 titan_stage_1 = {
     "dry_mass": 4000.0,
     "propellant_mass": 76203.0 - 4000.0,
-    "thrust": 1900 * 1000,
+    "thrust": 1900 * 1000,  # N
     "Isp": 290.0,
-    "area": 3.1 * 16,
+    "area": np.pi * 3.1**2,
     "Cd": 1.08,  # smooth, long cylinder.
     "time_ECO": 138.0,
     "time_sep": 2.0,
@@ -28,9 +28,9 @@ titan_stage_1 = {
 titan_stage_2 = {
     "dry_mass": 1725.0,
     "propellant_mass": 28939 - 1725.0,
-    "thrust": 356 * 1000,
+    "thrust": 356 * 1000,  # N
     "Isp": 308.0,
-    "area": 2.3 * 9.8,
+    "area": np.pi * 2.3**2,
     "Cd": 1.08,  # smooth, long cylinder.
     "time_ECO": 225.0,
     "time_sep": 2.0,

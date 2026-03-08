@@ -84,7 +84,7 @@ class Guidance:
 
 
 @dataclass
-class MissileConfig:
+class BallisticConfig:
     stages: list[MissileStage]
     position: list[float]
     name: str = "MultiStageMissile"
@@ -96,7 +96,7 @@ class MissileConfig:
 
 
 class BallisticMissile(SimulationInterface, MovableObject):
-    def __init__(self, cfg: MissileConfig, t=0.0):
+    def __init__(self, cfg: BallisticConfig, t=0.0):
         super().__init__(position=cfg.position, name=cfg.name)
 
         self.stages = cfg.stages
@@ -112,7 +112,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
 
     @property
     def area(self):
-        return sum(stage.area for stage in self.stages)
+        return max(stage.area for stage in self.stages)
 
     @property
     def Cd(self):
