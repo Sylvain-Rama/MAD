@@ -41,7 +41,8 @@ class MovableObject:
 
     def local_frame(self, target: "MovableObject") -> tuple[NDArray, NDArray]:
         r_hat = self.norm
-        t_hat = target.position - np.dot(target.position, r_hat) * r_hat
+        delta = self.position - target.position
+        t_hat = delta - np.dot(delta, r_hat) * r_hat
         t_hat_norm = np.linalg.norm(t_hat)
         if t_hat_norm < 1e-8:
             return r_hat, np.zeros_like(self.position)  # target is directly above/below
