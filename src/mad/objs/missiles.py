@@ -4,6 +4,7 @@ from numpy.typing import NDArray
 from mad.objs.common_schemas import MovableObject, History
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
+from mad.objs.guidances import Guidance
 from mad.logger import SourceLogger
 from mad.objs.constants import G0
 
@@ -78,12 +79,6 @@ class MissileStage:
 
 
 @dataclass
-class Guidance:
-    cruise_altitude: float
-    target: MovableObject
-
-
-@dataclass
 class BallisticConfig:
     stages: list[MissileStage]
     position: list[float]
@@ -112,7 +107,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
 
     @property
     def area(self):
-        return max(stage.area for stage in self.stages)
+        return sum(stage.area for stage in self.stages)
 
     @property
     def Cd(self):
@@ -151,30 +146,6 @@ class BallisticMissile(SimulationInterface, MovableObject):
         a = "active" if self.active else "inactive"
         return f"BallisticMissile {self.name}, deltaV {self.deltav} m/s, {a}."
 
-    def optimal_gamma(self, planet: Planet, sigma: NDArray):
-        return np.arctan((self.deltav**2 - planet.mu / planet.radius) / self.deltav**2 * np.tan(sigma / 2))
-
-    def gravity_turn_direction(self, target: MovableObject, optimal_gamma: NDArray, burned_fraction: float):
-
-        r_hat, t_hat = self.local_frame(target)
-
-        # smooth rotation from vertical to target direction
-        theta = optimal_gamma * (1 - np.cos(np.pi / 2 * burned_fraction))
-
-        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
-        return d / np.linalg.norm(d)
-
-    def get_guidance(self, planet: Planet) -> NDArray:
-
-        if self.guidance is not None:
-            sigma = self.central_angle(self.guidance.target)
-            gamma = self.optimal_gamma(planet, sigma)
-            return self.gravity_turn_direction(self.guidance.target, gamma, self.burned_fraction)
-
-        else:
-            # If no guidance, just continue straight
-            return self.norm
-
     @property
     def thrust_acc(self):
         running_stage = self.stages[0]
@@ -211,7 +182,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         gravity = planet.gravity(self)
         drag = planet.drag(self)
 
-        direction = self.get_guidance(planet)
+        direction = self.guidance.get_guidance(self) if self.guidance else np.ones_like(self.position)
         thrust = self.thrust_acc * direction
 
         return gravity + drag + thrust
