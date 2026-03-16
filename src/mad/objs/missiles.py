@@ -62,6 +62,7 @@ class MissileStage:
         payload_mass = self.payload.mass if self.payload else 0.0
         return self.dry_mass + self.propellant_mass + payload_mass
 
+    @property
     def thrust_force(self) -> float:
         return self.thrust if self.propellant_mass > 0 else 0.0
 
@@ -107,11 +108,11 @@ class BallisticMissile(SimulationInterface, MovableObject):
 
     @property
     def area(self):
-        return sum(stage.area for stage in self.stages)
+        return self.stages[-1].area
 
     @property
     def Cd(self):
-        return sum(stage.Cd for stage in self.stages)
+        return self.stages[-1].Cd
 
     @property
     def deltav(self):
@@ -152,7 +153,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         if not running_stage.active:
             return np.zeros_like(self.velocity)
 
-        return running_stage.thrust / self.mass
+        return running_stage.thrust_force / self.mass
 
     def update(self, dt: float) -> None | Projectile:
         self.t += dt
@@ -184,6 +185,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
 
         # If no guidance, we continue along the same direction.
         direction = self.guidance.get_guidance(self) if self.guidance else self.norm
+        direction = direction / np.linalg.norm(direction)
         thrust = self.thrust_acc * direction
 
         return gravity + drag + thrust

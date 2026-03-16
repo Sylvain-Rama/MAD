@@ -19,7 +19,7 @@ class MovableObject:
     def __init__(self, position: list[float], velocity: list[float] | None = None, name: str = "MovableObject"):
 
         self.position = np.asarray(position)  # m
-        if velocity:
+        if velocity is not None:
             self.velocity = np.asarray(velocity)  # m/s
         else:
             self.velocity = np.zeros_like(self.position)
