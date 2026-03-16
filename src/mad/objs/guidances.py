@@ -31,19 +31,14 @@ class ClosedFormBallistic(Guidance):
         return np.arccos(np.clip(np.dot(r1, r2), -1, 1))
 
     def local_frame(self, missile: "MovableObject") -> tuple[NDArray, NDArray]:
-        r_hat = missile.norm
+        r_hat = missile.position / np.linalg.norm(missile.position)
 
-        delta = self.target.position - missile.position
-        t_hat = delta - np.dot(delta, r_hat) * r_hat
+        # local horizontal (90° rotation)
+        t_hat = np.array([-r_hat[1], r_hat[0]])
 
-        t_hat_norm = np.linalg.norm(t_hat)
-
-        if t_hat_norm < 1e-8:
-            return r_hat, np.zeros_like(missile.position)
-
-        t_hat /= t_hat_norm
-        if np.dot(t_hat, self.target.position - missile.position) < 0:
-            logger["Physics"].warning("Missile going opposite direction from the target!")
+        # ensure tangent points toward target
+        if np.dot(t_hat, missile.position - self.target.position) < 0:
+            t_hat = -t_hat
 
         return r_hat, t_hat
 
