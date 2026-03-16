@@ -36,7 +36,11 @@ class Planet(MovableObject):
 
     @property
     def escape_velocity(self):
-        return np.sqrt(2 * G * self.mass / self.radius)
+        return np.sqrt(2 * self.mu / self.radius)
+
+    @property
+    def orbital_velocity(self):
+        return np.sqrt(self.mu / self.radius)
 
     @property
     def gravity_at_surface(self):

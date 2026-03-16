@@ -4,7 +4,8 @@ import sys
 SOURCE_COLORS = {
     "Simulation": "<white>",
     "Missile": "<red>",
-    "Physics": "<green>",
+    "Interceptor": "<green>",
+    "Physics": "<white>",
     "Projectile": "<blue>",
     "Unknown": "<yellow>",
 }

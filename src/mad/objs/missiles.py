@@ -182,7 +182,8 @@ class BallisticMissile(SimulationInterface, MovableObject):
         gravity = planet.gravity(self)
         drag = planet.drag(self)
 
-        direction = self.guidance.get_guidance(self) if self.guidance else np.ones_like(self.position)
+        # If no guidance, we continue along the same direction.
+        direction = self.guidance.get_guidance(self) if self.guidance else self.norm
         thrust = self.thrust_acc * direction
 
         return gravity + drag + thrust

@@ -4,6 +4,9 @@ from mad.objs.common_schemas import MovableObject
 from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import NDArray
+from mad.logger import SourceLogger
+
+logger = SourceLogger()
 
 
 class Guidance(ABC):
@@ -20,45 +23,64 @@ class ClosedFormBallistic(Guidance):
         self.planet = planet
         self.target = target
 
-    def local_frame(self, missile) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    @staticmethod
+    def central_angle(missile: MovableObject, target: MovableObject) -> NDArray:
+        r1 = missile.position / np.linalg.norm(missile.position)
+        r2 = target.position / np.linalg.norm(target.position)
 
+        return np.arccos(np.clip(np.dot(r1, r2), -1, 1))
+
+    def local_frame(self, missile: "MovableObject") -> tuple[NDArray, NDArray]:
         r_hat = missile.norm
-        target_hat = self.target.norm
+
         delta = self.target.position - missile.position
+        t_hat = delta - np.dot(delta, r_hat) * r_hat
 
-        if r_hat.size == 2:
-            # 2D tangent: rotate 90° CCW
-            t_hat = np.array([-r_hat[1], r_hat[0]])
-            # Ensure t_hat points toward target
-            if np.dot(t_hat, delta) < 0:
-                t_hat = -t_hat
-        else:
-            # 3D tangent: great-circle tangent
-            plane_normal = np.cross(r_hat, target_hat)
-            t_hat = np.cross(plane_normal, r_hat)
+        t_hat_norm = np.linalg.norm(t_hat)
 
-        t_norm = np.linalg.norm(t_hat)
-        if t_norm < 1e-8:
-            return r_hat, np.zeros_like(r_hat)
+        if t_hat_norm < 1e-8:
+            return r_hat, np.zeros_like(missile.position)
 
-        return r_hat, t_hat / t_norm
+        t_hat /= t_hat_norm
+        if np.dot(t_hat, self.target.position - missile.position) < 0:
+            logger["Physics"].warning("Missile going opposite direction from the target!")
 
-    def optimal_gamma(self, missile, sigma: float) -> float:
+        return r_hat, t_hat
 
-        v = np.linalg.norm(missile.velocity)
-        r = np.linalg.norm(missile.position)
-        return np.arctan((v**2 - self.planet.mu / r) / v**2 * np.tan(sigma / 2))
+    def optimal_gamma(self, missile: MovableObject, sigma: NDArray) -> NDArray:
 
-    def gravity_turn_direction(self, missile, optimal_gamma: float) -> NDArray[np.floating]:
+        gamma = np.arctan(
+            (missile.velocity**2 - self.planet.mu / np.linalg.norm(missile.position))
+            / missile.velocity**2
+            * np.tan(sigma / 2)
+        )
+        # gamma = np.clip(gamma, 0.0, np.pi / 2)
+
+        return gamma
+
+    def gravity_turn_direction(
+        self,
+        missile: MovableObject,
+        optimal_gamma: NDArray,
+    ):
 
         r_hat, t_hat = self.local_frame(missile)
+        f = missile.burned_fraction
 
-        # Construct thrust vector along tangent + radial
-        d = np.cos(optimal_gamma) * t_hat - np.sin(optimal_gamma) * r_hat
+        if f < 0.1:
+            theta = 0.0
+        else:
+            theta = optimal_gamma * (f - 0.1) / 0.9
+
+        # smooth rotation from vertical to target direction
+        # theta = optimal_gamma * missile.burned_fraction
+
+        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
         return d / np.linalg.norm(d)
 
-    def get_guidance(self, missile) -> NDArray[np.floating]:
+    def get_guidance(self, missile: MovableObject) -> NDArray:
 
-        sigma = missile.central_angle(self.target)
+        sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
+
         return self.gravity_turn_direction(missile, gamma)
