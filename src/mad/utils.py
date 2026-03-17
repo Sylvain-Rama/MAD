@@ -1,7 +1,16 @@
-import math
+import numpy as np
+from numpy.typing import NDArray
 
 
-def shortest_angle(a, b):
-    """Renvoie la différence angulaire [-pi, pi]"""
-    d = (b - a + math.pi) % (2 * math.pi) - math.pi
-    return d
+def to_vec3(arr: list | NDArray) -> NDArray:
+    if not isinstance(arr, (list, NDArray)):
+        raise TypeError(f"This vector expected a list or NDarray, got {type(arr)} instead.")
+    if isinstance(arr, list):
+        arr = np.asarray(arr)
+
+    if arr.shape[0] >= 3:
+        return arr[:3]
+
+    out = np.zeros(3, dtype=arr.dtype)
+    out[: arr.shape[0]] = arr
+    return out

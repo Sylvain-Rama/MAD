@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass, field
+from mad.utils import to_vec3
 
 
 @dataclass
@@ -16,31 +17,32 @@ class History:
 
 
 class MovableObject:
-    def __init__(self, position: list[float], velocity: list[float] | None = None, name: str = "MovableObject"):
+    def __init__(
+        self,
+        position: list[float] | NDArray,
+        velocity: list[float] | NDArray | None = None,
+        name: str = "MovableObject",
+    ):
 
-        self.position = np.asarray(position)  # m
+        self.position = to_vec3(position)
         if velocity is not None:
-            self.velocity = np.asarray(velocity)  # m/s
+            self.velocity = to_vec3(velocity)  # m/s
         else:
             self.velocity = np.zeros_like(self.position)
         self.active: bool = True
         self.name = name
 
     @property
-    def magnitude(self) -> np.floating:
-        return np.linalg.norm(self.position)
-
-    @property
-    def norm(self) -> NDArray[np.floating]:
-        if self.magnitude == 0.0:
+    def normalize(self) -> NDArray[np.floating]:
+        if np.linalg.norm(self.position) == 0.0:
             return np.zeros_like(self.position)
-        return self.position / self.magnitude
+        return self.position / np.linalg.norm(self.position)
 
     def central_angle(self, other: "MovableObject") -> NDArray:
-        return np.arccos(np.clip(np.dot(self.norm, other.norm), -1, 1))
+        return np.arccos(np.clip(np.dot(self.normalize, other.normalize), -1, 1))
 
     def local_frame(self, target: "MovableObject") -> tuple[NDArray, NDArray]:
-        r_hat = self.norm
+        r_hat = self.normalize
         delta = self.position - target.position
         t_hat = delta - np.dot(delta, r_hat) * r_hat
         t_hat_norm = np.linalg.norm(t_hat)
