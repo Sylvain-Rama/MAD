@@ -51,6 +51,15 @@ class Planet(MovableObject):
         # We take the first element as this is where distance = planet.radius.
         return self.gravity(surf_obj)[0]
 
+    def __repr__(self):
+        return (
+            f"Planet {self.name} at {self.position}\n"
+            f"Mass {self.mass:.2e} kg, Radius {self.radius / 1000} km.\n"
+            f"Gravity at surface: {self.gravity_at_surface:.2f} m/s^2\n"
+            f"Orbital velocity: {self.orbital_velocity:.2f} m/s\n"
+            f"Escape velocity: {self.escape_velocity:.2f} m/s"
+        )
+
     def drag(self, obj: MovableObject) -> NDArray:
         drag = np.zeros_like(obj.velocity)
         alt = max(0.0, self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
@@ -82,22 +91,22 @@ class Planet(MovableObject):
 
         return self.radius * angle
 
-    def create_random_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObject:
-        # Create a random object at the surface (+ altitude) of the planet.
+    def create_2D_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObject:
+        # Create a random object at the 2D surface (+ altitude) of the planet.
 
-        v = np.random.normal(size=self.position.shape[0])
+        v = np.random.normal(size=2)
         v /= np.linalg.norm(v)
 
         return MovableObject(position=(self.radius + altitude) * v, name=name)
 
-    def create_random_point_at_distance(self, obj: MovableObject, distance: float, name="RangedObj") -> MovableObject:
-        # Create a new random object at set distance from another point on the planet.
+    def create_2D_point_at_distance(self, obj: MovableObject, distance: float, name="RangedObj") -> MovableObject:
+        # Create a new random object at set distance from another point on the planet.2D mode for easy plot.
 
-        u = obj.norm
+        u = obj.normalize[:2]
         sigma = distance / self.radius
 
         # random orthogonal direction
-        v = np.random.normal(size=self.position.shape[0])
+        v = np.random.normal(size=2)
         v -= np.dot(v, u) * u
         v /= np.linalg.norm(v)
 
@@ -106,6 +115,7 @@ class Planet(MovableObject):
         return MovableObject(position=self.radius * point, name=name)
 
     def plot_2D_with_points(self, points: list[MovableObject] | None, ax=None) -> mpl.figure.Figure | None:
+        # 2D plot of the planet. If using point in 2D, they will appear at the circumference.
         plot_fig = False
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(4, 4))
@@ -125,9 +135,6 @@ class Planet(MovableObject):
         ax.grid()
 
         return fig if plot_fig else None  # type: ignore
-
-    def __repr__(self):
-        return f"Planet {self.name} at {self.position}, mass {self.mass}, radius {self.radius}."
 
 
 class SimulationInterface(ABC):

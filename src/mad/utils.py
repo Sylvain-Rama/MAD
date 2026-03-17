@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 
 
 def to_vec3(arr: list | NDArray) -> NDArray:
-    if not isinstance(arr, (list, NDArray)):
+    if not isinstance(arr, (list, np.ndarray)):
         raise TypeError(f"This vector expected a list or NDarray, got {type(arr)} instead.")
     if isinstance(arr, list):
         arr = np.asarray(arr)
