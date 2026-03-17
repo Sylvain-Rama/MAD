@@ -20,8 +20,6 @@ titan_stage_1 = {
     "Isp": 290.0,
     "area": np.pi * 3.1**2,
     "Cd": 1.08,  # smooth, long cylinder.
-    "time_ECO": 138.0,
-    "time_sep": 2.0,
     "name": "Stage1",
 }
 
@@ -32,7 +30,5 @@ titan_stage_2 = {
     "Isp": 308.0,
     "area": np.pi * 2.3**2,
     "Cd": 1.08,  # smooth, long cylinder.
-    "time_ECO": 225.0,
-    "time_sep": 2.0,
     "name": "Stage2",
 }

@@ -34,22 +34,13 @@ class MovableObject:
 
     @property
     def normalize(self) -> NDArray[np.floating]:
-        if np.linalg.norm(self.position) == 0.0:
+        norm = np.linalg.norm(self.position)
+        if norm < 1e-8:
             return np.zeros_like(self.position)
-        return self.position / np.linalg.norm(self.position)
+        return self.position / norm
 
-    def central_angle(self, other: "MovableObject") -> NDArray:
-        return np.arccos(np.clip(np.dot(self.normalize, other.normalize), -1, 1))
-
-    def local_frame(self, target: "MovableObject") -> tuple[NDArray, NDArray]:
-        r_hat = self.normalize
-        delta = self.position - target.position
-        t_hat = delta - np.dot(delta, r_hat) * r_hat
-        t_hat_norm = np.linalg.norm(t_hat)
-        if t_hat_norm < 1e-8:
-            return r_hat, np.zeros_like(self.position)  # target is directly above/below
-        t_hat /= t_hat_norm
-        return r_hat, t_hat
+    # def central_angle(self, other: "MovableObject") -> NDArray:
+    #     return np.arccos(np.clip(np.dot(self.normalize, other.normalize), -1, 1))
 
     def distance(self, other: "MovableObject") -> np.floating:
         return np.linalg.norm(self.position - other.position)
