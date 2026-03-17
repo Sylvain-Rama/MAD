@@ -10,9 +10,9 @@ logger = SourceLogger()
 
 @dataclass
 class ProjectileConfig:
-    position: list[float]  # m
+    position: list[float] | NDArray  # m
     mass: float  # kg
-    velocity: list[float] | None = None  # m / s
+    velocity: list[float] | NDArray | None = None  # m / s
     name: str = "Projectile"
     area: float = 0.01  # m^2
     Cd: float = 0.47  # sphere
@@ -20,10 +20,6 @@ class ProjectileConfig:
     @property
     def to_dict(self):
         return asdict(self)
-
-    def __post_init__(self):
-        if not self.velocity:
-            self.velocity = [0.0] * len(self.position)
 
 
 class Projectile(SimulationInterface, MovableObject):
