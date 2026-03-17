@@ -32,14 +32,14 @@ class ClosedFormBallistic(Guidance):
 
     def local_frame(self, missile: "MovableObject") -> tuple[NDArray, NDArray]:
         r_hat = missile.position / np.linalg.norm(missile.position)
+        rt_hat = self.target.position / np.linalg.norm(self.target.position)
 
-        # local horizontal (90° rotation)
-        t_hat = np.array([-r_hat[1], r_hat[0]])
+        t_hat = np.cross(np.cross(rt_hat, r_hat), r_hat)
+        t_norm = np.linalg.norm(t_hat)
+        if t_norm < 1e-8:
+            return r_hat, np.zeros_like(r_hat)
 
-        # ensure tangent points toward target
-        if np.dot(t_hat, missile.position - self.target.position) < 0:
-            t_hat = -t_hat
-
+        t_hat /= t_norm
         return r_hat, t_hat
 
     def optimal_gamma(self, missile: MovableObject, sigma: NDArray) -> NDArray:
@@ -49,7 +49,6 @@ class ClosedFormBallistic(Guidance):
             / missile.velocity**2
             * np.tan(sigma / 2)
         )
-        # gamma = np.clip(gamma, 0.0, np.pi / 2)
 
         return gamma
 
@@ -60,15 +59,9 @@ class ClosedFormBallistic(Guidance):
     ):
 
         r_hat, t_hat = self.local_frame(missile)
-        f = missile.burned_fraction
-
-        if f < 0.1:
-            theta = 0.0
-        else:
-            theta = optimal_gamma * (f - 0.1) / 0.9
 
         # smooth rotation from vertical to target direction
-        # theta = optimal_gamma * missile.burned_fraction
+        theta = optimal_gamma * missile.burned_fraction
 
         d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
         return d / np.linalg.norm(d)

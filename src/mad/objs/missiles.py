@@ -27,8 +27,6 @@ class StageConfig:
     Isp: float  # s
     area: float  # m^2
     Cd: float
-    time_ECO: float  # s
-    time_sep: float  # s
     payload: Payload | None = None
     name: str = "Stage"
 
@@ -82,7 +80,7 @@ class MissileStage:
 @dataclass
 class BallisticConfig:
     stages: list[MissileStage]
-    position: list[float]
+    position: list[float] | NDArray
     name: str = "MultiStageMissile"
     guidance: Guidance | None = None
 
@@ -101,6 +99,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
+        self.Cd = 1.08
 
     @property
     def mass(self):
@@ -109,10 +108,6 @@ class BallisticMissile(SimulationInterface, MovableObject):
     @property
     def area(self):
         return self.stages[-1].area
-
-    @property
-    def Cd(self):
-        return self.stages[-1].Cd
 
     @property
     def deltav(self):
@@ -184,7 +179,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         drag = planet.drag(self)
 
         # If no guidance, we continue along the same direction.
-        direction = self.guidance.get_guidance(self) if self.guidance else self.norm
+        direction = self.guidance.get_guidance(self) if self.guidance else self.normalize
         direction = direction / np.linalg.norm(direction)
         thrust = self.thrust_acc * direction
 
