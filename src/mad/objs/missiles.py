@@ -140,10 +140,15 @@ class BallisticMissile(SimulationInterface, MovableObject):
 
     def __repr__(self):
         a = "active" if self.active else "inactive"
-        return f"BallisticMissile {self.name}, deltaV {self.deltav} m/s, {a}."
+        return (
+            f"BallisticMissile {self.name}, {a}.\n"
+            f"Stages: {", ".join([x.name for x in self.stages])}.\n"
+            f"Available deltaV: {self.deltav:.2f} m/s.\n"
+            f"Burned Fraction: {self.burned_fraction:.2f}."
+        )
 
     @property
-    def thrust_acc(self):
+    def thrust_acc(self) -> float:
         running_stage = self.stages[0]
         if not running_stage.active:
             return np.zeros_like(self.velocity)
@@ -178,10 +183,14 @@ class BallisticMissile(SimulationInterface, MovableObject):
         gravity = planet.gravity(self)
         drag = planet.drag(self)
 
-        # If no guidance, we continue along the same direction.
-        direction = self.guidance.get_guidance(self) if self.guidance else self.normalize
-        direction = direction / np.linalg.norm(direction)
-        thrust = self.thrust_acc * direction
+        # If there is no thrust, no need to check for direction: we cannot act on it.
+        if self.thrust_acc > 0:
+            # If no guidance, we continue along the same direction.
+            direction = self.guidance.get_guidance(self) if self.guidance else self.normalize
+            direction = direction / np.linalg.norm(direction)
+            thrust = self.thrust_acc * direction
+        else:
+            thrust = np.zeros_like(self.velocity)
 
         return gravity + drag + thrust
 
