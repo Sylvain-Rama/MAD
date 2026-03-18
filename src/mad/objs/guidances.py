@@ -25,14 +25,11 @@ class ClosedFormBallistic(Guidance):
 
     @staticmethod
     def central_angle(missile: MovableObject, target: MovableObject) -> NDArray:
-        r1 = missile.position / np.linalg.norm(missile.position)
-        r2 = target.position / np.linalg.norm(target.position)
-
-        return np.arccos(np.clip(np.dot(r1, r2), -1, 1))
+        return np.arccos(np.clip(np.dot(missile.normalize, target.normalize), -1, 1))
 
     def local_frame(self, missile: "MovableObject") -> tuple[NDArray, NDArray]:
-        r_hat = missile.position / np.linalg.norm(missile.position)
-        rt_hat = self.target.position / np.linalg.norm(self.target.position)
+        r_hat = missile.normalize
+        rt_hat = self.target.normalize
 
         t_hat = np.cross(np.cross(rt_hat, r_hat), r_hat)
         t_norm = np.linalg.norm(t_hat)
