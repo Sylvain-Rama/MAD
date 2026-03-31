@@ -1,14 +1,17 @@
 from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
+from typing import TYPE_CHECKING
 from mad.objs.common_schemas import MovableObject, History
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
-from mad.objs.guidances import Guidance
 from mad.logger import SourceLogger
 from mad.objs.constants import G0
 
 from copy import deepcopy
+
+if TYPE_CHECKING:
+    from mad.objs.guidances import Guidance
 
 logger = SourceLogger()
 
@@ -82,7 +85,7 @@ class BallisticConfig:
     stages: list[MissileStage]
     position: list[float] | NDArray
     name: str = "MultiStageMissile"
-    guidance: Guidance | None = None
+    guidance: "Guidance | None" = None
 
     @property
     def to_dict(self):

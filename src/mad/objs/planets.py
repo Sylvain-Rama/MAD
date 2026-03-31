@@ -88,7 +88,7 @@ class Planet(MovableObject):
         )
 
         angle = np.arccos(np.clip(cos_angle, -1, 1))
-
+        
         return self.radius * angle
 
     def create_2D_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObject:
