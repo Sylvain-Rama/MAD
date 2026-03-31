@@ -11,14 +11,6 @@ logger = SourceLogger()
 
 class Guidance(ABC):
     # Any Guidance class should return the direction as a NDArray of same shape of position or velocity.
-
-    @abstractmethod
-    def get_guidance(self, missile) -> NDArray:
-        pass
-
-
-class GravityTurn(Guidance):
-
     def __init__(self, planet, target: "MovableObject"):
         self.planet = planet
         self.target = target
@@ -38,6 +30,18 @@ class GravityTurn(Guidance):
 
         t_hat /= t_norm
         return r_hat, t_hat
+
+    @abstractmethod
+    def get_guidance(self, missile) -> NDArray:
+        pass
+
+
+class GravityTurn(Guidance):
+    """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve. 
+    The optimal curve is computed based on the current velocity and the central angle to the target."""
+
+    def __init__(self, planet, target: "MovableObject"):
+        super().__init__(planet, target)
 
     def optimal_gamma(self, missile: MovableObject, sigma: NDArray) -> NDArray:
 
@@ -69,3 +73,17 @@ class GravityTurn(Guidance):
         gamma = self.optimal_gamma(missile, sigma)
 
         return self.gravity_turn_direction(missile, gamma)
+
+
+class ClosedFormBallistic(Guidance):
+    """Closed-form ballistic guidance: the missile starts vertically and stops thrusting at the optimal point, 
+    then follows a ballistic trajectory to the target. The optimal point is computed based on the current velocity 
+    and the central angle to the target.
+    """
+
+    def __init__(self, planet, target: "MovableObject"):
+            super().__init__(planet, target)
+
+    def get_guidance(self, missile: MovableObject) -> NDArray:
+        direction = self.target.position - missile.position
+        return direction / np.linalg.norm(direction)
