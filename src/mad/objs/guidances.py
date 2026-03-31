@@ -17,7 +17,7 @@ class Guidance(ABC):
         pass
 
 
-class ClosedFormBallistic(Guidance):
+class GravityTurn(Guidance):
 
     def __init__(self, planet, target: "MovableObject"):
         self.planet = planet
