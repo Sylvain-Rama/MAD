@@ -1,6 +1,6 @@
 from mad.objs.common_schemas import MovableObject
 
-
+from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 import numpy as np
@@ -11,6 +11,11 @@ if TYPE_CHECKING:
     from mad.objs.missiles import BallisticMissile
 
 logger = SourceLogger()
+
+@dataclass
+class GuidanceResults:
+    direction: NDArray
+    state:str
 
 
 class Guidance(ABC):
@@ -45,7 +50,7 @@ class Guidance(ABC):
 
 
     @abstractmethod
-    def get_guidance(self, missile: "BallisticMissile") -> NDArray:
+    def get_guidance(self, missile: "BallisticMissile") -> GuidanceResults:
         pass
 
 
@@ -55,6 +60,7 @@ class GravityTurn(Guidance):
 
     def __init__(self, planet, target: "MovableObject"):
         super().__init__(planet, target)
+        self.state = "powered"
 
     def gravity_turn_direction(
         self,
@@ -67,11 +73,14 @@ class GravityTurn(Guidance):
         d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
         return d / np.linalg.norm(d)
 
-    def get_guidance(self, missile: "BallisticMissile") -> NDArray:
+    def get_guidance(self, missile: "BallisticMissile") -> GuidanceResults:
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
 
-        return self.gravity_turn_direction(missile, gamma)
+        return GuidanceResults(
+            direction=self.gravity_turn_direction(missile, gamma),
+            state=self.state
+        )
 
 
 class ClosedFormBallistic(Guidance):
@@ -99,9 +108,24 @@ class ClosedFormBallistic(Guidance):
             self.state = "ballistic"
             logger["Physics"].info(f"{missile.name} switched to ballistic phase at distance {optimal_distance:.2f} m.")
 
-    def get_guidance(self, missile: "BallisticMissile") -> NDArray:
+    def gravity_turn_direction(
+        self,
+        missile: "BallisticMissile",
+        optimal_gamma: NDArray,
+    ):
+        r_hat, t_hat = self.local_frame(missile)
+        theta = optimal_gamma * missile.burned_fraction
+
+        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+        return d / np.linalg.norm(d)
+
+    def get_guidance(self, missile: "BallisticMissile") -> GuidanceResults:
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
+        direction = self.gravity_turn_direction(missile, gamma)
         self.set_flight_phase(missile, gamma)
 
-        return gamma 
+        return GuidanceResults(
+            direction=direction,
+            state=self.state
+        )

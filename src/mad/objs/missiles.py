@@ -11,7 +11,7 @@ from mad.objs.constants import G0
 from copy import deepcopy
 
 if TYPE_CHECKING:
-    from mad.objs.guidances import Guidance
+    from mad.objs.guidances import Guidance, GuidanceResults
 
 logger = SourceLogger()
 
@@ -103,6 +103,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
         self.Cd = 1.08
+        self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
     @property
     def mass(self):
@@ -153,12 +154,18 @@ class BallisticMissile(SimulationInterface, MovableObject):
     def thrust_acc(self) -> float:
         running_stage = self.stages[0]
         if not running_stage.active:
-            return np.zeros_like(self.velocity)
+            return 0.0
 
         return running_stage.thrust_force / self.mass
 
     def update(self, dt: float) -> None | Projectile:
         self.t += dt
+        self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+        if self.guidance_results:
+            if self.guidance_results.state != "powered":
+                logger["Missile"].info(f"{self.name} switched to {self.guidance_results.state} phase at {self.t:.2f}.")
+                [setattr(stage, "active", False) for stage in self.stages]
+
         running_stage = self.stages[0]
         running_stage.update(dt)
 
@@ -190,7 +197,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         # If there is no thrust, no need to check for direction: we cannot act on it.
         if self.thrust_acc > 0:
             # If no guidance, we continue along the same direction.
-            direction = self.guidance.get_guidance(self) if self.guidance else self.normalize
+            direction = self.guidance_results.direction if self.guidance_results else self.normalize
             direction = direction / np.linalg.norm(direction)
             thrust = self.thrust_acc * direction
         else:
