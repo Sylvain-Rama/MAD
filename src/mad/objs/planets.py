@@ -99,11 +99,11 @@ class Planet(MovableObject):
 
         return MovableObject(position=(self.radius + altitude) * v, name=name)
 
-    def create_2D_point_at_distance(self, obj: MovableObject, distance: float, name="RangedObj") -> MovableObject:
+    def create_2D_point_at_distance(self, obj: MovableObject, distance_km: float, name="RangedObj") -> MovableObject:
         # Create a new random object at set distance from another point on the planet.2D mode for easy plot.
 
         u = obj.normalize[:2]
-        sigma = distance / self.radius
+        sigma = (distance_km * 1000) / self.radius
 
         # random orthogonal direction
         v = np.random.normal(size=2)

@@ -8,6 +8,7 @@ dependencies = [
     "scipy",
     "matplotlib",
     "loguru",
+    "lamberthub",
 ]
 
 [tool.setuptools.packages.find]
