@@ -130,13 +130,12 @@ class BallisticMissile(SimulationInterface, MovableObject):
         # Extremely imprecise, as it does not take into account we lose stages
         return np.clip((self.initial_mass - self.mass) / (self.initial_mass - self.final_mass), 0, 1)
 
-    def ballistic_range(self, planet: Planet, gamma_deg: float = 30):
+    def ballistic_range(self, planet: Planet, gamma_rad: float=np.radians(45)) -> float:
         # Helper to quickly determine the range of the missile.
-        gamma = np.radians(gamma_deg)
         # Taking 0.8 to estimate for drag / gravity / steering losses
         deltav = 0.8 * self.deltav
-        num = deltav**2 * np.sin(gamma) * np.cos(gamma)
-        den = planet.mu / planet.radius - deltav**2 * np.sin(gamma) ** 2
+        num = deltav**2 * np.sin(gamma_rad) * np.cos(gamma_rad)
+        den = planet.mu / planet.radius - deltav**2 * np.sin(gamma_rad) ** 2
         central_angle = 2 * np.arctan(num / den)
 
         return planet.radius * central_angle
@@ -178,6 +177,8 @@ class BallisticMissile(SimulationInterface, MovableObject):
             if len(self.stages) == 0:
                 self.active = False
                 logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
+            else:
+                self.stages[0].t = self.t
             return Projectile(stage_cfg, t=deepcopy(self.t))
         else:
             return None

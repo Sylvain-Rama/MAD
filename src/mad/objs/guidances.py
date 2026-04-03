@@ -82,7 +82,8 @@ class ClosedFormBallistic(Guidance):
 
     def __init__(self, planet, target: "MovableObject"):
             super().__init__(planet, target)
-            self.state = "powered" 
+            self.state = "powered"
+             
 
     def set_flight_phase(self, missile: "BallisticMissile", gamma: NDArray) -> None:
     
@@ -92,11 +93,11 @@ class ClosedFormBallistic(Guidance):
             / (self.planet.mu / self.planet.radius - (0.8 * missile.deltav) ** 2 * np.sin(gamma) ** 2)
         )
 
-        linear_distance = np.linalg.norm(optimal_distance)
+        optimal_distance = np.linalg.norm(optimal_distance)
 
-        if self.state == "powered" and self.planet.surface_distance(missile, self.target) <= linear_distance:
+        if self.state == "powered" and self.planet.surface_distance(missile, self.target) <= optimal_distance:
             self.state = "ballistic"
-            logger["Physics"].info(f"{missile.name} switched to ballistic phase at distance {linear_distance:.2f} m.")
+            logger["Physics"].info(f"{missile.name} switched to ballistic phase at distance {optimal_distance:.2f} m.")
 
     def get_guidance(self, missile: "BallisticMissile") -> NDArray:
         sigma = self.central_angle(missile, self.target)
