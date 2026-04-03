@@ -11,7 +11,7 @@ from mad.objs.constants import G0
 from copy import deepcopy
 
 if TYPE_CHECKING:
-    from mad.objs.guidances import Guidance, GuidanceResults
+    from mad.objs.guidances import Guidance
 
 logger = SourceLogger()
 
@@ -131,7 +131,7 @@ class BallisticMissile(SimulationInterface, MovableObject):
         # Extremely imprecise, as it does not take into account we lose stages
         return np.clip((self.initial_mass - self.mass) / (self.initial_mass - self.final_mass), 0, 1)
 
-    def ballistic_range(self, planet: Planet, gamma_rad: float=np.radians(45)) -> float:
+    def ballistic_range(self, planet: Planet, gamma_rad: float = np.radians(45)) -> float:
         # Helper to quickly determine the range of the missile.
         # Taking 0.8 to estimate for drag / gravity / steering losses
         deltav = 0.8 * self.deltav
