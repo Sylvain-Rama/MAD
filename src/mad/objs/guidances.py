@@ -101,7 +101,7 @@ class ClosedFormBallistic(Guidance):
             * np.arctan(v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2))
         )
 
-        optimal_distance = np.linalg.norm(optimal_distance) * 2
+        optimal_distance = np.linalg.norm(optimal_distance) * 1.5
 
         # Use only the tangential (horizontal) component of the remaining distance so that
         # radial ascent — which doesn't change the downrange position — cannot inflate the
