@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib",
     "loguru",
     "lamberthub",
+    "tqdm>=4.67.3",
 ]
 
 [tool.setuptools.packages.find]

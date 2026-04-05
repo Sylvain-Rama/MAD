@@ -90,18 +90,18 @@ class ClosedFormBallistic(Guidance):
         super().__init__(planet, target)
         self.state = "powered"
 
-    def set_flight_phase(self, missile: "BallisticMissile", gamma: NDArray, t: float) -> None:
+    def set_flight_phase(self, missile: "BallisticMissile", gamma: NDArray, sigma: NDArray, t: float) -> None:
 
-        # Compute the optimal distance to stop thrusting based on the current velocity and central angle.
+        # Compute the optimal angle (and corresponding arc-length distance) to stop thrusting
+        # based on the current velocity and central angle.
         r = np.linalg.norm(missile.position)
         v = missile.velocity
-        optimal_distance = (
-            self.planet.radius
-            * 2
-            * np.arctan(v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2))
+        optimal_angle = 2 * np.arctan(
+            v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2)
         )
 
-        optimal_distance = np.linalg.norm(optimal_distance) * 1.5
+        optimal_angle = np.linalg.norm(optimal_angle)
+        optimal_distance = self.planet.radius * optimal_angle
 
         # Use only the tangential (horizontal) component of the remaining distance so that
         # radial ascent — which doesn't change the downrange position — cannot inflate the
@@ -112,6 +112,11 @@ class ClosedFormBallistic(Guidance):
         if tangential_distance <= optimal_distance:
             self.state = "ballistic"
             logger["Physics"].info(f"{missile.name} switched to ballistic phase at distance {optimal_distance:.2f} m.")
+        elif sigma <= optimal_angle:
+            self.state = "ballistic"
+            logger["Physics"].info(
+                f"{missile.name} switched to ballistic phase at central angle {np.degrees(sigma):.2f} deg."
+            )
 
     def gravity_turn_direction(
         self,
@@ -128,6 +133,6 @@ class ClosedFormBallistic(Guidance):
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
         direction = self.gravity_turn_direction(missile, gamma)
-        self.set_flight_phase(missile, gamma, t)
+        self.set_flight_phase(missile, gamma, sigma, t)
 
         return GuidanceResults(direction=direction, state=self.state)

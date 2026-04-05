@@ -16,8 +16,9 @@ class History:
         self.velocity.append(velocity)
 
 
-class MovableObject:
+class MovableObj:
     _id_counter: int = 0
+
     def __init__(
         self,
         position: list[float] | NDArray,
@@ -32,8 +33,8 @@ class MovableObject:
             self.velocity = np.zeros_like(self.position)
         self.active: bool = True
         self.name = name
-        self._id = self.__class__.__name__ + f"_{self.name}_" + str(MovableObject._id_counter)
-        MovableObject._id_counter += 1
+        self._id = self.__class__.__name__ + f"_{self.name}_" + str(MovableObj._id_counter)
+        MovableObj._id_counter += 1
 
     @property
     def normalize(self) -> NDArray[np.floating]:
@@ -42,14 +43,14 @@ class MovableObject:
             return np.zeros_like(self.position)
         return self.position / norm
 
-    def distance(self, other: "MovableObject") -> np.floating:
+    def distance(self, other: "MovableObj") -> np.floating:
         return np.linalg.norm(self.position - other.position)
 
     def __repr__(self):
         a = "active" if self.active else "inactive"
         return f"{self.name} at {self.position}, velocity {self.velocity}, {a}."
-    
-    def __eq__(self, other:object)->bool:
-        if not isinstance(other, MovableObject):
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MovableObj):
             return False
         return self._id == other._id

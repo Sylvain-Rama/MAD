@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.common_schemas import MovableObject, History
+from mad.objs.common_schemas import MovableObj, History
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = SourceLogger()
 
 
-class Payload(MovableObject):
+class Payload(MovableObj):
     mass: float  # kg
     area: float  # m^2
     yield_kt: float  # kt
@@ -92,7 +92,7 @@ class BallisticConfig:
         return asdict(self)
 
 
-class BallisticMissile(SimulationInterface, MovableObject):
+class BallisticMissile(SimulationInterface, MovableObj):
     def __init__(self, cfg: BallisticConfig, t=0.0):
         super().__init__(position=cfg.position, name=cfg.name)
 

@@ -48,6 +48,9 @@ class _BoundSourceLogger:
     def critical(self, message, *a, **kw):
         self._logger.critical(message, *a, **kw)
 
+    def success(self, message, *a, **kw):
+        self._logger.success(message, *a, **kw)     
+
 
 class SourceLogger:
     def __init__(self, base_logger=get_logger()):
