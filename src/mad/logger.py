@@ -49,7 +49,7 @@ class _BoundSourceLogger:
         self._logger.critical(message, *a, **kw)
 
     def success(self, message, *a, **kw):
-        self._logger.success(message, *a, **kw)     
+        self._logger.success(message, *a, **kw)
 
 
 class SourceLogger:

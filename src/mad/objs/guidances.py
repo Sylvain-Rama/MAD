@@ -1,4 +1,4 @@
-from mad.objs.common_schemas import MovableObject
+from mad.objs.common_schemas import MovableObj
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -21,12 +21,12 @@ class GuidanceResults:
 
 class Guidance(ABC):
     # Any Guidance class should return the direction as a NDArray of same shape of position or velocity.
-    def __init__(self, planet, target: "MovableObject"):
+    def __init__(self, planet, target: "MovableObj"):
         self.planet = planet
         self.target = target
 
     @staticmethod
-    def central_angle(missile: "BallisticMissile", target: MovableObject) -> NDArray:
+    def central_angle(missile: "BallisticMissile", target: MovableObj) -> NDArray:
         return np.arccos(np.clip(np.dot(missile.normalize, target.normalize), -1, 1))
 
     def local_frame(self, missile: "BallisticMissile") -> tuple[NDArray, NDArray]:
@@ -58,7 +58,7 @@ class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
 
-    def __init__(self, planet, target: "MovableObject"):
+    def __init__(self, planet, target: "MovableObj"):
         super().__init__(planet, target)
         self.state = "powered"
 
@@ -86,7 +86,7 @@ class ClosedFormBallistic(Guidance):
     and the central angle to the target.
     """
 
-    def __init__(self, planet, target: "MovableObject"):
+    def __init__(self, planet, target: "MovableObj"):
         super().__init__(planet, target)
         self.state = "powered"
 

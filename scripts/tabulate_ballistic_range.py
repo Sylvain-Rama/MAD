@@ -32,9 +32,7 @@ from mad.logger import SourceLogger
 
 logger = SourceLogger()
 
-AVAILABLE_OBJECTS = {"titan_stage_1": StageConfig(**titan_stage_1), 
-                     "titan_stage_2": StageConfig(**titan_stage_2)
-                     }
+AVAILABLE_OBJECTS = {"titan_stage_1": StageConfig(**titan_stage_1), "titan_stage_2": StageConfig(**titan_stage_2)}
 
 DT = 10.0  # time step (s) — coarse is intentional
 MAX_TIME = 7_200.0  # 2 h; enough for any sub-orbital ballistic arc
@@ -43,6 +41,7 @@ ALTITUDES_KM = np.arange(0, 601, 50)
 VELOCITIES_KMS = np.arange(1.0, 8.5, 0.5)
 GAMMAS_DEG = np.arange(5, 75, 5)
 
+
 def parse_args():
     parser = ArgumentParser(description="Tabulate ballistic range for Earth.")
     parser.add_argument(
@@ -50,7 +49,8 @@ def parse_args():
         "-c",
         type=str,
         default="titan_stage_2",
-        help="Ballistic Object config to use (default: titan_stage_2). Available: " + ", ".join(AVAILABLE_OBJECTS.keys()),
+        help="Ballistic Object config to use (default: titan_stage_2). Available: "
+        + ", ".join(AVAILABLE_OBJECTS.keys()),
     )
     return parser.parse_args()
 
@@ -70,7 +70,11 @@ def simulate(planet: Planet, config: StageConfig, r0: float, v0: float, gamma_ra
 
     vel = v0 * (np.sin(gamma_rad) * r_hat + np.cos(gamma_rad) * t_hat)
 
-    obj = Projectile(ProjectileConfig(position=pos.tolist(), velocity=vel.tolist(), mass=config.dry_mass, area=config.area, Cd=config.Cd))
+    obj = Projectile(
+        ProjectileConfig(
+            position=pos.tolist(), velocity=vel.tolist(), mass=config.dry_mass, area=config.area, Cd=config.Cd
+        )
+    )
     start_hat = obj.normalize.copy()
 
     for _ in range(int(MAX_TIME / DT)):
@@ -90,7 +94,7 @@ def main() -> None:
     args = parse_args()
     planet = Planet(PlanetConfig(**EARTH_SETTINGS))
     config = AVAILABLE_OBJECTS[args.config]
-    
+
     grid = [
         (alt_km, v_kms, gamma_deg) for alt_km in ALTITUDES_KM for v_kms in VELOCITIES_KMS for gamma_deg in GAMMAS_DEG
     ]
@@ -98,13 +102,13 @@ def main() -> None:
     logger["Physics"].info(f"Computing {total} trajectories  (dt={DT} s, max_time={MAX_TIME} s) …")
 
     rows = []
-    for i, (alt_km, v_kms, gamma_deg) in tqdm(enumerate(grid), total=total, desc = "Simulating trajectories"):
+    for i, (alt_km, v_kms, gamma_deg) in tqdm(enumerate(grid), total=total, desc="Simulating trajectories"):
         r0 = planet.radius + alt_km * 1e3
         v0 = v_kms * 1e3
         gamma_rad = np.radians(gamma_deg)
 
         result = simulate(planet, config, r0, v0, gamma_rad)
-        
+
         rows.append(
             dict(
                 altitude_m=alt_km * 1e3,
@@ -121,7 +125,7 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    logger["Physics"].success(f"Saved {total} rows → {out_path}")
+    logger["Physics"].success(f"Saved {total} rows to {out_path}")
 
 
 if __name__ == "__main__":
