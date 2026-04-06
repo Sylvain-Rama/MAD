@@ -139,9 +139,10 @@ class Planet(MovableObj):
 
 class SimulationInterface(ABC):
     """SimulationInterface is an abstract class that defines the interface for any object that can be simulated in the planet environment.
-     It requires the implementation of the update, accelerations and integrate methods, which are used to update the object's state, 
-     compute the accelerations and integrate the equations of motion, respectively. It is used to ensure that all objects that can be 
-     simulated in the planet environment have a consistent interface and can be easily integrated into the simulation loop."""
+    It requires the implementation of the update, accelerations and integrate methods, which are used to update the object's state,
+    compute the accelerations and integrate the equations of motion, respectively. It is used to ensure that all objects that can be
+    simulated in the planet environment have a consistent interface and can be easily integrated into the simulation loop.
+    """
 
     @abstractmethod
     def update(self, dt: float) -> MovableObj | None:

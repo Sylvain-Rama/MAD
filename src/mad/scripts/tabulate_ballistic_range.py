@@ -12,13 +12,10 @@ Usage:
     python scripts/tabulate_ballistic_range.py
 
 Output:
-    scripts/ballistic_table.csv
+    tables/ballistic_table.csv
 """
 
-import sys
 import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import csv
 import numpy as np
@@ -26,17 +23,20 @@ from argparse import ArgumentParser
 from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.objs.missiles import StageConfig
+from mad.objs.missiles import MissileStageConfig
 from mad.objs.constants import EARTH_SETTINGS, titan_stage_1, titan_stage_2
 from mad.logger import SourceLogger
+from mad.utils import BALLISTIC_FIELD_NAMES
 
 logger = SourceLogger()
 
-AVAILABLE_OBJECTS = {"titan_stage_1": StageConfig(**titan_stage_1), "titan_stage_2": StageConfig(**titan_stage_2)}
-FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad"]
+AVAILABLE_OBJECTS = {"titan_stage_1": MissileStageConfig(**titan_stage_1), 
+                     "titan_stage_2": MissileStageConfig(**titan_stage_2),
+                     }
+
 
 DT = 10.0  # time step (s) — coarse is intentional
-MAX_TIME = 7_200.0  # 2 h; enough for any sub-orbital ballistic arc
+MAX_TIME = 14_400.0  # 4 h; enough for any sub-orbital ballistic arc
 
 ALTITUDES_KM = np.arange(0, 601, 50)
 VELOCITIES_KMS = np.arange(1.0, 8.5, 0.5)
@@ -56,7 +56,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def simulate(planet: Planet, config: StageConfig, r0: float, v0: float, gamma_rad: float) -> float | None:
+def simulate(planet: Planet, config: MissileStageConfig, r0: float, v0: float, gamma_rad: float) -> float | None:
     """
     Simulate a ballistic arc in the (x, y) plane starting from radius r0,
     speed v0, elevation angle gamma_rad above local horizontal.
@@ -120,10 +120,10 @@ def main() -> None:
             )
         )
 
-    out_path = os.path.join("tables", args.config + "_table.csv")
-    
+    out_path = os.path.join("tables", args.config + ".csv")
+
     with open(out_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELD_NAMES)
+        writer = csv.DictWriter(f, fieldnames=BALLISTIC_FIELD_NAMES)
         writer.writeheader()
         writer.writerows(rows)
 
