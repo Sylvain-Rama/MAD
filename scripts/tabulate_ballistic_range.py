@@ -33,6 +33,7 @@ from mad.logger import SourceLogger
 logger = SourceLogger()
 
 AVAILABLE_OBJECTS = {"titan_stage_1": StageConfig(**titan_stage_1), "titan_stage_2": StageConfig(**titan_stage_2)}
+FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad"]
 
 DT = 10.0  # time step (s) — coarse is intentional
 MAX_TIME = 7_200.0  # 2 h; enough for any sub-orbital ballistic arc
@@ -109,6 +110,7 @@ def main() -> None:
 
         result = simulate(planet, config, r0, v0, gamma_rad)
 
+        # Fields are altitude (m), velocity (m/s), gamma (rad), range (rad)
         rows.append(
             dict(
                 altitude_m=alt_km * 1e3,
@@ -119,9 +121,9 @@ def main() -> None:
         )
 
     out_path = os.path.join("tables", args.config + "_table.csv")
-    fieldnames = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad"]
+    
     with open(out_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=FIELD_NAMES)
         writer.writeheader()
         writer.writerows(rows)
 

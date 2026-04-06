@@ -54,3 +54,16 @@ class MovableObj:
         if not isinstance(other, MovableObj):
             return False
         return self._id == other._id
+
+
+class BallisticObj(MovableObj):
+
+    def __init__(
+        self,
+        position: list[float] | NDArray,
+        velocity: list[float] | NDArray | None = None,
+        name: str = "BallisticObject",
+    ):
+        super().__init__(position, velocity, name)
+
+    pass

@@ -8,6 +8,7 @@ SOURCE_COLORS = {
     "Physics": "<white>",
     "Projectile": "<blue>",
     "Unknown": "<yellow>",
+    "I/O": "<cyan>",
 }
 
 

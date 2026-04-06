@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.common_schemas import MovableObj, History
+from mad.objs.common_schemas import BallisticObj, History
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
@@ -16,14 +16,14 @@ if TYPE_CHECKING:
 logger = SourceLogger()
 
 
-class Payload(MovableObj):
+class Payload(BallisticObj):
     mass: float  # kg
     area: float  # m^2
     yield_kt: float  # kt
 
 
 @dataclass
-class StageConfig:
+class MissileStageConfig:
     dry_mass: float  # kg
     propellant_mass: float  # kg
     thrust: float  # N = kg * m / s^2
@@ -31,7 +31,8 @@ class StageConfig:
     area: float  # m^2
     Cd: float
     payload: Payload | None = None
-    name: str = "Stage"
+    name: str = "MissileStage"
+    ballistic_table: str | None = None
 
     @property
     def to_dict(self):
@@ -39,7 +40,7 @@ class StageConfig:
 
 
 class MissileStage:
-    def __init__(self, cfg: StageConfig):
+    def __init__(self, cfg: MissileStageConfig):
         self.config = cfg
         self.dry_mass = cfg.dry_mass
         self.propellant_mass = cfg.propellant_mass
@@ -57,6 +58,10 @@ class MissileStage:
         self.payload = cfg.payload
         self.name = cfg.name
         self.t = 0.0
+        if cfg.ballistic_table:
+            self.ballistic_table = np.loadtxt(cfg.ballistic_table, delimiter=",", skiprows=1)
+        else:
+            self.ballistic_table = None
 
     @property
     def mass(self) -> float:
@@ -81,7 +86,7 @@ class MissileStage:
 
 
 @dataclass
-class BallisticConfig:
+class BallisticMissileConfig:
     stages: list[MissileStage]
     position: list[float] | NDArray
     name: str = "MultiStageMissile"
@@ -92,8 +97,8 @@ class BallisticConfig:
         return asdict(self)
 
 
-class BallisticMissile(SimulationInterface, MovableObj):
-    def __init__(self, cfg: BallisticConfig, t=0.0):
+class BallisticMissile(SimulationInterface, BallisticObj):
+    def __init__(self, cfg: BallisticMissileConfig, t=0.0):
         super().__init__(position=cfg.position, name=cfg.name)
 
         self.stages = cfg.stages
