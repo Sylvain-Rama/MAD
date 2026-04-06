@@ -17,6 +17,16 @@ class History:
 
 
 class MovableObj:
+    """MovableObj is the base class for any object that has a position and velocity, and can move in the simulation.
+    It provides basic functionalities such as distance calculation and normalization of the position vector.
+    It does not have any mass, area or drag coefficient, and is not affected by gravity or drag. 
+    It is only a geometric point that can move in space.
+    Parameters:
+    - position: initial position of the object in meters (m)
+    - velocity: initial velocity of the object in meters per second (m/s)
+    - name: name of the object (string)
+    """
+
     _id_counter: int = 0
 
     def __init__(
@@ -55,15 +65,27 @@ class MovableObj:
             return False
         return self._id == other._id
 
-
 class BallisticObj(MovableObj):
+    """
+    BallisticObj is a MovableObj with mass, area and drag coefficient, which can be used for projectiles and missiles.
+    It does not have any guidance or propulsion, and is only affected by gravity and drag.
+    Parameters:
+    - position: initial position of the object in meters (m)
+    - velocity: initial velocity of the object in meters per second (m/s)
+    - name: name of the object (string)
+    - mass: mass of the object in kg
+    - area: cross-sectional area of the object in m^2
+    - Cd: drag coefficient of the object (dimensionless)
+    """
 
-    def __init__(
-        self,
-        position: list[float] | NDArray,
-        velocity: list[float] | NDArray | None = None,
-        name: str = "BallisticObject",
-    ):
+    def __init__(self, 
+                 position: list[float] | NDArray, 
+                 velocity: list[float] | NDArray | None = None, 
+                 name: str = "BallisticObject",
+                 mass: float = 1.0,
+                 area: float = 0.01,
+                 Cd: float = 0.47):
         super().__init__(position, velocity, name)
-
-    pass
+        self.mass = mass
+        self.area = area
+        self.Cd = Cd

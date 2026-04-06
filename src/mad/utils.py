@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from mad.logger import SourceLogger
-from scripts.tabulate_ballistic_range import FIELD_NAMES
+from mad.scripts.tabulate_ballistic_range import FIELD_NAMES
 
 logger = SourceLogger()
 
