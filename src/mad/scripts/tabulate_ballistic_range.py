@@ -62,7 +62,7 @@ def simulate(planet: Planet, config: MissileStageConfig, r0: float, v0: float, g
     speed v0, elevation angle gamma_rad above local horizontal.
 
     Returns the central angle covered (rad) until ground impact,
-    or None if the object does not return within MAX_TIME.
+    or np.nan if the object does not return within MAX_TIME.
     """
     # Place the missile at (r0, 0, 0); build velocity in the x-y plane.
     pos = np.array([r0, 0.0, 0.0], dtype=float)
@@ -85,7 +85,7 @@ def simulate(planet: Planet, config: MissileStageConfig, r0: float, v0: float, g
         obj.velocity = obj.velocity + acc * DT
         obj.position = obj.position + obj.velocity * DT
     else:
-        return None  # escape trajectory or very long range
+        return np.nan  # escape trajectory or very long range
 
     cos_a = np.clip(np.dot(start_hat, obj.normalize), -1.0, 1.0)
     return float(np.arccos(cos_a))
