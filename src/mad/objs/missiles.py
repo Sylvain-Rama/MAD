@@ -107,7 +107,7 @@ class BallisticMissile(SimulationInterface, MovableObj):
         self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
-        self.Cd = 1.08 # long cylinder, should be good enough for a first approximation
+        self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
     @property

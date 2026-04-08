@@ -4,7 +4,7 @@ G: float = 6.67408e-11  # m^3/(kg*s^2)
 G0: float = 9.80665  # m/s^2, value for earth
 
 EARTH_SETTINGS = {
-    "position": [0, 0, 0],  # center of the sim
+    "position": [0.0, 0.0, 0.0],  # center of the sim
     "radius": 6371000.0,  # m
     "mass": 5.972e24,  # kg
     "spin_rate": 7.0882359e-5,  # rad/s

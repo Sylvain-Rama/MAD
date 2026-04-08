@@ -25,22 +25,25 @@ from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.missiles import MissileStageConfig
 from mad.objs.constants import EARTH_SETTINGS, titan_stage_1, titan_stage_2
-from mad.logger import SourceLogger
+from mad.simulation import run_simulation
+from mad.logger import SourceLogger, configure_logger
 from mad.utils import BALLISTIC_FIELD_NAMES
 
+configure_logger(active_sources=["I/O"])
 logger = SourceLogger()
 
-AVAILABLE_OBJECTS = {"titan_stage_1": MissileStageConfig(**titan_stage_1), 
-                     "titan_stage_2": MissileStageConfig(**titan_stage_2),
-                     }
+AVAILABLE_OBJECTS = {
+    "titan_stage_1": MissileStageConfig(**titan_stage_1),
+    "titan_stage_2": MissileStageConfig(**titan_stage_2),
+}
 
 
-DT = 10.0  # time step (s) — coarse is intentional
-MAX_TIME = 14_400.0  # 4 h; enough for any sub-orbital ballistic arc
+DT = 5.0  # time step (s) — coarse is intentional
+MAX_TIME = 3600.0  # 2 h; enough for any sub-orbital ballistic arc
 
 ALTITUDES_KM = np.arange(0, 601, 50)
-VELOCITIES_KMS = np.arange(1.0, 8.5, 0.5)
-GAMMAS_DEG = np.arange(5, 75, 5)
+VELOCITIES_KMS = np.arange(0.5, 8.5, 0.5)
+GAMMAS_DEG = np.arange(-20, 90, 5)
 
 
 def parse_args():
@@ -76,18 +79,17 @@ def simulate(planet: Planet, config: MissileStageConfig, r0: float, v0: float, g
             position=pos.tolist(), velocity=vel.tolist(), mass=config.dry_mass, area=config.area, Cd=config.Cd
         )
     )
-    start_hat = obj.normalize.copy()
+    start_pos = obj.position.copy()
 
-    for _ in range(int(MAX_TIME / DT)):
-        if np.linalg.norm(obj.position) <= planet.radius:
-            break
-        acc = planet.gravity(obj) + planet.drag(obj)
-        obj.velocity = obj.velocity + acc * DT
-        obj.position = obj.position + obj.velocity * DT
-    else:
-        return np.nan  # escape trajectory or very long range
+    simulated_object = run_simulation([obj], planet, dt=DT, max_time=MAX_TIME)
 
-    cos_a = np.clip(np.dot(start_hat, obj.normalize), -1.0, 1.0)
+    final_pos = simulated_object[0].history.position[-1]
+
+    cos_a = np.clip(
+        np.dot(start_pos, final_pos) / (np.linalg.norm(start_pos) * np.linalg.norm(final_pos)),
+        -1.0,
+        1.0,
+    )
     return float(np.arccos(cos_a))
 
 
@@ -100,7 +102,7 @@ def main() -> None:
         (alt_km, v_kms, gamma_deg) for alt_km in ALTITUDES_KM for v_kms in VELOCITIES_KMS for gamma_deg in GAMMAS_DEG
     ]
     total = len(grid)
-    logger["Physics"].info(f"Computing {total} trajectories  (dt={DT} s, max_time={MAX_TIME} s) …")
+    logger["I/O"].info(f"Computing {total} trajectories  (dt={DT} s, max_time={MAX_TIME} s) …")
 
     rows = []
     for i, (alt_km, v_kms, gamma_deg) in tqdm(enumerate(grid), total=total, desc="Simulating trajectories"):
@@ -127,7 +129,7 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    logger["Physics"].success(f"Saved {total} rows to {out_path}")
+    logger["I/O"].success(f"Saved {total} rows to {out_path}")
 
 
 if __name__ == "__main__":

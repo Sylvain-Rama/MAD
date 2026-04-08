@@ -25,7 +25,7 @@ def load_ballistic_table(table_name: str) -> NDArray | None:
     """Load a ballistic table from a CSV file. The CSV file must have columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     The first row must be a header with exactly those column names. Returns a 2D numpy array with those four columns."""
 
-    # TODO: Use a proper path management solution and make this more robust to different environments. 
+    # TODO: Use a proper path management solution and make this more robust to different environments.
     # For now, we assume the tables are in src/mad/tables and the script is run from the root of the repo.
     file_path = f"/app/src/mad/tables/{table_name}.csv"
     expected_columns = BALLISTIC_FIELD_NAMES
