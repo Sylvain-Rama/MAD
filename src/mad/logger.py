@@ -1,6 +1,10 @@
 from loguru import logger
 import sys
 
+_inactive_sources: set[str] = set()
+_active_sources: set[str] = set()
+_all_disabled: bool = False
+
 SOURCE_COLORS = {
     "Simulation": "<white>",
     "Missile": "<red>",
@@ -10,6 +14,15 @@ SOURCE_COLORS = {
     "Unknown": "<yellow>",
     "I/O": "<cyan>",
 }
+
+
+def _source_filter(record) -> bool:
+    if _all_disabled:
+        return False
+    source = record["extra"].get("source", "Unknown")
+    if _active_sources:
+        return source in _active_sources
+    return source not in _inactive_sources
 
 
 def formatter(record):
@@ -25,9 +38,28 @@ def get_logger():
         sys.stdout,
         format=formatter,
         colorize=True,
+        filter=_source_filter,
     )
 
     return logger
+
+
+def configure_logger(
+    inactive_sources: list[str] | None = None,
+    active_sources: list[str] | None = None,
+    disable_all: bool = False,
+):
+    global _inactive_sources, _active_sources, _all_disabled
+    _inactive_sources = set(inactive_sources or [])
+    _active_sources = set(active_sources or [])
+    _all_disabled = disable_all
+    logger.remove()
+    logger.add(
+        sys.stdout,
+        format=formatter,
+        colorize=True,
+        filter=_source_filter,
+    )
 
 
 class _BoundSourceLogger:
@@ -67,3 +99,18 @@ if __name__ == "__main__":
     madlogger["Simulation"].warning("test")
     madlogger["Missile"].info("info")
     madlogger["dfdsf"].critical("critical")
+
+    print("--- Missile silenced ---")
+    configure_logger(inactive_sources=["Missile"])
+    madlogger["Simulation"].warning("test")
+    madlogger["Missile"].info("this should not appear")
+
+    print("--- Only Simulation active ---")
+    configure_logger(active_sources=["Simulation"])
+    madlogger["Simulation"].warning("visible")
+    madlogger["Missile"].info("this should not appear")
+    madlogger["Projectile"].debug("this should not appear")
+
+    print("--- All disabled ---")
+    configure_logger(disable_all=True)
+    madlogger["Simulation"].warning("this should not appear")
