@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.common_schemas import BallisticObj, History
+from mad.objs.common_schemas import BallisticObj, History, MovableObj
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
@@ -88,26 +88,26 @@ class MissileStage:
 @dataclass
 class BallisticMissileConfig:
     stages: list[MissileStage]
-    position: list[float] | NDArray
-    name: str = "MultiStageMissile"
     guidance: "Guidance | None" = None
+    payload: Payload | None = None
 
     @property
     def to_dict(self):
         return asdict(self)
 
 
-class BallisticMissile(SimulationInterface, BallisticObj):
-    def __init__(self, cfg: BallisticMissileConfig, t=0.0):
-        super().__init__(position=cfg.position, name=cfg.name)
+class BallisticMissile(SimulationInterface, MovableObj):
+    def __init__(self, position, cfg: BallisticMissileConfig, velocity=None, name="BallisticMissile", t=0.0):
+        super().__init__(position=position, velocity=velocity, name=name)
 
         self.stages = cfg.stages
         self.guidance = cfg.guidance
+        self.payload = cfg.payload
         self.t = t
         self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
-        self.Cd = 1.08
+        self.Cd = 1.08 # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
     @property
