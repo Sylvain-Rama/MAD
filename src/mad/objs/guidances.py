@@ -1,4 +1,4 @@
-from mad.objs.common_schemas import MovableObject
+from mad.objs.common_schemas import MovableObj
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -21,12 +21,12 @@ class GuidanceResults:
 
 class Guidance(ABC):
     # Any Guidance class should return the direction as a NDArray of same shape of position or velocity.
-    def __init__(self, planet, target: "MovableObject"):
+    def __init__(self, planet, target: "MovableObj"):
         self.planet = planet
         self.target = target
 
     @staticmethod
-    def central_angle(missile: "BallisticMissile", target: MovableObject) -> NDArray:
+    def central_angle(missile: "BallisticMissile", target: MovableObj) -> NDArray:
         return np.arccos(np.clip(np.dot(missile.normalize, target.normalize), -1, 1))
 
     def local_frame(self, missile: "BallisticMissile") -> tuple[NDArray, NDArray]:
@@ -58,7 +58,7 @@ class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
 
-    def __init__(self, planet, target: "MovableObject"):
+    def __init__(self, planet, target: "MovableObj"):
         super().__init__(planet, target)
         self.state = "powered"
 
@@ -86,22 +86,22 @@ class ClosedFormBallistic(Guidance):
     and the central angle to the target.
     """
 
-    def __init__(self, planet, target: "MovableObject"):
+    def __init__(self, planet, target: "MovableObj"):
         super().__init__(planet, target)
         self.state = "powered"
 
-    def set_flight_phase(self, missile: "BallisticMissile", gamma: NDArray, t: float) -> None:
+    def set_flight_phase(self, missile: "BallisticMissile", gamma: NDArray, sigma: NDArray, t: float) -> None:
 
-        # Compute the optimal distance to stop thrusting based on the current velocity and central angle.
+        # Compute the optimal angle (and corresponding arc-length distance) to stop thrusting
+        # based on the current velocity and central angle.
         r = np.linalg.norm(missile.position)
         v = missile.velocity
-        optimal_distance = (
-            self.planet.radius
-            * 2
-            * np.arctan(v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2))
+        optimal_angle = 2 * np.arctan(
+            v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2)
         )
 
-        optimal_distance = np.linalg.norm(optimal_distance) * 1.5
+        optimal_angle = np.linalg.norm(optimal_angle)
+        optimal_distance = self.planet.radius * optimal_angle
 
         # Use only the tangential (horizontal) component of the remaining distance so that
         # radial ascent — which doesn't change the downrange position — cannot inflate the
@@ -112,6 +112,11 @@ class ClosedFormBallistic(Guidance):
         if tangential_distance <= optimal_distance:
             self.state = "ballistic"
             logger["Physics"].info(f"{missile.name} switched to ballistic phase at distance {optimal_distance:.2f} m.")
+        elif sigma <= optimal_angle:
+            self.state = "ballistic"
+            logger["Physics"].info(
+                f"{missile.name} switched to ballistic phase at central angle {np.degrees(sigma):.2f} deg."
+            )
 
     def gravity_turn_direction(
         self,
@@ -128,6 +133,6 @@ class ClosedFormBallistic(Guidance):
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
         direction = self.gravity_turn_direction(missile, gamma)
-        self.set_flight_phase(missile, gamma, t)
+        self.set_flight_phase(missile, gamma, sigma, t)
 
         return GuidanceResults(direction=direction, state=self.state)

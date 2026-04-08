@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.planets import Planet, SimulationInterface
-from mad.objs.common_schemas import MovableObject, History
+from mad.objs.common_schemas import BallisticObj, History
 from mad.logger import SourceLogger
 
 logger = SourceLogger()
@@ -22,12 +22,9 @@ class ProjectileConfig:
         return asdict(self)
 
 
-class Projectile(SimulationInterface, MovableObject):
+class Projectile(SimulationInterface, BallisticObj):
     def __init__(self, config: ProjectileConfig, t: float = 0.0):
-        super().__init__(config.position, config.velocity, config.name)
-        self.mass = config.mass
-        self.area = config.area
-        self.Cd = config.Cd
+        super().__init__(config.position, config.velocity, config.name, config.mass, config.area, config.Cd)
         self.config = config
         self.history = History(position=[self.position.tolist()], velocity=[self.velocity.tolist()], time=[t])
         self.t = t

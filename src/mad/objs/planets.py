@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from mad.objs.common_schemas import MovableObject
+from mad.objs.common_schemas import MovableObj
 from mad.objs.constants import G
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
@@ -24,7 +24,7 @@ class PlanetConfig:
         return asdict(self)
 
 
-class Planet(MovableObject):
+class Planet(MovableObj):
     def __init__(self, config: PlanetConfig):
         super().__init__(config.position, config.velocity, config.name)
         self.mass = config.mass
@@ -46,7 +46,7 @@ class Planet(MovableObject):
     def gravity_at_surface(self):
         surface_pos = np.zeros_like(self.position)
         surface_pos[0] = self.radius
-        surf_obj = MovableObject(position=surface_pos)
+        surf_obj = MovableObj(position=surface_pos)
 
         # We take the first element as this is where distance = planet.radius.
         return self.gravity(surf_obj)[0]
@@ -60,7 +60,7 @@ class Planet(MovableObject):
             f"Escape velocity: {self.escape_velocity:.2f} m/s"
         )
 
-    def drag(self, obj: MovableObject) -> NDArray:
+    def drag(self, obj: MovableObj) -> NDArray:
         drag = np.zeros_like(obj.velocity)
         alt = max(0.0, self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
 
@@ -72,7 +72,7 @@ class Planet(MovableObject):
 
         return drag
 
-    def gravity(self, other: MovableObject) -> NDArray:
+    def gravity(self, other: MovableObj) -> NDArray:
         r_vec = other.position - self.position
         dist = np.linalg.norm(r_vec)
         if dist < 1e-6:
@@ -80,7 +80,7 @@ class Planet(MovableObject):
 
         return -self.mu * r_vec / dist**3
 
-    def surface_distance(self, obj1: MovableObject, obj2: MovableObject) -> float:
+    def surface_distance(self, obj1: MovableObj, obj2: MovableObj) -> float:
         # Will give the linear distance (m) between 2 objects placed at the surface.
 
         cos_angle = np.dot(obj1.position, obj2.position) / (
@@ -91,15 +91,15 @@ class Planet(MovableObject):
 
         return self.radius * angle
 
-    def create_2D_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObject:
+    def create_2D_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObj:
         # Create a random object at the 2D surface (+ altitude) of the planet.
 
         v = np.random.normal(size=2)
         v /= np.linalg.norm(v)
 
-        return MovableObject(position=(self.radius + altitude) * v, name=name)
+        return MovableObj(position=(self.radius + altitude) * v, name=name)
 
-    def create_2D_point_at_distance(self, obj: MovableObject, distance_km: float, name="RangedObj") -> MovableObject:
+    def create_2D_point_at_distance(self, obj: MovableObj, distance_km: float, name="RangedObj") -> MovableObj:
         # Create a new random object at set distance from another point on the planet.2D mode for easy plot.
 
         u = obj.normalize[:2]
@@ -112,9 +112,9 @@ class Planet(MovableObject):
 
         point = np.cos(sigma) * u + np.sin(sigma) * v
 
-        return MovableObject(position=self.radius * point, name=name)
+        return MovableObj(position=self.radius * point, name=name)
 
-    def plot_2D_with_points(self, points: list[MovableObject] | None, ax=None) -> mpl.figure.Figure | None:
+    def plot_2D_with_points(self, points: list[MovableObj] | None, ax=None) -> mpl.figure.Figure | None:
         # 2D plot of the planet. If using point in 2D, they will appear at the circumference.
         plot_fig = False
         if ax is None:
@@ -138,9 +138,14 @@ class Planet(MovableObject):
 
 
 class SimulationInterface(ABC):
+    """SimulationInterface is an abstract class that defines the interface for any object that can be simulated in the planet environment.
+    It requires the implementation of the update, accelerations and integrate methods, which are used to update the object's state,
+    compute the accelerations and integrate the equations of motion, respectively. It is used to ensure that all objects that can be
+    simulated in the planet environment have a consistent interface and can be easily integrated into the simulation loop.
+    """
 
     @abstractmethod
-    def update(self, dt: float) -> MovableObject | None:
+    def update(self, dt: float) -> MovableObj | None:
         """This abstract method is dedicated to the update of the object itself.
         It can return other Movable objects to be able to spawn elements in the simulation."""
         pass
