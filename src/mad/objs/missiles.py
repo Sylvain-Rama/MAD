@@ -6,7 +6,7 @@ from mad.objs.common_schemas import BallisticObj, History, MovableObj
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
-from mad.objs.constants import G0
+from mad.configs.physics import G0
 
 from copy import deepcopy
 

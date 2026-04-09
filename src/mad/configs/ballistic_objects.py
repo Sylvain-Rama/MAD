@@ -1,17 +1,6 @@
+"""Ballistic objects."""
+
 import numpy as np
-
-G: float = 6.67408e-11  # m^3/(kg*s^2)
-G0: float = 9.80665  # m/s^2, value for earth
-
-EARTH_SETTINGS = {
-    "position": [0.0, 0.0, 0.0],  # center of the sim
-    "radius": 6371000.0,  # m
-    "mass": 5.972e24,  # kg
-    "spin_rate": 7.0882359e-5,  # rad/s
-    "name": "Earth",
-    "rho0": 1.225,  # kg / m^3
-    "atmosphere_height": 8500.0,  # m
-}
 
 titan_stage_1 = {
     "dry_mass": 4000.0,
@@ -31,4 +20,18 @@ titan_stage_2 = {
     "area": np.pi * 2.3**2,
     "Cd": 1.08,  # smooth, long cylinder.
     "name": "Stage2",
+}
+
+rock = {
+    "mass": 1.0,  # kg
+    "area": np.pi * 0.1**2,  # m^2
+    "Cd": 0.47,  # Sphere
+    "name": "Rock",
+}
+
+rock_no_drag = {
+    "mass": 1.0,  # kg
+    "area": 0.0,  # m^2
+    "Cd": 0.0,  # No drag
+    "name": "RockNoDrag",
 }

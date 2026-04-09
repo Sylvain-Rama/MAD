@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from mad.objs.common_schemas import MovableObj
-from mad.objs.constants import G
+from mad.configs.physics import G
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 
