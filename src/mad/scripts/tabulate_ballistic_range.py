@@ -23,8 +23,8 @@ from argparse import ArgumentParser
 from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.objs.missiles import MissileStageConfig
-from mad.objs.constants import EARTH_SETTINGS, titan_stage_1, titan_stage_2
+from mad.configs.planets import EARTH_SETTINGS
+from mad.configs.ballistic_objects import titan_stage_1, titan_stage_2, rock, rock_no_drag
 from mad.simulation import run_simulation
 from mad.logger import SourceLogger, configure_logger
 from mad.utils import BALLISTIC_FIELD_NAMES
@@ -33,17 +33,19 @@ configure_logger(active_sources=["I/O"])
 logger = SourceLogger()
 
 AVAILABLE_OBJECTS = {
-    "titan_stage_1": MissileStageConfig(**titan_stage_1),
-    "titan_stage_2": MissileStageConfig(**titan_stage_2),
+    "titan_stage_1": titan_stage_1,
+    "titan_stage_2": titan_stage_2,
+    "rock": rock,
+    "rock_no_drag": rock_no_drag,
 }
 
 
-DT = 5.0  # time step (s) — coarse is intentional
+DT = 1.0  # time step (s) — coarse is intentional
 MAX_TIME = 3600.0  # 2 h; enough for any sub-orbital ballistic arc
 
-ALTITUDES_KM = np.arange(0, 601, 50)
-VELOCITIES_KMS = np.arange(0.5, 8.5, 0.5)
-GAMMAS_DEG = np.arange(-20, 90, 5)
+ALTITUDES_KM = np.arange(0, 1, 0.1)
+VELOCITIES_KMS = np.arange(0.5, 5, 0.5)
+GAMMAS_DEG = np.arange(-20, 90, 10)
 
 
 def parse_args():
@@ -59,7 +61,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def simulate(planet: Planet, config: MissileStageConfig, r0: float, v0: float, gamma_rad: float) -> float | None:
+def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gamma_rad: float) -> float | None:
     """
     Simulate a ballistic arc in the (x, y) plane starting from radius r0,
     speed v0, elevation angle gamma_rad above local horizontal.
@@ -74,11 +76,9 @@ def simulate(planet: Planet, config: MissileStageConfig, r0: float, v0: float, g
 
     vel = v0 * (np.sin(gamma_rad) * r_hat + np.cos(gamma_rad) * t_hat)
 
-    obj = Projectile(
-        ProjectileConfig(
-            position=pos.tolist(), velocity=vel.tolist(), mass=config.dry_mass, area=config.area, Cd=config.Cd
-        )
-    )
+    config.position = pos.tolist()
+    config.velocity = vel.tolist()
+    obj = Projectile(config)
     start_pos = obj.position.copy()
 
     simulated_object = run_simulation([obj], planet, dt=DT, max_time=MAX_TIME)
@@ -98,6 +98,14 @@ def main() -> None:
     planet = Planet(PlanetConfig(**EARTH_SETTINGS))
     config = AVAILABLE_OBJECTS[args.config]
 
+    ballistic_config = ProjectileConfig(
+        position=[0.0, 0.0, 0.0],
+        mass=config["mass"] if "mass" in config else config["dry_mass"],
+        area=config["area"],
+        Cd=config["Cd"],
+        name=config["name"],
+    )
+
     grid = [
         (alt_km, v_kms, gamma_deg) for alt_km in ALTITUDES_KM for v_kms in VELOCITIES_KMS for gamma_deg in GAMMAS_DEG
     ]
@@ -110,7 +118,7 @@ def main() -> None:
         v0 = v_kms * 1e3
         gamma_rad = np.radians(gamma_deg)
 
-        result = simulate(planet, config, r0, v0, gamma_rad)
+        result = simulate(planet, ballistic_config, r0, v0, gamma_rad)
 
         # Fields are altitude (m), velocity (m/s), gamma (rad), range (rad)
         rows.append(
@@ -122,7 +130,7 @@ def main() -> None:
             )
         )
 
-    out_path = os.path.join("tables", args.config + ".csv")
+    out_path = os.path.join("src/mad/tables", args.config + ".csv")
 
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=BALLISTIC_FIELD_NAMES)
