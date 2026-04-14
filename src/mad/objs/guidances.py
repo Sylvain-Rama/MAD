@@ -144,7 +144,19 @@ class RangeGuided(Guidance):
     def __init__(self, planet, target: "MovableObj", ballistic_table_path: str):
         super().__init__(planet, target)
         self.state = "powered"
-        self.ballistic_table = load_ballistic_table(ballistic_table_path)
+        if ballistic_table_path is not None:
+            self.ballistic_table = load_ballistic_table(ballistic_table_path)
+            self.alt_scale = np.ptp(self.ballistic_table[:, 0]) or 1.0
+            self.vel_scale = np.ptp(self.ballistic_table[:, 1]) or 1.0
+            self.gam_scale = np.ptp(self.ballistic_table[:, 2]) or 1.0
+        else:
+            self.ballistic_table = None
+            self.alt_scale = 1.0
+            self.vel_scale = 1.0
+            self.gam_scale = 1.0
+        # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
+        # Resolved once on the first get_guidance call.
+        self._t_hat_sign: float | None = None
 
     def gravity_turn_direction(
         self,
@@ -163,31 +175,34 @@ class RangeGuided(Guidance):
             logger["Guidance"].error("Ballistic table not loaded. Cannot compute guidance.")
             return GuidanceResults(direction=np.zeros(3), state=self.state)
 
+        r_hat, t_hat = self.local_frame(missile)
+
+        # On first call, determine whether t_hat is prograde (+1) or retrograde (-1)
+        # by comparing it against the projection of the target direction onto the tangential plane.
+        if self._t_hat_sign is None:
+            rt_hat = self.target.normalize
+            prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+            self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
+
         sigma = self.central_angle(missile, self.target)
         range_to_target = self.planet.radius * sigma
-        gamma = self.optimal_gamma(missile, sigma)
 
         altitude = np.linalg.norm(missile.position) - self.planet.radius
         velocity = np.linalg.norm(missile.velocity)
 
-        # Find the closest entry in the ballistic table based on altitude, velocity and gamma
+        # Find the closest entry in the ballistic table based on altitude, velocity and gamma.
+        # Convert missile gamma to the table's prograde convention using the detected sign.
         table = self.ballistic_table
 
-        r_hat, t_hat = self.local_frame(missile)
         v_r = np.dot(missile.velocity, r_hat)
         v_t = np.dot(missile.velocity, t_hat)
-        # t_hat points retrograde (away from target); negate to get prograde convention
-        # used when the table was generated (sin=radial, cos=toward-target tangential)
-        missile_gamma = np.arctan2(v_r, -v_t)
+        missile_gamma = np.arctan2(v_r, self._t_hat_sign * v_t)
 
-        alt_scale = np.ptp(table[:, 0]) or 1.0
-        vel_scale = np.ptp(table[:, 1]) or 1.0
-        gam_scale = np.ptp(table[:, 2]) or 1.0
         idx = np.argmin(
             np.sqrt(
-                ((table[:, 0] - altitude) / alt_scale) ** 2
-                + ((table[:, 1] - velocity) / vel_scale) ** 2
-                + ((table[:, 2] - missile_gamma) / gam_scale) ** 2
+                ((table[:, 0] - altitude) / self.alt_scale) ** 2
+                + ((table[:, 1] - velocity) / self.vel_scale) ** 2
+                + ((table[:, 2] - missile_gamma) / self.gam_scale) ** 2
             )
         )
         optimal_range = table[idx, 3] * self.planet.radius
@@ -199,7 +214,7 @@ class RangeGuided(Guidance):
                 f"{missile.name} switched to ballistic phase at range {range_to_target:.2f} m (optimal: {optimal_range:.2f} m)."
             )
 
-        # table gamma is prograde-convention; gravity_turn_direction uses retrograde t_hat,
-        # so negate to recover the same sign as optimal_gamma() returns
-        direction = self.gravity_turn_direction(missile, -optimal_gamma)
+        # Convert table gamma (prograde convention) back to the local t_hat convention
+        # before passing to gravity_turn_direction.
+        direction = self.gravity_turn_direction(missile, self._t_hat_sign * optimal_gamma)
         return GuidanceResults(direction=direction, state=self.state)
