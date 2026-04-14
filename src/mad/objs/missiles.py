@@ -7,6 +7,7 @@ from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
 from mad.configs.physics import G0
+from mad.utils import load_ballistic_table
 
 from copy import deepcopy
 
@@ -32,7 +33,7 @@ class MissileStageConfig:
     Cd: float
     payload: Payload | None = None
     name: str = "MissileStage"
-    ballistic_table: str | None = None
+    ballistic_table_path: str | None = None
 
     @property
     def to_dict(self):
@@ -58,10 +59,7 @@ class MissileStage:
         self.payload = cfg.payload
         self.name = cfg.name
         self.t = 0.0
-        if cfg.ballistic_table:
-            self.ballistic_table = np.loadtxt(cfg.ballistic_table, delimiter=",", skiprows=1)
-        else:
-            self.ballistic_table = None
+        self.guidance: "Guidance | None" = None
 
     @property
     def mass(self) -> float:
@@ -73,9 +71,13 @@ class MissileStage:
         return self.thrust if self.propellant_mass > 0 else 0.0
 
     def update(self, dt: float) -> None:
+
         self.t += dt
         if not self.active:
             return
+
+        if self.guidance and self.active:
+            self.guidance.get_guidance(self)
 
         if self.propellant_mass > 0:
             dm = self.mass_flow_rate * dt
