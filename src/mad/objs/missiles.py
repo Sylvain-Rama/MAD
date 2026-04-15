@@ -106,11 +106,18 @@ class BallisticMissile(SimulationInterface, MovableObj):
         self.guidance = cfg.guidance
         self.payload = cfg.payload
         self.t = t
-        self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
+
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+
+        self.history = History(
+            time=[t],
+            position=[self.position.tolist()],
+            velocity=[self.velocity.tolist()],
+            gamma=[self.guidance_results.gamma if self.guidance_results else None],
+        )
 
     @property
     def mass(self):
@@ -220,4 +227,9 @@ class BallisticMissile(SimulationInterface, MovableObj):
 
         self.velocity += 0.5 * (a0 + a1) * dt
 
-        self.history.update(self.t, self.position.tolist(), self.velocity.tolist())
+        self.history.update(
+            self.t,
+            self.position.tolist(),
+            self.velocity.tolist(),
+            self.guidance_results.gamma if self.guidance_results else None,
+        )

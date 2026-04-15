@@ -40,12 +40,12 @@ AVAILABLE_OBJECTS = {
 }
 
 
-DT = 1.0  # time step (s) — coarse is intentional
-MAX_TIME = 3600.0  # 2 h; enough for any sub-orbital ballistic arc
+DT = 10.0  # time step (s) — coarse is intentional
+MAX_TIME = 7200.0  # 4 h; enough for any sub-orbital ballistic arc
 
-ALTITUDES_KM = np.arange(0, 1, 0.1)
-VELOCITIES_KMS = np.arange(0.5, 5, 0.5)
-GAMMAS_DEG = np.arange(-20, 90, 10)
+ALTITUDES_KM = np.arange(0, 1000, 10)
+VELOCITIES_KMS = np.arange(0.5, 10, 0.5)
+GAMMAS_DEG = np.arange(-10, 90, 2)
 
 
 def parse_args():

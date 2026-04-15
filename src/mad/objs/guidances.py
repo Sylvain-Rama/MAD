@@ -18,6 +18,7 @@ logger = SourceLogger()
 class GuidanceResults:
     direction: NDArray
     state: str
+    gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
 
 
 class Guidance(ABC):
@@ -144,16 +145,8 @@ class RangeGuided(Guidance):
     def __init__(self, planet, target: "MovableObj", ballistic_table_path: str):
         super().__init__(planet, target)
         self.state = "powered"
-        if ballistic_table_path is not None:
-            self.ballistic_table = load_ballistic_table(ballistic_table_path)
-            self.alt_scale = np.ptp(self.ballistic_table[:, 0]) or 1.0
-            self.vel_scale = np.ptp(self.ballistic_table[:, 1]) or 1.0
-            self.gam_scale = np.ptp(self.ballistic_table[:, 2]) or 1.0
-        else:
-            self.ballistic_table = None
-            self.alt_scale = 1.0
-            self.vel_scale = 1.0
-            self.gam_scale = 1.0
+        self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
+
         # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
         # Resolved once on the first get_guidance call.
         self._t_hat_sign: float | None = None
@@ -171,7 +164,7 @@ class RangeGuided(Guidance):
 
     def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
 
-        if self.ballistic_table is None:
+        if self.ballistic_guidance is None:
             logger["Guidance"].error("Ballistic table not loaded. Cannot compute guidance.")
             return GuidanceResults(direction=np.zeros(3), state=self.state)
 
@@ -192,7 +185,7 @@ class RangeGuided(Guidance):
 
         # Find the closest entry in the ballistic table based on altitude, velocity and gamma.
         # Convert missile gamma to the table's prograde convention using the detected sign.
-        table = self.ballistic_table
+        table = self.ballistic_guidance.table
 
         v_r = np.dot(missile.velocity, r_hat)
         v_t = np.dot(missile.velocity, t_hat)
@@ -200,9 +193,9 @@ class RangeGuided(Guidance):
 
         idx = np.argmin(
             np.sqrt(
-                ((table[:, 0] - altitude) / self.alt_scale) ** 2
-                + ((table[:, 1] - velocity) / self.vel_scale) ** 2
-                + ((table[:, 2] - missile_gamma) / self.gam_scale) ** 2
+                ((table[:, 0] - altitude) / self.ballistic_guidance.alt_scale) ** 2
+                + ((table[:, 1] - velocity) / self.ballistic_guidance.vel_scale) ** 2
+                + ((table[:, 2] - missile_gamma) / self.ballistic_guidance.gam_scale) ** 2
             )
         )
         optimal_range = table[idx, 3] * self.planet.radius
@@ -210,11 +203,20 @@ class RangeGuided(Guidance):
 
         if range_to_target <= optimal_range:
             self.state = "ballistic"
-            logger["Guidance"].info(
+            logger["Guidance"].debug(
                 f"{missile.name} switched to ballistic phase at range {range_to_target:.2f} m (optimal: {optimal_range:.2f} m)."
             )
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
-        direction = self.gravity_turn_direction(missile, self._t_hat_sign * optimal_gamma)
-        return GuidanceResults(direction=direction, state=self.state)
+
+        theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction
+
+        direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+
+        # direction = self.gravity_turn_direction(missile, self._t_hat_sign * optimal_gamma)
+        return GuidanceResults(
+            direction=direction,
+            state=self.state,
+            gamma=optimal_gamma,
+        )
