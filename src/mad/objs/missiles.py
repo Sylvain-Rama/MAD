@@ -7,7 +7,6 @@ from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
 from mad.configs.physics import G0
-from mad.utils import load_ballistic_table
 
 from copy import deepcopy
 

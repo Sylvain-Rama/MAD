@@ -25,7 +25,7 @@ from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets import EARTH_SETTINGS
 from mad.configs.ballistic_objects import titan_stage_1, titan_stage_2, rock, rock_no_drag
-from mad.simulation import run_simulation
+from mad.simulation import run_simple_simulation
 from mad.logger import SourceLogger, configure_logger
 from mad.utils import BALLISTIC_FIELD_NAMES
 
@@ -40,12 +40,12 @@ AVAILABLE_OBJECTS = {
 }
 
 
-DT = 10.0  # time step (s) — coarse is intentional
-MAX_TIME = 7200.0  # 4 h; enough for any sub-orbital ballistic arc
+DT = 2.0  # time step (s) — coarse is intentional
+MAX_TIME = 3600.0  # 2 h; enough for any sub-orbital ballistic arc
 
-ALTITUDES_KM = np.arange(0, 1000, 10)
-VELOCITIES_KMS = np.arange(0.5, 10, 0.5)
-GAMMAS_DEG = np.arange(-10, 90, 2)
+ALTITUDES_KM = np.arange(0, 800, 10)
+VELOCITIES_KMS = np.arange(0.5, 8, 0.5)
+GAMMAS_DEG = np.arange(20, 90, 2)
 
 
 def parse_args():
@@ -81,7 +81,7 @@ def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gam
     obj = Projectile(config)
     start_pos = obj.position.copy()
 
-    simulated_object = run_simulation([obj], planet, dt=DT, max_time=MAX_TIME)
+    simulated_object = run_simple_simulation([obj], planet, dt=DT, max_time=MAX_TIME)
 
     final_pos = simulated_object[0].history.position[-1]
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 from mad.logger import SourceLogger
-from mad.utils import load_ballistic_table
+from mad.utils import load_ballistic_table, BALLISTIC_FIELD_NAMES
 
 if TYPE_CHECKING:
     from mad.objs.missiles import BallisticMissile
@@ -202,15 +202,17 @@ class RangeGuided(Guidance):
         optimal_gamma = table[idx, 2]
 
         if range_to_target <= optimal_range:
+            table_values = {k: f"{v:.2f}" for k, v in zip(BALLISTIC_FIELD_NAMES, table[idx, :])}
             self.state = "ballistic"
             logger["Guidance"].debug(
-                f"{missile.name} switched to ballistic phase at range {range_to_target:.2f} m (optimal: {optimal_range:.2f} m)."
+                f"Target range {range_to_target:.2f} reached at Table index: {idx}, table values: {table_values}."
             )
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
 
-        theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction
+        # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
+        theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
 
