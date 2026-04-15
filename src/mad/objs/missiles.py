@@ -32,7 +32,7 @@ class MissileStageConfig:
     Cd: float
     payload: Payload | None = None
     name: str = "MissileStage"
-    ballistic_table: str | None = None
+    ballistic_table_path: str | None = None
 
     @property
     def to_dict(self):
@@ -58,10 +58,7 @@ class MissileStage:
         self.payload = cfg.payload
         self.name = cfg.name
         self.t = 0.0
-        if cfg.ballistic_table:
-            self.ballistic_table = np.loadtxt(cfg.ballistic_table, delimiter=",", skiprows=1)
-        else:
-            self.ballistic_table = None
+        self.guidance: "Guidance | None" = None
 
     @property
     def mass(self) -> float:
@@ -73,9 +70,13 @@ class MissileStage:
         return self.thrust if self.propellant_mass > 0 else 0.0
 
     def update(self, dt: float) -> None:
+
         self.t += dt
         if not self.active:
             return
+
+        if self.guidance and self.active:
+            self.guidance.get_guidance(self)
 
         if self.propellant_mass > 0:
             dm = self.mass_flow_rate * dt
@@ -104,11 +105,18 @@ class BallisticMissile(SimulationInterface, MovableObj):
         self.guidance = cfg.guidance
         self.payload = cfg.payload
         self.t = t
-        self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
+
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+
+        self.history = History(
+            time=[t],
+            position=[self.position.tolist()],
+            velocity=[self.velocity.tolist()],
+            gamma=[self.guidance_results.gamma if self.guidance_results else None],
+        )
 
     @property
     def mass(self):
@@ -218,4 +226,9 @@ class BallisticMissile(SimulationInterface, MovableObj):
 
         self.velocity += 0.5 * (a0 + a1) * dt
 
-        self.history.update(self.t, self.position.tolist(), self.velocity.tolist())
+        self.history.update(
+            self.t,
+            self.position.tolist(),
+            self.velocity.tolist(),
+            self.guidance_results.gamma if self.guidance_results else None,
+        )

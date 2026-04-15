@@ -9,11 +9,14 @@ class History:
     time: list = field(default_factory=list)
     position: list = field(default_factory=list)
     velocity: list = field(default_factory=list)
+    gamma: list = field(default_factory=list)
 
-    def update(self, time: float, position: list, velocity: list):
+    def update(self, time: float, position: list, velocity: list, gamma: float | None = None):
         self.time.append(time)
         self.position.append(position)
         self.velocity.append(velocity)
+        if gamma is not None:
+            self.gamma.append(gamma)
 
 
 class MovableObj:

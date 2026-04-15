@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 from mad.logger import SourceLogger
+from mad.utils import load_ballistic_table, BALLISTIC_FIELD_NAMES
 
 if TYPE_CHECKING:
     from mad.objs.missiles import BallisticMissile
@@ -17,6 +18,7 @@ logger = SourceLogger()
 class GuidanceResults:
     direction: NDArray
     state: str
+    gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
 
 
 class Guidance(ABC):
@@ -42,11 +44,8 @@ class Guidance(ABC):
         return r_hat, t_hat
 
     def optimal_gamma(self, missile: "BallisticMissile", sigma: NDArray) -> NDArray:
-        gamma = np.arctan(
-            (missile.velocity**2 - self.planet.mu / np.linalg.norm(missile.position))
-            / missile.velocity**2
-            * np.tan(sigma / 2)
-        )
+        v = np.linalg.norm(missile.velocity)
+        gamma = np.arctan((v**2 - self.planet.mu / np.linalg.norm(missile.position)) / v**2 * np.tan(sigma / 2))
         return gamma
 
     @abstractmethod
@@ -95,7 +94,7 @@ class ClosedFormBallistic(Guidance):
         # Compute the optimal angle (and corresponding arc-length distance) to stop thrusting
         # based on the current velocity and central angle.
         r = np.linalg.norm(missile.position)
-        v = missile.velocity
+        v = np.linalg.norm(missile.velocity)
         optimal_angle = 2 * np.arctan(
             v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2)
         )
@@ -136,3 +135,90 @@ class ClosedFormBallistic(Guidance):
         self.set_flight_phase(missile, gamma, sigma, t)
 
         return GuidanceResults(direction=direction, state=self.state)
+
+
+class RangeGuided(Guidance):
+    """The guidance returns an updated when the missile get in range to the target, according to the ballistic table.
+    The ballistic table is a CSV file with columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
+    """
+
+    def __init__(self, planet, target: "MovableObj", ballistic_table_path: str):
+        super().__init__(planet, target)
+        self.state = "powered"
+        self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
+
+        # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
+        # Resolved once on the first get_guidance call.
+        self._t_hat_sign: float | None = None
+
+    def gravity_turn_direction(
+        self,
+        missile: "BallisticMissile",
+        optimal_gamma: NDArray,
+    ):
+        r_hat, t_hat = self.local_frame(missile)
+        theta = optimal_gamma * missile.burned_fraction
+
+        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+        return d / np.linalg.norm(d)
+
+    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+
+        if self.ballistic_guidance is None:
+            logger["Guidance"].error("Ballistic table not loaded. Cannot compute guidance.")
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        r_hat, t_hat = self.local_frame(missile)
+
+        # On first call, determine whether t_hat is prograde (+1) or retrograde (-1)
+        # by comparing it against the projection of the target direction onto the tangential plane.
+        if self._t_hat_sign is None:
+            rt_hat = self.target.normalize
+            prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+            self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
+
+        sigma = self.central_angle(missile, self.target)
+        range_to_target = self.planet.radius * sigma
+
+        altitude = np.linalg.norm(missile.position) - self.planet.radius
+        velocity = np.linalg.norm(missile.velocity)
+
+        # Find the closest entry in the ballistic table based on altitude, velocity and gamma.
+        # Convert missile gamma to the table's prograde convention using the detected sign.
+        table = self.ballistic_guidance.table
+
+        v_r = np.dot(missile.velocity, r_hat)
+        v_t = np.dot(missile.velocity, t_hat)
+        missile_gamma = np.arctan2(v_r, self._t_hat_sign * v_t)
+
+        idx = np.argmin(
+            np.sqrt(
+                ((table[:, 0] - altitude) / self.ballistic_guidance.alt_scale) ** 2
+                + ((table[:, 1] - velocity) / self.ballistic_guidance.vel_scale) ** 2
+                + ((table[:, 2] - missile_gamma) / self.ballistic_guidance.gam_scale) ** 2
+            )
+        )
+        optimal_range = table[idx, 3] * self.planet.radius
+        optimal_gamma = table[idx, 2]
+
+        if range_to_target <= optimal_range:
+            table_values = {k: f"{v:.2f}" for k, v in zip(BALLISTIC_FIELD_NAMES, table[idx, :])}
+            self.state = "ballistic"
+            logger["Guidance"].debug(
+                f"Target range {range_to_target:.2f} reached at Table index: {idx}, table values: {table_values}."
+            )
+
+        # Convert table gamma (prograde convention) back to the local t_hat convention
+        # before passing to gravity_turn_direction.
+
+        # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
+        theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction * 2
+
+        direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+
+        # direction = self.gravity_turn_direction(missile, self._t_hat_sign * optimal_gamma)
+        return GuidanceResults(
+            direction=direction,
+            state=self.state,
+            gamma=optimal_gamma,
+        )
