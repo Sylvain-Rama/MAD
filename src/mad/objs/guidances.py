@@ -79,7 +79,7 @@ class GravityTurn(Guidance):
         return GuidanceResults(direction=self.gravity_turn_direction(missile, gamma), state=self.state)
 
 
-class ClosedFormBallistic(Guidance):
+class ClosedFormBallistic_old(Guidance):
     """Closed-form ballistic guidance: the missile starts vertically and stops thrusting at the optimal point,
     then follows a ballistic trajectory to the target. The optimal point is computed based on the current velocity
     and the central angle to the target.
@@ -137,7 +137,7 @@ class ClosedFormBallistic(Guidance):
         return GuidanceResults(direction=direction, state=self.state)
 
 
-class RangeGuided(Guidance):
+class TabulatedBallistic(Guidance):
     """The guidance returns an updated when the missile get in range to the target, according to the ballistic table.
     The ballistic table is a CSV file with columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     """
@@ -150,17 +150,6 @@ class RangeGuided(Guidance):
         # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
         # Resolved once on the first get_guidance call.
         self._t_hat_sign: float | None = None
-
-    def gravity_turn_direction(
-        self,
-        missile: "BallisticMissile",
-        optimal_gamma: NDArray,
-    ):
-        r_hat, t_hat = self.local_frame(missile)
-        theta = optimal_gamma * missile.burned_fraction
-
-        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
-        return d / np.linalg.norm(d)
 
     def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
 
@@ -222,3 +211,19 @@ class RangeGuided(Guidance):
             state=self.state,
             gamma=optimal_gamma,
         )
+
+
+class RCSGuidance(Guidance):
+    """Simple guidance that uses RCS thrusters to always point directly at the target, without any powered flight phase."""
+
+    def __init__(self, planet, target: "MovableObj"):
+        super().__init__(planet, target)
+        self.state = "powered"
+
+    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+        r_hat = missile.normalize
+        rt_hat = self.target.normalize
+
+        direction = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+        direction /= np.linalg.norm(direction)
+        return GuidanceResults(direction=direction, state=self.state)

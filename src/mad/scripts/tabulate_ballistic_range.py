@@ -24,7 +24,7 @@ from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets import EARTH_SETTINGS
-from mad.configs.ballistic_objects import titan_stage_1, titan_stage_2, rock, rock_no_drag
+from mad.configs.ballistic_objects import titan_stage_1, titan_stage_2, rock, rock_no_drag, B53_warhead
 from mad.simulation import run_simple_simulation
 from mad.logger import SourceLogger, configure_logger
 from mad.utils import BALLISTIC_FIELD_NAMES
@@ -37,6 +37,7 @@ AVAILABLE_OBJECTS = {
     "titan_stage_2": titan_stage_2,
     "rock": rock,
     "rock_no_drag": rock_no_drag,
+    "B53_warhead": B53_warhead,
 }
 
 
@@ -110,6 +111,7 @@ def main() -> None:
         (alt_km, v_kms, gamma_deg) for alt_km in ALTITUDES_KM for v_kms in VELOCITIES_KMS for gamma_deg in GAMMAS_DEG
     ]
     total = len(grid)
+    logger["I/O"].info(f"Using config '{args.config}' for ballistic object properties.")
     logger["I/O"].info(f"Computing {total} trajectories  (dt={DT} s, max_time={MAX_TIME} s) …")
 
     rows = []
