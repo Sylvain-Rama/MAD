@@ -221,6 +221,19 @@ class RCSGuidance(Guidance):
         self.state = "powered"
 
     def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
-        direction = self.target.position - missile.position
-        direction /= np.linalg.norm(direction)
-        return GuidanceResults(direction=direction, state=self.state)
+        v_norm = np.linalg.norm(missile.velocity)
+        if v_norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        v_hat = missile.velocity / v_norm
+
+        los = self.target.position - missile.position
+
+        # Remove the component along the current velocity so thrust is purely a
+        # course correction (perpendicular to flight path).  This makes guidance
+        # stable at any thrust level: higher thrust curves the trajectory more
+        # sharply toward the target instead of causing downrange overshoot.
+        correction = los - np.dot(los, v_hat) * v_hat
+        norm = np.linalg.norm(correction)
+        if norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        return GuidanceResults(direction=correction / norm, state=self.state)

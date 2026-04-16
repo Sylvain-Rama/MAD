@@ -6,7 +6,7 @@ titan_stage_1 = {
     "dry_mass": 4000.0,
     "propellant_mass": 76203.0 - 4000.0,
     "thrust": 1900 * 1000,  # N
-    "Isp": 256.0,
+    "Isp": 290.0,
     "area": np.pi * 3.1**2,
     "Cd": 1.08,  # smooth, long cylinder.
     "name": "Stage1",

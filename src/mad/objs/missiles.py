@@ -181,7 +181,7 @@ class BallisticMissile(SimulationInterface, MovableObj):
     @property
     def mass(self):
         payload_mass = self.payload.mass if self.payload else 0.0
-        return sum(stage.mass for stage in self.stages) + payload_mass
+        return sum(stage.mass for stage in self.stages)
 
     @property
     def area(self):

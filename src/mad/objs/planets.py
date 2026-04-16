@@ -124,9 +124,28 @@ class Planet(MovableObj):
             plot_fig = True
 
         if display_planet:
-            planet_body = mpl.patches.Circle(
-                self.position, radius=self.radius, ec="black", fill=False, label=self.name, ls="--"
-            )
+            if points is not None and len(points) == 2:
+                theta1 = np.degrees(
+                    np.arctan2(points[0].position[1] - self.position[1], points[0].position[0] - self.position[0])
+                )
+                theta2 = np.degrees(
+                    np.arctan2(points[1].position[1] - self.position[1], points[1].position[0] - self.position[0])
+                )
+                planet_body = mpl.patches.Arc(
+                    self.position,
+                    2 * self.radius,
+                    2 * self.radius,
+                    angle=0,
+                    theta1=min(theta1, theta2),
+                    theta2=max(theta1, theta2),
+                    ec="black",
+                    label=self.name,
+                    ls="--",
+                )
+            else:
+                planet_body = mpl.patches.Circle(
+                    self.position, radius=self.radius, ec="black", fill=False, label=self.name, ls="--"
+                )
             ax.add_patch(planet_body)
 
         if points is not None:
