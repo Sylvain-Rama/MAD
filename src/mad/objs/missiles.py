@@ -36,7 +36,7 @@ class Payload(SimulationInterface, MovableObj):
         self.guidance = config.guidance
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
         self.t = t
-        self.RCS_thrust = 50.0  # N, typical for small thrusters
+        self.RCS_thrust = 500.0  # N, typical for small thrusters
 
         self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
 
@@ -54,6 +54,10 @@ class Payload(SimulationInterface, MovableObj):
 
         if self.distance(planet) <= planet.radius:
             logger["Missile"].info(f"Warhead {self.name} detonated on the ground!")
+            if self.guidance:
+                distance_to_target = self.guidance.planet.surface_distance(self, self.guidance.target)
+                logger["Missile"].info(f"Distance to target at detonation: {distance_to_target/1000:.2f} km.")
+
             self.active = False
             return np.zeros_like(self.velocity)
 
@@ -143,7 +147,7 @@ class MissileStage:
 class BallisticMissileConfig:
     stages: list[MissileStage]
     guidance: "Guidance | None" = None
-    payload: Payload | None = None
+    payload: PayloadConfig | None = None
 
     @property
     def to_dict(self):
@@ -174,7 +178,7 @@ class BallisticMissile(SimulationInterface, MovableObj):
     @property
     def mass(self):
         payload_mass = self.payload.mass if self.payload else 0.0
-        return sum(stage.mass for stage in self.stages) + payload_mass
+        return sum(stage.mass for stage in self.stages)
 
     @property
     def area(self):
@@ -225,13 +229,24 @@ class BallisticMissile(SimulationInterface, MovableObj):
 
         return running_stage.thrust_force / self.mass
 
-    def update(self, dt: float) -> None | Projectile:
+    def update(self, dt: float) -> None | list[Projectile | Payload]:
+        released_objects = []
         self.t += dt
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+
         if self.guidance_results:
             if self.guidance_results.state != "powered":
                 logger["Missile"].info(f"{self.name} switched to {self.guidance_results.state} phase at {self.t:.2f}.")
                 [setattr(stage, "active", False) for stage in self.stages]
+                if self.payload:
+                    payload = Payload(
+                        config=self.payload,
+                        position=self.position.copy(),
+                        velocity=self.velocity.copy(),
+                        t=deepcopy(self.t),
+                    )
+                    released_objects.append(payload)
+                    logger["Missile"].info(f"{self.name} released payload {payload.name} at {self.t:.2f}.")
 
         running_stage = self.stages[0]
         running_stage.update(dt)
@@ -253,9 +268,14 @@ class BallisticMissile(SimulationInterface, MovableObj):
                 logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
             else:
                 self.stages[0].t = self.t
-            return Projectile(stage_cfg, t=deepcopy(self.t))
-        else:
-            return None
+
+            released_objects.append(Projectile(stage_cfg, t=deepcopy(self.t)))
+
+        if released_objects is not None:
+            for obj in released_objects:
+                logger["Simulation"].info(f"{obj.name} added to Simulation.")
+
+        return released_objects if released_objects else None
 
     def accelerations(self, planet: Planet) -> NDArray:
         gravity = planet.gravity(self)
