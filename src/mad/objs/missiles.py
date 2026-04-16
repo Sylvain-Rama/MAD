@@ -24,6 +24,7 @@ class PayloadConfig(BallisticObj):
     name: str = "Payload"
     yield_kt: float = 0.0  # kt
     guidance: "Guidance | None" = None
+    RCS_thrust: float = 500.0  # N, used for terminal guidance.
 
 
 class Payload(SimulationInterface, MovableObj):
@@ -36,7 +37,7 @@ class Payload(SimulationInterface, MovableObj):
         self.guidance = config.guidance
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
         self.t = t
-        self.RCS_thrust = 500.0  # N, typical for small thrusters
+        self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
         self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
 
@@ -164,7 +165,9 @@ class BallisticMissile(SimulationInterface, MovableObj):
         self.t = t
 
         self.initial_mass = deepcopy(self.mass)
-        self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
+        self.final_mass = deepcopy(
+            sum(stage.dry_mass for stage in self.stages) + (self.payload.mass if self.payload else 0.0)
+        )
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
@@ -178,7 +181,7 @@ class BallisticMissile(SimulationInterface, MovableObj):
     @property
     def mass(self):
         payload_mass = self.payload.mass if self.payload else 0.0
-        return sum(stage.mass for stage in self.stages)
+        return sum(stage.mass for stage in self.stages) + payload_mass
 
     @property
     def area(self):
@@ -270,10 +273,6 @@ class BallisticMissile(SimulationInterface, MovableObj):
                 self.stages[0].t = self.t
 
             released_objects.append(Projectile(stage_cfg, t=deepcopy(self.t)))
-
-        if released_objects is not None:
-            for obj in released_objects:
-                logger["Simulation"].info(f"{obj.name} added to Simulation.")
 
         return released_objects if released_objects else None
 

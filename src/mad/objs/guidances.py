@@ -221,9 +221,6 @@ class RCSGuidance(Guidance):
         self.state = "powered"
 
     def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
-        r_hat = missile.normalize
-        rt_hat = self.target.normalize
-
-        direction = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+        direction = self.target.position - missile.position
         direction /= np.linalg.norm(direction)
         return GuidanceResults(direction=direction, state=self.state)
