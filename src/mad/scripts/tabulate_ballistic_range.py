@@ -16,10 +16,10 @@ Output:
 """
 
 import os
-
 import csv
 import numpy as np
 from argparse import ArgumentParser
+from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
@@ -60,6 +60,33 @@ def parse_args():
         + ", ".join(AVAILABLE_OBJECTS.keys()),
     )
     return parser.parse_args()
+
+
+# ── multiprocessing helpers ──────────────────────────────────────────────────
+_worker_planet: Planet | None = None
+_worker_config: ProjectileConfig | None = None
+
+
+def _pool_initializer(planet: Planet, config: ProjectileConfig) -> None:
+    """Copy planet and config into each worker process once."""
+    global _worker_planet, _worker_config
+    _worker_planet = planet
+    _worker_config = config
+
+
+def _simulate_row(args: tuple) -> dict:
+    """Worker entry-point: unpack grid point, call simulate, return row dict."""
+    alt_km, v_kms, gamma_deg = args
+    r0 = _worker_planet.radius + alt_km * 1e3
+    v0 = v_kms * 1e3
+    gamma_rad = np.radians(gamma_deg)
+    result = simulate(_worker_planet, _worker_config, r0, v0, gamma_rad)
+    return dict(
+        altitude_m=alt_km * 1e3,
+        velocity_m_s=v0,
+        gamma_rad=gamma_rad,
+        range_rad=result,
+    )
 
 
 def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gamma_rad: float) -> float | None:
@@ -114,21 +141,19 @@ def main() -> None:
     logger["I/O"].info(f"Using config '{args.config}' for ballistic object properties.")
     logger["I/O"].info(f"Computing {total} trajectories  (dt={DT} s, max_time={MAX_TIME} s) …")
 
-    rows = []
-    for i, (alt_km, v_kms, gamma_deg) in tqdm(enumerate(grid), total=total, desc="Simulating trajectories"):
-        r0 = planet.radius + alt_km * 1e3
-        v0 = v_kms * 1e3
-        gamma_rad = np.radians(gamma_deg)
+    n_workers = cpu_count() - 1  # leave one core free for the main process
+    logger["I/O"].info(f"Using {n_workers} worker processes.")
 
-        result = simulate(planet, ballistic_config, r0, v0, gamma_rad)
-
-        # Fields are altitude (m), velocity (m/s), gamma (rad), range (rad)
-        rows.append(
-            dict(
-                altitude_m=alt_km * 1e3,
-                velocity_m_s=v0,
-                gamma_rad=gamma_rad,
-                range_rad=result,
+    with Pool(
+        processes=n_workers,
+        initializer=_pool_initializer,
+        initargs=(planet, ballistic_config),
+    ) as pool:
+        rows = list(
+            tqdm(
+                pool.imap(_simulate_row, grid),
+                total=total,
+                desc="Simulating trajectories",
             )
         )
 
