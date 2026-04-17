@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from mad.logger import SourceLogger
+
+if TYPE_CHECKING:
+    from mad.objs.planets import Planet
 
 
 @dataclass
@@ -60,3 +66,34 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
     except Exception as e:
         logger["I/O"].error(f"Error loading ballistic table from {file_path}: {e}")
         return None
+
+
+def extract_history(objs: list, planet: Planet) -> dict[str, dict[str, NDArray]]:
+
+    results = {}
+    for obj in objs:
+        pos = np.asarray(obj.history.position)
+        vel = np.asarray(obj.history.velocity)
+        time = np.asarray(obj.history.time)
+        gamma = np.asarray([x for x in obj.history.gamma if x is not None]) if obj.history.gamma else None
+
+        posx, posz = pos[:, 0], pos[:, 1]
+
+        r = np.linalg.norm(pos, axis=1)
+        velout = np.linalg.norm(vel, axis=1)
+
+        energy = 0.5 * velout**2 - planet.mu / r
+        altitude = r - planet.radius
+
+        results[obj.name] = {
+            "time": time,
+            "altitude": altitude,
+            "velocity": velout,
+            "posx": posx,
+            "posz": posz,
+            "energy": energy,
+        }
+        if gamma is not None:
+            results[obj.name]["gamma"] = gamma
+
+    return results
