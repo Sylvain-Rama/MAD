@@ -39,7 +39,12 @@ class Payload(SimulationInterface, MovableObj):
         self.t = t
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
-        self.history = History(time=[t], position=[self.position.tolist()], velocity=[self.velocity.tolist()])
+        self.history = History(
+            time=[t],
+            position=[self.position.tolist()],
+            velocity=[self.velocity.tolist()],
+            gamma=[self.guidance_results.gamma if self.guidance_results else None],
+        )
 
     @property
     def thrust_acc(self) -> float:
@@ -65,10 +70,12 @@ class Payload(SimulationInterface, MovableObj):
         gravity = planet.gravity(self)
         drag = planet.drag(self)
 
-        # If no guidance, we continue along the same direction.
-        direction = self.guidance_results.direction if self.guidance_results else self.normalize
-        direction = direction / np.linalg.norm(direction)
-        thrust = self.thrust_acc * direction
+        thrust = np.zeros_like(self.velocity)
+        if self.guidance_results is not None:
+            d = self.guidance_results.direction
+            d_norm = np.linalg.norm(d)
+            if d_norm > 1e-8:
+                thrust = self.thrust_acc * (d / d_norm)
 
         return gravity + drag + thrust
 
