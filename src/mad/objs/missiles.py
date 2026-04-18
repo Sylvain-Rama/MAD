@@ -50,9 +50,14 @@ class Payload(SimulationInterface, MovableObj):
     def thrust_acc(self) -> float:
         return self.RCS_thrust / self.mass
 
+    @property
+    def burned_fraction(self) -> float:
+        # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
+        return 1.0
+
     def update(self, dt: float) -> None:
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
 
         return None
 
@@ -75,7 +80,9 @@ class Payload(SimulationInterface, MovableObj):
             d = self.guidance_results.direction
             d_norm = np.linalg.norm(d)
             if d_norm > 1e-8:
-                thrust = self.thrust_acc * (d / d_norm)
+                desired_acc = self.guidance_results.magnitude
+                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
+                thrust = acc * (d / d_norm)
 
         return gravity + drag + thrust
 
@@ -187,7 +194,8 @@ class BallisticMissile(SimulationInterface, MovableObj):
 
     @property
     def mass(self):
-        payload_mass = self.payload.mass if self.payload else 0.0
+        # We ignore the payload mass until the end, when it is released.
+        # Allows us to not have to worry about the transition from missile to payload.
         return sum(stage.mass for stage in self.stages)
 
     @property
@@ -242,7 +250,7 @@ class BallisticMissile(SimulationInterface, MovableObj):
     def update(self, dt: float) -> None | list[Projectile | Payload]:
         released_objects = []
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
 
         if self.guidance_results:
             if self.guidance_results.state != "powered":
