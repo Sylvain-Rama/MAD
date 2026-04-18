@@ -173,9 +173,11 @@ class BallisticMissileConfig:
         return asdict(self)
 
 
-class BallisticMissile(SimulationInterface, MovableObj, GuidedObj):
+class BallisticMissile(SimulationInterface, BallisticObj, GuidedObj):
     def __init__(self, position, cfg: BallisticMissileConfig, velocity=None, name="BallisticMissile", t=0.0):
-        super().__init__(position=position, velocity=velocity, name=name)
+        # mass and area are computed properties on this class; bypass BallisticObj.__init__
+        # to avoid storing unused _mass/_area defaults.
+        MovableObj.__init__(self, position=position, velocity=velocity, name=name)
 
         self.stages = cfg.stages
         self.guidance = cfg.guidance

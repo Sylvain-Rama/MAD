@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import matplotlib.figure
 import matplotlib.patches
-from mad.objs.common_schemas import MovableObj, DraggableObj
+from mad.objs.common_schemas import MovableObj, BallisticObj
 from mad.configs.physics import G
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
@@ -61,7 +61,7 @@ class Planet(MovableObj):
             f"Escape velocity: {self.escape_velocity:.2f} m/s"
         )
 
-    def drag(self, obj: DraggableObj) -> NDArray:
+    def drag(self, obj: BallisticObj) -> NDArray:
         drag = np.zeros_like(obj.velocity)
         alt = max(0.0, float(np.linalg.norm(obj.position - self.position)) - self.radius)
 

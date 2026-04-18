@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 from mad.utils import to_vec3
 
 if TYPE_CHECKING:
@@ -95,23 +95,6 @@ class SimulationInterface(ABC):
         pass
 
 
-class DraggableObj(Protocol):
-    """Structural interface for objects that experience atmospheric drag.
-
-    Satisfied by BallisticObj, Projectile, Payload, and BallisticMissile
-    without requiring explicit inheritance."""
-
-    position: NDArray
-    velocity: NDArray
-    Cd: float
-
-    @property
-    def mass(self) -> float: ...
-
-    @property
-    def area(self) -> float: ...
-
-
 class BallisticObj(MovableObj):
     """
     BallisticObj is a MovableObj with mass, area and drag coefficient, which can be used for projectiles and missiles.
@@ -135,9 +118,17 @@ class BallisticObj(MovableObj):
         Cd: float = 0.47,
     ):
         super().__init__(position, velocity, name)
-        self.mass = mass
-        self.area = area
+        self._mass = mass
+        self._area = area
         self.Cd = Cd
+
+    @property
+    def mass(self) -> float:
+        return self._mass
+
+    @property
+    def area(self) -> float:
+        return self._area
 
 
 class GuidedObj(ABC):
