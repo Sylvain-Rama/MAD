@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 from mad.utils import to_vec3
 
 if TYPE_CHECKING:
@@ -80,9 +80,9 @@ class SimulationInterface(ABC):
     that subclasses are expected to override."""
 
     @abstractmethod
-    def update(self, dt: float) -> "MovableObj | None":
-        """Update internal state. May return a new MovableObj spawned during the step
-        (e.g. a separated stage)."""
+    def update(self, dt: float) -> list[MovableObj] | None:
+        """Update internal state. May return a list of new MovableObj spawned during the step
+        (e.g. a separated stage or released payload)."""
         pass
 
     @abstractmethod
@@ -93,6 +93,23 @@ class SimulationInterface(ABC):
     def integrate(self, dt: float, planet: "Planet") -> None:
         """Advance position and velocity by one time step. Override in subclasses."""
         pass
+
+
+class DraggableObj(Protocol):
+    """Structural interface for objects that experience atmospheric drag.
+
+    Satisfied by BallisticObj, Projectile, Payload, and BallisticMissile
+    without requiring explicit inheritance."""
+
+    position: NDArray
+    velocity: NDArray
+    Cd: float
+
+    @property
+    def mass(self) -> float: ...
+
+    @property
+    def area(self) -> float: ...
 
 
 class BallisticObj(MovableObj):

@@ -1,8 +1,9 @@
 import numpy as np
 from numpy.typing import NDArray
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-from mad.objs.common_schemas import MovableObj
+import matplotlib.figure
+import matplotlib.patches
+from mad.objs.common_schemas import MovableObj, DraggableObj
 from mad.configs.physics import G
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
@@ -60,9 +61,9 @@ class Planet(MovableObj):
             f"Escape velocity: {self.escape_velocity:.2f} m/s"
         )
 
-    def drag(self, obj: MovableObj) -> NDArray:
+    def drag(self, obj: DraggableObj) -> NDArray:
         drag = np.zeros_like(obj.velocity)
-        alt = max(0.0, self.distance(obj) - self.radius)  # type: ignore[no-matching-overload]
+        alt = max(0.0, float(np.linalg.norm(obj.position - self.position)) - self.radius)
 
         if alt > 0:
             rho = self.rho0 * np.exp(-alt / self.atmosphere_height)
@@ -116,7 +117,7 @@ class Planet(MovableObj):
 
     def plot_2D_with_points(
         self, points: list[MovableObj] | None, ax=None, display_planet=True
-    ) -> mpl.figure.Figure | None:
+    ) -> matplotlib.figure.Figure | None:
         # 2D plot of the planet. If using point in 2D, they will appear at the circumference.
         plot_fig = False
         if ax is None:
@@ -131,8 +132,8 @@ class Planet(MovableObj):
                 theta2 = np.degrees(
                     np.arctan2(points[1].position[1] - self.position[1], points[1].position[0] - self.position[0])
                 )
-                planet_body = mpl.patches.Arc(
-                    self.position,
+                planet_body = matplotlib.patches.Arc(
+                    (float(self.position[0]), float(self.position[1])),
                     2 * self.radius,
                     2 * self.radius,
                     angle=0,
@@ -143,8 +144,13 @@ class Planet(MovableObj):
                     ls="--",
                 )
             else:
-                planet_body = mpl.patches.Circle(
-                    self.position, radius=self.radius, ec="black", fill=False, label=self.name, ls="--"
+                planet_body = matplotlib.patches.Circle(
+                    (float(self.position[0]), float(self.position[1])),
+                    radius=self.radius,
+                    ec="black",
+                    fill=False,
+                    label=self.name,
+                    ls="--",
                 )
             ax.add_patch(planet_body)
 
@@ -167,7 +173,7 @@ class SimulationInterface(ABC):
     """
 
     @abstractmethod
-    def update(self, dt: float) -> MovableObj | None:
+    def update(self, dt: float) -> list[MovableObj] | None:
         """This abstract method is dedicated to the update of the object itself.
         It can return other Movable objects to be able to spawn elements in the simulation."""
         pass

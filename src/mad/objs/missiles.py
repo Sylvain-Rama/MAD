@@ -251,7 +251,7 @@ class BallisticMissile(SimulationInterface, MovableObj, GuidedObj):
 
         return running_stage.thrust_force / self.mass
 
-    def update(self, dt: float) -> None | list[Projectile | Payload]:
+    def update(self, dt: float) -> list[MovableObj] | None:
         released_objects = []
         self.t += dt
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None

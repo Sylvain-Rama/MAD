@@ -76,6 +76,8 @@ def _pool_initializer(planet: Planet, config: ProjectileConfig) -> None:
 
 def _simulate_row(args: tuple) -> dict:
     """Worker entry-point: unpack grid point, call simulate, return row dict."""
+    assert _worker_planet is not None
+    assert _worker_config is not None
     alt_km, v_kms, gamma_deg = args
     r0 = _worker_planet.radius + alt_km * 1e3
     v0 = v_kms * 1e3
@@ -128,10 +130,10 @@ def main() -> None:
 
     ballistic_config = ProjectileConfig(
         position=[0.0, 0.0, 0.0],
-        mass=config["mass"] if "mass" in config else config["dry_mass"],
-        area=config["area"],
-        Cd=config["Cd"],
-        name=config["name"],
+        mass=float(config["mass"] if "mass" in config else config["dry_mass"]),
+        area=float(config["area"]),
+        Cd=float(config["Cd"]),
+        name=str(config["name"]),
     )
 
     grid = [
