@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.common_schemas import BallisticObj, History, MovableObj
+from mad.objs.common_schemas import BallisticObj, GuidedObj, History, MovableObj
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet, SimulationInterface
 from mad.logger import SourceLogger
@@ -17,7 +17,7 @@ logger = SourceLogger()
 
 
 @dataclass
-class PayloadConfig(BallisticObj):
+class PayloadConfig:
     mass: float  # kg
     area: float  # m^2
     Cd: float
@@ -27,12 +27,16 @@ class PayloadConfig(BallisticObj):
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
 
 
-class Payload(SimulationInterface, MovableObj):
+class Payload(SimulationInterface, BallisticObj, GuidedObj):
     def __init__(self, config: PayloadConfig, position: NDArray, velocity=None, t=0.0):
-        super().__init__(position=position, velocity=velocity, name=config.name)
-        self.mass = config.mass
-        self.area = config.area
-        self.Cd = config.Cd
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=config.mass,
+            area=config.area,
+            Cd=config.Cd,
+        )
         self.yield_kt = config.yield_kt
         self.guidance = config.guidance
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
@@ -53,7 +57,7 @@ class Payload(SimulationInterface, MovableObj):
     @property
     def burned_fraction(self) -> float:
         # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
-        return 1.0
+        return 0.5
 
     def update(self, dt: float) -> None:
         self.t += dt
@@ -169,7 +173,7 @@ class BallisticMissileConfig:
         return asdict(self)
 
 
-class BallisticMissile(SimulationInterface, MovableObj):
+class BallisticMissile(SimulationInterface, MovableObj, GuidedObj):
     def __init__(self, position, cfg: BallisticMissileConfig, velocity=None, name="BallisticMissile", t=0.0):
         super().__init__(position=position, velocity=velocity, name=name)
 

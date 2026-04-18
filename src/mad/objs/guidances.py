@@ -2,16 +2,31 @@ from mad.objs.common_schemas import MovableObj
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 from mad.logger import SourceLogger
 from mad.utils import load_ballistic_table, BALLISTIC_FIELD_NAMES
 
-if TYPE_CHECKING:
-    from mad.objs.missiles import BallisticMissile
-
 logger = SourceLogger()
+
+
+class GuidableObj(Protocol):
+    """Structural interface expected by all Guidance implementations.
+
+    Any object that exposes these attributes can be guided — no concrete
+    inheritance from BallisticMissile is required.  Both BallisticMissile
+    and Payload satisfy this protocol."""
+
+    position: NDArray
+    velocity: NDArray
+    name: str
+
+    @property
+    def normalize(self) -> NDArray: ...
+
+    @property
+    def burned_fraction(self) -> float: ...
 
 
 @dataclass
@@ -19,20 +34,29 @@ class GuidanceResults:
     direction: NDArray
     state: str
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
-    magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²);
+    magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
 
 
 class Guidance(ABC):
-    # Any Guidance class should return the direction as a NDArray of same shape of position or velocity.
-    def __init__(self, planet, target: "MovableObj"):
+    """Base class for all guidance laws.
+
+    Provides shared geometry helpers (`central_angle`, `local_frame`,
+    `optimal_gamma`, `gravity_turn_direction`) so subclasses only need to
+    implement `get_guidance`.  All concrete subclasses start in the
+    ``"powered"`` state; subclasses that need a different initial state
+    should override it after calling ``super().__init__``.
+    """
+
+    def __init__(self, planet, target: MovableObj):
         self.planet = planet
         self.target = target
+        self.state = "powered"
 
     @staticmethod
-    def central_angle(missile: "BallisticMissile", target: MovableObj) -> NDArray:
+    def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
         return np.arccos(np.clip(np.dot(missile.normalize, target.normalize), -1, 1))
 
-    def local_frame(self, missile: "BallisticMissile") -> tuple[NDArray, NDArray]:
+    def local_frame(self, missile: GuidableObj) -> tuple[NDArray, NDArray]:
         r_hat = missile.normalize
         rt_hat = self.target.normalize
 
@@ -44,13 +68,19 @@ class Guidance(ABC):
         t_hat /= t_norm
         return r_hat, t_hat
 
-    def optimal_gamma(self, missile: "BallisticMissile", sigma: NDArray) -> NDArray:
+    def optimal_gamma(self, missile: GuidableObj, sigma: NDArray) -> NDArray:
         v = np.linalg.norm(missile.velocity)
         gamma = np.arctan((v**2 - self.planet.mu / np.linalg.norm(missile.position)) / v**2 * np.tan(sigma / 2))
         return gamma
 
+    def gravity_turn_direction(self, missile: GuidableObj, optimal_gamma: NDArray) -> NDArray:
+        r_hat, t_hat = self.local_frame(missile)
+        theta = optimal_gamma * missile.burned_fraction
+        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+        return d / np.linalg.norm(d)
+
     @abstractmethod
-    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         pass
 
 
@@ -58,84 +88,11 @@ class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
 
-    def __init__(self, planet, target: "MovableObj"):
-        super().__init__(planet, target)
-        self.state = "powered"
-
-    def gravity_turn_direction(
-        self,
-        missile: "BallisticMissile",
-        optimal_gamma: NDArray,
-    ):
-        r_hat, t_hat = self.local_frame(missile)
-        theta = optimal_gamma * missile.burned_fraction
-
-        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
-        return d / np.linalg.norm(d)
-
-    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
 
         return GuidanceResults(direction=self.gravity_turn_direction(missile, gamma), state=self.state)
-
-
-class ClosedFormBallistic_old(Guidance):
-    """Closed-form ballistic guidance: the missile starts vertically and stops thrusting at the optimal point,
-    then follows a ballistic trajectory to the target. The optimal point is computed based on the current velocity
-    and the central angle to the target.
-    """
-
-    def __init__(self, planet, target: "MovableObj"):
-        super().__init__(planet, target)
-        self.state = "powered"
-
-    def set_flight_phase(self, missile: "BallisticMissile", gamma: NDArray, sigma: NDArray, t: float) -> None:
-
-        # Compute the optimal angle (and corresponding arc-length distance) to stop thrusting
-        # based on the current velocity and central angle.
-        r = np.linalg.norm(missile.position)
-        v = np.linalg.norm(missile.velocity)
-        optimal_angle = 2 * np.arctan(
-            v**2 * np.sin(gamma) * np.cos(gamma) / (self.planet.mu / r - v**2 * np.sin(gamma) ** 2)
-        )
-
-        optimal_angle = np.linalg.norm(optimal_angle)
-        optimal_distance = self.planet.radius * optimal_angle
-
-        # Use only the tangential (horizontal) component of the remaining distance so that
-        # radial ascent — which doesn't change the downrange position — cannot inflate the
-        # metric and prevent the threshold from being reached.
-        _, t_hat = self.local_frame(missile)
-        tangential_distance = np.abs(np.dot(self.target.position - missile.position, t_hat))
-
-        if tangential_distance <= optimal_distance:
-            self.state = "ballistic"
-            logger["Physics"].info(f"{missile.name} switched to ballistic phase at distance {optimal_distance:.2f} m.")
-        elif sigma <= optimal_angle:
-            self.state = "ballistic"
-            logger["Physics"].info(
-                f"{missile.name} switched to ballistic phase at central angle {np.degrees(sigma):.2f} deg."
-            )
-
-    def gravity_turn_direction(
-        self,
-        missile: "BallisticMissile",
-        optimal_gamma: NDArray,
-    ):
-        r_hat, t_hat = self.local_frame(missile)
-        theta = optimal_gamma * missile.burned_fraction
-
-        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
-        return d / np.linalg.norm(d)
-
-    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
-        sigma = self.central_angle(missile, self.target)
-        gamma = self.optimal_gamma(missile, sigma)
-        direction = self.gravity_turn_direction(missile, gamma)
-        self.set_flight_phase(missile, gamma, sigma, t)
-
-        return GuidanceResults(direction=direction, state=self.state)
 
 
 class TabulatedBallistic(Guidance):
@@ -143,16 +100,15 @@ class TabulatedBallistic(Guidance):
     The ballistic table is a CSV file with columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     """
 
-    def __init__(self, planet, target: "MovableObj", ballistic_table_path: str):
+    def __init__(self, planet, target: MovableObj, ballistic_table_path: str):
         super().__init__(planet, target)
-        self.state = "powered"
         self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
 
         # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
         # Resolved once on the first get_guidance call.
         self._t_hat_sign: float | None = None
 
-    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
 
         if self.ballistic_guidance is None:
             logger["Guidance"].error("Ballistic table not loaded. Cannot compute guidance.")
@@ -219,11 +175,7 @@ class TabulatedBallistic(Guidance):
 class RCSGuidance(Guidance):
     """Simple guidance that uses RCS thrusters to always point directly at the target, without any powered flight phase."""
 
-    def __init__(self, planet, target: "MovableObj"):
-        super().__init__(planet, target)
-        self.state = "powered"
-
-    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         v_norm = np.linalg.norm(missile.velocity)
         if v_norm < 1e-8:
             return GuidanceResults(direction=np.zeros(3), state=self.state)
@@ -261,13 +213,12 @@ class ProportionalNavigation(Guidance):
     def __init__(
         self,
         planet,
-        target: "MovableObj",
+        target: MovableObj,
         N: float = 4.0,
         activation_altitude_km: float | None = 300.0,
         activation_range_km: float | None = None,
     ):
         super().__init__(planet, target)
-        self.state = "powered"
         self.N = N
         self.activation_altitude_m = activation_altitude_km * 1000.0 if activation_altitude_km is not None else None
         self.activation_range_m = activation_range_km * 1000.0 if activation_range_km is not None else None
@@ -275,7 +226,7 @@ class ProportionalNavigation(Guidance):
         self._prev_t: float | None = None
         self._armed: bool = False
 
-    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         los = self.target.position - missile.position
         los_norm = np.linalg.norm(los)
         if los_norm < 1e-8:
@@ -339,4 +290,4 @@ class ProportionalNavigation(Guidance):
         if cmd_norm < 1e-8:
             return GuidanceResults(direction=np.zeros(3), state=self.state)
 
-        return GuidanceResults(direction=a_cmd / cmd_norm, state=self.state, magnitude=cmd_norm)
+        return GuidanceResults(direction=a_cmd / cmd_norm, state=self.state, magnitude=float(cmd_norm))

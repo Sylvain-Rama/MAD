@@ -1,7 +1,12 @@
 import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 from mad.utils import to_vec3
+
+if TYPE_CHECKING:
+    from mad.objs.planets import Planet
 
 
 @dataclass
@@ -69,6 +74,27 @@ class MovableObj:
         return self._id == other._id
 
 
+class SimulationInterface(ABC):
+    """Abstract interface for any object that can be simulated inside a planet environment.
+    Subclasses must implement `update` and `accelerations`; `integrate` has a no-op default
+    that subclasses are expected to override."""
+
+    @abstractmethod
+    def update(self, dt: float) -> "MovableObj | None":
+        """Update internal state. May return a new MovableObj spawned during the step
+        (e.g. a separated stage)."""
+        pass
+
+    @abstractmethod
+    def accelerations(self, planet: "Planet") -> NDArray:
+        """Return the total acceleration vector (gravity + thrust + drag + …) in m/s²."""
+        pass
+
+    def integrate(self, dt: float, planet: "Planet") -> None:
+        """Advance position and velocity by one time step. Override in subclasses."""
+        pass
+
+
 class BallisticObj(MovableObj):
     """
     BallisticObj is a MovableObj with mass, area and drag coefficient, which can be used for projectiles and missiles.
@@ -95,3 +121,24 @@ class BallisticObj(MovableObj):
         self.mass = mass
         self.area = area
         self.Cd = Cd
+
+
+class GuidedObj(ABC):
+    """Abstract mixin for simulation objects that receive guidance commands.
+
+    Pair with MovableObj (or BallisticObj) in the class MRO.  Concrete
+    subclasses must implement `burned_fraction` and `thrust_acc`, which are
+    the two properties that guidance laws and thrust computations depend on.
+    """
+
+    @property
+    @abstractmethod
+    def burned_fraction(self) -> float:
+        """Fraction of propellant consumed, in [0, 1]."""
+        ...
+
+    @property
+    @abstractmethod
+    def thrust_acc(self) -> float:
+        """Maximum available propulsion acceleration (m/s²)."""
+        ...
