@@ -211,6 +211,3 @@ src/tests/
 .mypy_cache
 .ruff_cache
 .pytest_cache
-
-# Precomputed ballistic tables
-*.csv

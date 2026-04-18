@@ -114,17 +114,39 @@ class Planet(MovableObj):
 
         return MovableObj(position=self.radius * point, name=name)
 
-    def plot_2D_with_points(self, points: list[MovableObj] | None, ax=None) -> mpl.figure.Figure | None:
+    def plot_2D_with_points(
+        self, points: list[MovableObj] | None, ax=None, display_planet=True
+    ) -> mpl.figure.Figure | None:
         # 2D plot of the planet. If using point in 2D, they will appear at the circumference.
         plot_fig = False
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(4, 4))
             plot_fig = True
 
-        planet_body = mpl.patches.Circle(
-            self.position, radius=self.radius, ec="black", fill=False, label=self.name, ls="--"
-        )
-        ax.add_patch(planet_body)
+        if display_planet:
+            if points is not None and len(points) == 2:
+                theta1 = np.degrees(
+                    np.arctan2(points[0].position[1] - self.position[1], points[0].position[0] - self.position[0])
+                )
+                theta2 = np.degrees(
+                    np.arctan2(points[1].position[1] - self.position[1], points[1].position[0] - self.position[0])
+                )
+                planet_body = mpl.patches.Arc(
+                    self.position,
+                    2 * self.radius,
+                    2 * self.radius,
+                    angle=0,
+                    theta1=min(theta1, theta2),
+                    theta2=max(theta1, theta2),
+                    ec="black",
+                    label=self.name,
+                    ls="--",
+                )
+            else:
+                planet_body = mpl.patches.Circle(
+                    self.position, radius=self.radius, ec="black", fill=False, label=self.name, ls="--"
+                )
+            ax.add_patch(planet_body)
 
         if points is not None:
             for point in points:

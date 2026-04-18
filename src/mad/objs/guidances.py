@@ -19,6 +19,7 @@ class GuidanceResults:
     direction: NDArray
     state: str
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
+    magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²);
 
 
 class Guidance(ABC):
@@ -79,7 +80,7 @@ class GravityTurn(Guidance):
         return GuidanceResults(direction=self.gravity_turn_direction(missile, gamma), state=self.state)
 
 
-class ClosedFormBallistic(Guidance):
+class ClosedFormBallistic_old(Guidance):
     """Closed-form ballistic guidance: the missile starts vertically and stops thrusting at the optimal point,
     then follows a ballistic trajectory to the target. The optimal point is computed based on the current velocity
     and the central angle to the target.
@@ -137,7 +138,7 @@ class ClosedFormBallistic(Guidance):
         return GuidanceResults(direction=direction, state=self.state)
 
 
-class RangeGuided(Guidance):
+class TabulatedBallistic(Guidance):
     """The guidance returns an updated when the missile get in range to the target, according to the ballistic table.
     The ballistic table is a CSV file with columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     """
@@ -150,17 +151,6 @@ class RangeGuided(Guidance):
         # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
         # Resolved once on the first get_guidance call.
         self._t_hat_sign: float | None = None
-
-    def gravity_turn_direction(
-        self,
-        missile: "BallisticMissile",
-        optimal_gamma: NDArray,
-    ):
-        r_hat, t_hat = self.local_frame(missile)
-        theta = optimal_gamma * missile.burned_fraction
-
-        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
-        return d / np.linalg.norm(d)
 
     def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
 
@@ -207,10 +197,12 @@ class RangeGuided(Guidance):
             logger["Guidance"].debug(
                 f"Target range {range_to_target:.2f} reached at Table index: {idx}, table values: {table_values}."
             )
+            logger["Guidance"].debug(
+                f"Switch range error: {(range_to_target - optimal_range)/1000:.2f} km, gamma error: {missile_gamma - optimal_gamma:.2f} rad."
+            )
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
-
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
         theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction * 2
 
@@ -222,3 +214,129 @@ class RangeGuided(Guidance):
             state=self.state,
             gamma=optimal_gamma,
         )
+
+
+class RCSGuidance(Guidance):
+    """Simple guidance that uses RCS thrusters to always point directly at the target, without any powered flight phase."""
+
+    def __init__(self, planet, target: "MovableObj"):
+        super().__init__(planet, target)
+        self.state = "powered"
+
+    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+        v_norm = np.linalg.norm(missile.velocity)
+        if v_norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        v_hat = missile.velocity / v_norm
+
+        los = self.target.position - missile.position
+
+        # Remove the component along the current velocity so thrust is purely a
+        # course correction (perpendicular to flight path).  This makes guidance
+        # stable at any thrust level: higher thrust curves the trajectory more
+        # sharply toward the target instead of causing downrange overshoot.
+        correction = los - np.dot(los, v_hat) * v_hat
+        norm = np.linalg.norm(correction)
+        if norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        return GuidanceResults(direction=correction / norm, state=self.state)
+
+
+class ProportionalNavigation(Guidance):
+    """Proportional Navigation (PN) terminal guidance for reentry vehicles.
+
+    Commands acceleration perpendicular to the current velocity, proportional
+    to the line-of-sight (LOS) rotation rate:
+
+        a_cmd = N * v_c * los_rate_hat  (perpendicular to velocity)
+
+    where N is the navigation gain (typically 3-5), v_c is the closing speed,
+    and los_rate_hat is the unit LOS angular rate vector.
+
+    Guidance is dormant until the payload is within `activation_altitude_km`
+    OR within `activation_range_km` surface distance of the target. The LOS
+    history is reset at activation to avoid a stale derivative.
+    """
+
+    def __init__(
+        self,
+        planet,
+        target: "MovableObj",
+        N: float = 4.0,
+        activation_altitude_km: float | None = 300.0,
+        activation_range_km: float | None = None,
+    ):
+        super().__init__(planet, target)
+        self.state = "powered"
+        self.N = N
+        self.activation_altitude_m = activation_altitude_km * 1000.0 if activation_altitude_km is not None else None
+        self.activation_range_m = activation_range_km * 1000.0 if activation_range_km is not None else None
+        self._prev_los_hat: NDArray | None = None
+        self._prev_t: float | None = None
+        self._armed: bool = False
+
+    def get_guidance(self, missile: "BallisticMissile", t: float = 0.0) -> GuidanceResults:
+        los = self.target.position - missile.position
+        los_norm = np.linalg.norm(los)
+        if los_norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        los_hat = los / los_norm
+
+        v_norm = np.linalg.norm(missile.velocity)
+        if v_norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        v_hat = missile.velocity / v_norm
+
+        # Check arming conditions; reset LOS history on the transition.
+        if not self._armed:
+            altitude = np.linalg.norm(missile.position) - self.planet.radius
+            surface_range = self.planet.radius * self.central_angle(missile, self.target)
+            armed_by_alt = self.activation_altitude_m is not None and altitude <= self.activation_altitude_m
+            armed_by_range = self.activation_range_m is not None and surface_range <= self.activation_range_m
+            if armed_by_alt or armed_by_range:
+                self._armed = True
+                self._prev_los_hat = None
+                self._prev_t = None
+                logger["Guidance"].info(
+                    f"PN armed at altitude {altitude/1000:.1f} km, range {surface_range/1000:.1f} km."
+                )
+            else:
+                return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        # On first call after arming, seed the LOS history.
+        if self._prev_los_hat is None or self._prev_t is None:
+            self._prev_los_hat = los_hat.copy()
+            self._prev_t = t
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        dt = t - self._prev_t
+        if dt < 1e-9:
+            self._prev_los_hat = los_hat.copy()
+            self._prev_t = t
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        # LOS rate vector (rad/s): d(los_hat)/dt projected perpendicular to los_hat
+        d_los_hat = (los_hat - self._prev_los_hat) / dt
+        # Remove component along los_hat to get pure angular rate
+        los_rate = d_los_hat - np.dot(d_los_hat, los_hat) * los_hat
+
+        self._prev_los_hat = los_hat.copy()
+        self._prev_t = t
+
+        los_rate_norm = np.linalg.norm(los_rate)
+        if los_rate_norm < 1e-12:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        # Closing velocity (positive when approaching)
+        v_c = -np.dot(missile.velocity, los_hat)
+
+        # PN command: a = N * v_c * los_rate_hat, in the plane perpendicular to LOS.
+        # Then project onto the plane perpendicular to velocity so RCS doesn't brake.
+        a_cmd = self.N * v_c * los_rate / los_rate_norm
+        a_cmd = a_cmd - np.dot(a_cmd, v_hat) * v_hat
+
+        cmd_norm = np.linalg.norm(a_cmd)
+        if cmd_norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        return GuidanceResults(direction=a_cmd / cmd_norm, state=self.state, magnitude=cmd_norm)
