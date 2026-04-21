@@ -6,7 +6,7 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 from mad.logger import SourceLogger
-from mad.utils import load_ballistic_table, BALLISTIC_FIELD_NAMES
+from mad.utils import load_ballistic_table
 
 logger = SourceLogger()
 
@@ -137,38 +137,49 @@ class TabulatedBallistic(Guidance):
         v_t = np.dot(missile.velocity, t_hat)
         missile_gamma = np.arctan2(v_r, self._t_hat_sign * v_t)
 
-        idx = np.argmin(
-            np.sqrt(
-                ((table[:, 0] - altitude) / self.ballistic_guidance.alt_scale) ** 2
-                + ((table[:, 1] - velocity) / self.ballistic_guidance.vel_scale) ** 2
-                + ((table[:, 2] - missile_gamma) / self.ballistic_guidance.gam_scale) ** 2
-            )
+        query_point = np.array(
+            [
+                altitude / self.ballistic_guidance.alt_scale,
+                velocity / self.ballistic_guidance.vel_scale,
+                missile_gamma / self.ballistic_guidance.gam_scale,
+            ]
         )
-        optimal_range = table[idx, 3] * self.planet.radius
-        optimal_gamma = table[idx, 2]
+        k = min(3, len(table))
+        dists, idxs = self.ballistic_guidance.kdtree.query(query_point, k=k)
+
+        if dists[0] < 1e-12:
+            # Exact match — no interpolation needed.
+            optimal_range = table[idxs[0], 3] * self.planet.radius
+            gamma = table[idxs[0], 2]
+        else:
+            weights = 1.0 / dists
+            weights /= weights.sum()
+            optimal_range = float(np.dot(weights, table[idxs, 3])) * self.planet.radius
+            gamma = float(np.dot(weights, table[idxs, 2]))
 
         if range_to_target <= optimal_range:
-            table_values = {k: f"{v:.2f}" for k, v in zip(BALLISTIC_FIELD_NAMES, table[idx, :])}
+            # TODO: Continue correction for final approach.
+            # Tried using a second KDTREE that queries gamma based on range error
+            # instead of altitude/velocity, to fix any residual range error from the first table.
+            # This did not really do anything...
+
             self.state = "ballistic"
-            logger["Guidance"].debug(
-                f"Target range {range_to_target:.2f} reached at Table index: {idx}, table values: {table_values}."
-            )
-            logger["Guidance"].debug(
-                f"Switch range error: {(range_to_target - optimal_range)/1000:.2f} km, gamma error: {missile_gamma - optimal_gamma:.2f} rad."
+            logger["Guidance"].info(
+                f"Ballistic phase at t={t:.1f}s, altitude={altitude/1000:.1f}km, "
+                f"velocity={velocity:.1f}m/s, range error: {(range_to_target - optimal_range)/1000:.1f}km.",
             )
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
-        theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction * 2
+        theta = self._t_hat_sign * gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
 
-        # direction = self.gravity_turn_direction(missile, self._t_hat_sign * optimal_gamma)
         return GuidanceResults(
             direction=direction,
             state=self.state,
-            gamma=optimal_gamma,
+            gamma=gamma,
         )
 
 
