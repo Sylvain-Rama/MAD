@@ -3,7 +3,7 @@ from time import time
 from collections import defaultdict
 from mad.logger import SourceLogger
 from mad.objs.planets import Planet
-from mad.objs.common_schemas import BallisticObj
+from mad.objs.common_schemas import BallisticObj, GuidedObj
 from mad.utils import extract_history
 
 logger = SourceLogger()
@@ -132,4 +132,27 @@ class Simulation:
 
         self.results = extract_history(active_objs, planet)
         stop = time()
-        logger["Simulation"].info(f"Simulation ended. Took {stop - start:.2f} seconds of real time.")
+        logger["Simulation"].info(f"Simulation ended at {t:.2f}s. Took {stop - start:.2f} s of real time.")
+
+
+# Convenience function for quick simulations without collision detection or logging.
+def run_simple_simulation(
+    moving_objs: list[BallisticObj], planet: Planet, dt: float = 0.1, max_time: float = 3600.0
+) -> list[BallisticObj]:
+    """Run a simple simulation of the given objects moving under the influence of the planet's gravity and atmospheric drag.
+    The objects must have their initial position and velocity set. The simulation runs until max_time
+    or until all objects are inactive (e.g. impacted or ran out of propellant). Returns the list
+    of objects with their final states after the simulation."""
+    active_objs = moving_objs[:]
+    t = 0.0
+    while (t < max_time) and any(obj.active for obj in active_objs):
+
+        for obj in active_objs[:]:
+            if not obj.active:
+                continue
+            _ = obj.update(dt)
+            obj.integrate(dt, planet)
+
+        t += dt
+
+    return active_objs

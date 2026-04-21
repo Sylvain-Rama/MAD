@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.planets import Planet
-from mad.objs.common_schemas import BallisticObj, History, SimulationInterface
+from mad.objs.common_schemas import BallisticObj, History
 from mad.logger import SourceLogger
 
 logger = SourceLogger()
