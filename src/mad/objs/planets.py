@@ -6,7 +6,6 @@ import matplotlib.patches
 from mad.objs.common_schemas import MovableObj, BallisticObj
 from mad.configs.physics import G
 from dataclasses import dataclass, asdict
-from abc import ABC, abstractmethod
 
 
 @dataclass
@@ -163,26 +162,3 @@ class Planet(MovableObj):
         ax.grid()
 
         return fig if plot_fig else None  # type: ignore
-
-
-class SimulationInterface(ABC):
-    """SimulationInterface is an abstract class that defines the interface for any object that can be simulated in the planet environment.
-    It requires the implementation of the update, accelerations and integrate methods, which are used to update the object's state,
-    compute the accelerations and integrate the equations of motion, respectively. It is used to ensure that all objects that can be
-    simulated in the planet environment have a consistent interface and can be easily integrated into the simulation loop.
-    """
-
-    @abstractmethod
-    def update(self, dt: float) -> list[MovableObj] | None:
-        """This abstract method is dedicated to the update of the object itself.
-        It can return other Movable objects to be able to spawn elements in the simulation."""
-        pass
-
-    @abstractmethod
-    def accelerations(self, planet: Planet) -> NDArray:
-        """Abstract method dedicated to the computation of accelerations: gravity, thrust, drag, etc..."""
-        pass
-
-    def integrate(self, dt: float, planet: Planet) -> None:
-        """This abstract method is dedicated to the update of the object position / velocity according to the selected planet."""
-        pass

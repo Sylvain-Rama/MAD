@@ -2,9 +2,9 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.common_schemas import BallisticObj, GuidedObj, History, MovableObj
+from mad.objs.common_schemas import BallisticObj, GuidedObj, History, MovableObj, SimulationInterface
 from mad.objs.projectiles import ProjectileConfig, Projectile
-from mad.objs.planets import Planet, SimulationInterface
+from mad.objs.planets import Planet
 from mad.logger import SourceLogger
 from mad.configs.physics import G0
 
@@ -27,7 +27,7 @@ class PayloadConfig:
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
 
 
-class Payload(SimulationInterface, BallisticObj, GuidedObj):
+class Payload(BallisticObj, GuidedObj):
     def __init__(self, config: PayloadConfig, position: NDArray, velocity=None, t=0.0):
         super().__init__(
             position=position,
@@ -173,7 +173,7 @@ class BallisticMissileConfig:
         return asdict(self)
 
 
-class BallisticMissile(SimulationInterface, BallisticObj, GuidedObj):
+class BallisticMissile(BallisticObj, GuidedObj):
     def __init__(self, position, cfg: BallisticMissileConfig, velocity=None, name="BallisticMissile", t=0.0):
         # mass and area are computed properties on this class; bypass BallisticObj.__init__
         # to avoid storing unused _mass/_area defaults.
@@ -253,7 +253,7 @@ class BallisticMissile(SimulationInterface, BallisticObj, GuidedObj):
 
         return running_stage.thrust_force / self.mass
 
-    def update(self, dt: float) -> list[MovableObj] | None:
+    def update(self, dt: float) -> list[BallisticObj] | None:
         released_objects = []
         self.t += dt
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
