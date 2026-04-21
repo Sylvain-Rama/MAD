@@ -4,6 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from scipy.spatial import KDTree
 from mad.logger import SourceLogger
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ class BallisticTable:
     alt_scale: float
     vel_scale: float
     gam_scale: float
+    kdtree: KDTree  # Built from normalized (alt, vel, gamma) inputs for interpolation
 
 
 BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad"]
@@ -61,7 +63,14 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
         vel_scale = np.ptp(table[:, 1]) or 1.0
         gam_scale = np.ptp(table[:, 2]) or 1.0
 
-        return BallisticTable(table=table, alt_scale=alt_scale, vel_scale=vel_scale, gam_scale=gam_scale)
+        norm_inputs = np.column_stack([
+            table[:, 0] / alt_scale,
+            table[:, 1] / vel_scale,
+            table[:, 2] / gam_scale,
+        ])
+        kdtree = KDTree(norm_inputs)
+
+        return BallisticTable(table=table, alt_scale=alt_scale, vel_scale=vel_scale, gam_scale=gam_scale, kdtree=kdtree)
 
     except Exception as e:
         logger["I/O"].error(f"Error loading ballistic table from {file_path}: {e}")

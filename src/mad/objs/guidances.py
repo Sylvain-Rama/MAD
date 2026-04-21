@@ -6,7 +6,7 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 from mad.logger import SourceLogger
-from mad.utils import load_ballistic_table, BALLISTIC_FIELD_NAMES
+from mad.utils import load_ballistic_table
 
 logger = SourceLogger()
 
@@ -137,21 +137,31 @@ class TabulatedBallistic(Guidance):
         v_t = np.dot(missile.velocity, t_hat)
         missile_gamma = np.arctan2(v_r, self._t_hat_sign * v_t)
 
-        idx = np.argmin(
-            np.sqrt(
-                ((table[:, 0] - altitude) / self.ballistic_guidance.alt_scale) ** 2
-                + ((table[:, 1] - velocity) / self.ballistic_guidance.vel_scale) ** 2
-                + ((table[:, 2] - missile_gamma) / self.ballistic_guidance.gam_scale) ** 2
-            )
+        query_point = np.array(
+            [
+                altitude / self.ballistic_guidance.alt_scale,
+                velocity / self.ballistic_guidance.vel_scale,
+                missile_gamma / self.ballistic_guidance.gam_scale,
+            ]
         )
-        optimal_range = table[idx, 3] * self.planet.radius
-        optimal_gamma = table[idx, 2]
+        k = min(5, len(table))
+        dists, idxs = self.ballistic_guidance.kdtree.query(query_point, k=k)
+
+        if dists[0] < 1e-12:
+            # Exact match — no interpolation needed.
+            optimal_range = table[idxs[0], 3] * self.planet.radius
+            optimal_gamma = table[idxs[0], 2]
+        else:
+            weights = 1.0 / dists
+            weights /= weights.sum()
+            optimal_range = float(np.dot(weights, table[idxs, 3])) * self.planet.radius
+            optimal_gamma = float(np.dot(weights, table[idxs, 2]))
 
         if range_to_target <= optimal_range:
-            table_values = {k: f"{v:.2f}" for k, v in zip(BALLISTIC_FIELD_NAMES, table[idx, :])}
             self.state = "ballistic"
             logger["Guidance"].debug(
-                f"Target range {range_to_target:.2f} reached at Table index: {idx}, table values: {table_values}."
+                f"Target range {range_to_target:.2f} reached. "
+                f"Interpolated optimal_range: {optimal_range:.2f} m, optimal_gamma: {optimal_gamma:.4f} rad."
             )
             logger["Guidance"].debug(
                 f"Switch range error: {(range_to_target - optimal_range)/1000:.2f} km, gamma error: {missile_gamma - optimal_gamma:.2f} rad."
