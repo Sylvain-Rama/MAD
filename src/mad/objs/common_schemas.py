@@ -79,9 +79,12 @@ class SimulationInterface(ABC):
     Subclasses must implement `update` and `accelerations`; `integrate` has a no-op default
     that subclasses are expected to override."""
 
+    def __init__(self):
+        self.active: bool = True
+
     @abstractmethod
-    def update(self, dt: float) -> list[MovableObj] | None:
-        """Update internal state. May return a list of new MovableObj spawned during the step
+    def update(self, dt: float) -> list["BallisticObj"] | None:
+        """Update internal state. May return a list of new BallisticObj spawned during the step
         (e.g. a separated stage or released payload)."""
         pass
 
@@ -90,12 +93,13 @@ class SimulationInterface(ABC):
         """Return the total acceleration vector (gravity + thrust + drag + …) in m/s²."""
         pass
 
+    @abstractmethod
     def integrate(self, dt: float, planet: "Planet") -> None:
         """Advance position and velocity by one time step. Override in subclasses."""
         pass
 
 
-class BallisticObj(MovableObj):
+class BallisticObj(MovableObj, SimulationInterface):
     """
     BallisticObj is a MovableObj with mass, area and drag coefficient, which can be used for projectiles and missiles.
     It does not have any guidance or propulsion, and is only affected by gravity and drag.
