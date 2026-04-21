@@ -39,8 +39,8 @@ class Payload(BallisticObj, GuidedObj):
         )
         self.yield_kt = config.yield_kt
         self.guidance = config.guidance
-        self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
         self.t = t
+        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
         self.history = History(
@@ -256,6 +256,10 @@ class BallisticMissile(BallisticObj, GuidedObj):
     def update(self, dt: float) -> list[BallisticObj] | None:
         released_objects = []
         self.t += dt
+
+        running_stage = self.stages[0]
+        running_stage.update(dt)
+
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
 
         if self.guidance_results:
@@ -271,9 +275,6 @@ class BallisticMissile(BallisticObj, GuidedObj):
                     )
                     released_objects.append(payload)
                     logger["Missile"].info(f"{self.name} released payload {payload.name} at {self.t:.2f}.")
-
-        running_stage = self.stages[0]
-        running_stage.update(dt)
 
         if not running_stage.active:
             stage_cfg = ProjectileConfig(

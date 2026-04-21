@@ -144,41 +144,61 @@ class TabulatedBallistic(Guidance):
                 missile_gamma / self.ballistic_guidance.gam_scale,
             ]
         )
-        k = min(5, len(table))
+        k = min(3, len(table))
         dists, idxs = self.ballistic_guidance.kdtree.query(query_point, k=k)
 
         if dists[0] < 1e-12:
             # Exact match — no interpolation needed.
             optimal_range = table[idxs[0], 3] * self.planet.radius
-            optimal_gamma = table[idxs[0], 2]
+            gamma = table[idxs[0], 2]
         else:
             weights = 1.0 / dists
             weights /= weights.sum()
             optimal_range = float(np.dot(weights, table[idxs, 3])) * self.planet.radius
-            optimal_gamma = float(np.dot(weights, table[idxs, 2]))
+            gamma = float(np.dot(weights, table[idxs, 2]))
 
         if range_to_target <= optimal_range:
-            self.state = "ballistic"
             logger["Guidance"].debug(
-                f"Target range {range_to_target:.2f} reached. "
-                f"Interpolated optimal_range: {optimal_range:.2f} m, optimal_gamma: {optimal_gamma:.4f} rad."
+                f"Old gamma: {missile_gamma:.4f} rad, optimal gamma: {gamma:.4f} rad, range to target: {range_to_target:.2f} m, optimal range: {optimal_range:.2f} m."
             )
+            # Look up the gamma needed to reach the target range from current (alt, vel).
+            # This is the steering target: different from the gamma-based lookup above which
+            # only tells us what range the missile's *current* gamma would achieve.
+            range_query = np.array(
+                [
+                    altitude / self.ballistic_guidance.alt_scale,
+                    velocity / self.ballistic_guidance.vel_scale,
+                    (range_to_target / self.planet.radius) / self.ballistic_guidance.range_scale,
+                ]
+            )
+            r_dists, r_idxs = self.ballistic_guidance.kdtree_range.query(range_query, k=2)
+            if r_dists[0] < 1e-12:
+                gamma = table[r_idxs[0], 2]
+            else:
+                r_weights = 1.0 / r_dists
+                r_weights /= r_weights.sum()
+                gamma = float(np.dot(r_weights, table[r_idxs, 2]))
+
+            self.state = "ballistic"
+
+            logger["Guidance"].debug(f"New gamma from secondary KDTREE: {gamma:.4f} rad")
+
             logger["Guidance"].debug(
-                f"Switch range error: {(range_to_target - optimal_range)/1000:.2f} km, gamma error: {missile_gamma - optimal_gamma:.2f} rad."
+                f"Switch range error: {(range_to_target - optimal_range)/1000:.2f} km, gamma error: {missile_gamma - gamma:.2f} rad."
             )
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
-        theta = self._t_hat_sign * optimal_gamma * missile.burned_fraction * 2
+        theta = self._t_hat_sign * gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
 
-        # direction = self.gravity_turn_direction(missile, self._t_hat_sign * optimal_gamma)
+        # direction = self.gravity_turn_direction(missile, self._t_hat_sign * gamma)
         return GuidanceResults(
             direction=direction,
             state=self.state,
-            gamma=optimal_gamma,
+            gamma=gamma,
         )
 
 

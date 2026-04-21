@@ -17,7 +17,9 @@ class BallisticTable:
     alt_scale: float
     vel_scale: float
     gam_scale: float
-    kdtree: KDTree  # Built from normalized (alt, vel, gamma) inputs for interpolation
+    range_scale: float
+    kdtree: KDTree  # Built from normalized (alt, vel, gamma) inputs
+    kdtree_range: KDTree  # Built from normalized (alt, vel, range_rad) for range-based gamma lookup
 
 
 BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad"]
@@ -62,15 +64,35 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
         alt_scale = np.ptp(table[:, 0]) or 1.0
         vel_scale = np.ptp(table[:, 1]) or 1.0
         gam_scale = np.ptp(table[:, 2]) or 1.0
+        range_scale = np.ptp(table[:, 3]) or 1.0
 
-        norm_inputs = np.column_stack([
-            table[:, 0] / alt_scale,
-            table[:, 1] / vel_scale,
-            table[:, 2] / gam_scale,
-        ])
+        norm_inputs = np.column_stack(
+            [
+                table[:, 0] / alt_scale,
+                table[:, 1] / vel_scale,
+                table[:, 2] / gam_scale,
+            ]
+        )
         kdtree = KDTree(norm_inputs)
 
-        return BallisticTable(table=table, alt_scale=alt_scale, vel_scale=vel_scale, gam_scale=gam_scale, kdtree=kdtree)
+        norm_inputs_range = np.column_stack(
+            [
+                table[:, 0] / alt_scale,
+                table[:, 1] / vel_scale,
+                table[:, 3] / range_scale,
+            ]
+        )
+        kdtree_range = KDTree(norm_inputs_range)
+
+        return BallisticTable(
+            table=table,
+            alt_scale=alt_scale,
+            vel_scale=vel_scale,
+            gam_scale=gam_scale,
+            range_scale=range_scale,
+            kdtree=kdtree,
+            kdtree_range=kdtree_range,
+        )
 
     except Exception as e:
         logger["I/O"].error(f"Error loading ballistic table from {file_path}: {e}")
