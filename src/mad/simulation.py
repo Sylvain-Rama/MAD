@@ -3,7 +3,7 @@ from time import time
 from collections import defaultdict
 from mad.logger import SourceLogger
 from mad.objs.planets import Planet
-from mad.objs.common_schemas import BallisticObj, GuidedObj
+from mad.objs.base import BallisticObj, MovableObj
 from mad.utils import extract_history
 
 logger = SourceLogger()
@@ -17,7 +17,7 @@ class Simulation:
 
         self.neighbours = (-1, 0, 1)
 
-    def build_voxel_grid(self, objs: list[BallisticObj]) -> dict[tuple[int, ...], list[int]]:
+    def build_voxel_grid(self, objs: list[MovableObj]) -> dict[tuple[int, ...], list[int]]:
         """Partition active objects into a voxel grid and return a mapping of voxel key → list of object indices.
 
         Each object is assigned to the voxel whose integer key is floor(position / voxel_size).
@@ -45,7 +45,7 @@ class Simulation:
 
     def detect_collisions(
         self,
-        objs: list[BallisticObj],
+        objs: list[MovableObj],
         grid: dict[tuple[int, ...], list[int]],
         collision_radius: float,
     ) -> list[tuple[int, int]]:
@@ -90,7 +90,7 @@ class Simulation:
 
         return collisions
 
-    def apply_collisions(self, objs: list[BallisticObj], collisions: list[tuple[int, int]]) -> None:
+    def apply_collisions(self, objs: list[MovableObj], collisions: list[tuple[int, int]]) -> None:
         """Mark both objects in each colliding pair as inactive (in-place)."""
         for i, j in collisions:
             objs[i].active = False
@@ -98,7 +98,7 @@ class Simulation:
 
     def run(
         self,
-        moving_objs: list[BallisticObj],
+        moving_objs: list[MovableObj],
         planet: Planet,
     ) -> None:
         """Run a simple simulation of the given objects moving under the influence of the planet's gravity and atmospheric drag.

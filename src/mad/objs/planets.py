@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import matplotlib.figure
 import matplotlib.patches
-from mad.objs.common_schemas import MovableObj, BallisticObj
+from mad.objs.base import MovableObj, BallisticObj
 from mad.configs.physics import G
 from dataclasses import dataclass, asdict
 

@@ -1,4 +1,4 @@
-from mad.objs.common_schemas import MovableObj
+from mad.objs.base import MovableObj
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -172,7 +172,7 @@ class TabulatedBallistic(Guidance):
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
-        theta = self._t_hat_sign * gamma * missile.burned_fraction * 2
+        theta = self._t_hat_sign * missile_gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
 
