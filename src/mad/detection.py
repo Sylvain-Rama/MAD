@@ -2,6 +2,7 @@ from mad.objs.base import MovableObj
 import numpy as np
 from collections import defaultdict
 from mad.logger import SourceLogger
+from mad.configs.physics import VOXEL_SIZE_KM
 
 logger = SourceLogger()
 
@@ -12,7 +13,7 @@ class CollisionDetector:
     Collisions are detected by checking each object against others in the same voxel and its 26 neighbours, using an exact distance test.
     """
 
-    def __init__(self, voxel_size_km: float = 50.0):
+    def __init__(self, voxel_size_km: float = VOXEL_SIZE_KM):
         self.voxel_size = voxel_size_km
         self.neighbours = (-1, 0, 1)
 

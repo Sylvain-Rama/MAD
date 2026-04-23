@@ -1,6 +1,4 @@
-import numpy as np
 from time import time
-from collections import defaultdict
 from mad.logger import SourceLogger
 from mad.objs.planets import Planet
 from mad.objs.base import MovableObj, SimulationInterface
