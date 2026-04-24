@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from scipy.spatial import KDTree
 from mad.logger import SourceLogger
-from mad.configs.physics import VOXEL_SIZE_KM
+from mad.configs.physics import VOXEL_SIZE
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
@@ -42,15 +42,14 @@ def to_vec3(arr: list | NDArray) -> NDArray:
     return out
 
 
-def to_voxel_key(position: list | NDArray, voxel_size_km: float = VOXEL_SIZE_KM) -> tuple[int, ...]:
+def to_voxel_key(position: list | NDArray, voxel_size: float = VOXEL_SIZE) -> tuple[int, ...]:
     """Convert a position in metres to a voxel key (tuple of ints) based on the given voxel size in km."""
     if not isinstance(position, (list, np.ndarray)):
         raise TypeError(f"Position must be a list or NDArray, got {type(position)} instead.")
     pos_arr = np.asarray(position)
     if pos_arr.shape[0] < 3:
         raise ValueError(f"Position must have at least 3 components, got shape {pos_arr.shape} instead.")
-    voxel_size_m = voxel_size_km * 1000.0
-    key = tuple(np.floor(pos_arr / voxel_size_m).astype(int))
+    key = tuple(np.floor(pos_arr / voxel_size).astype(int))
     return key
 
 

@@ -2,7 +2,7 @@ from mad.objs.base import MovableObj
 import numpy as np
 from collections import defaultdict
 from mad.logger import SourceLogger
-from mad.configs.physics import VOXEL_SIZE_KM
+from mad.configs.physics import VOXEL_SIZE
 
 logger = SourceLogger()
 
@@ -13,8 +13,8 @@ class CollisionDetector:
     Collisions are detected by checking each object against others in the same voxel and its 26 neighbours, using an exact distance test.
     """
 
-    def __init__(self, voxel_size_km: float = VOXEL_SIZE_KM):
-        self.voxel_size = voxel_size_km
+    def __init__(self, voxel_size: float = VOXEL_SIZE):
+        self.voxel_size = voxel_size
         self.neighbours = (-1, 0, 1)
 
     def build_voxel_grid(self, objs: list[MovableObj]) -> dict[tuple[int, ...], list[int]]:
@@ -44,7 +44,7 @@ class CollisionDetector:
         self,
         objs: list[MovableObj],
         grid: dict[tuple[int, ...], list[int]],
-        collision_radius_m: float = 500.0,
+        collision_radius: float = 500.0,
     ) -> list[tuple[int, int]]:
         """Return all colliding pairs using the pre-built voxel grid.
 
@@ -56,14 +56,14 @@ class CollisionDetector:
         ----------
         objs:             list of simulation objects (same list passed to build_voxel_grid)
         grid:             voxel grid returned by build_voxel_grid
-        collision_radius_m: two objects are considered colliding when their centres are
+        collision_radius: two objects are considered colliding when their centres are
                         within this distance (metres)
 
         Returns
         -------
         List of (i, j) index pairs with i < j for every detected collision.
         """
-        r2 = collision_radius_m**2
+        r2 = collision_radius**2
         seen: set[tuple[int, int]] = set()
         collisions: list[tuple[int, int]] = []
 
