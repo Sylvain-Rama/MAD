@@ -40,6 +40,13 @@ B53_warhead = {
     "mass": 4000.0,  # kg
     "area": np.pi * 0.5**2,  # m^2
     "Cd": 0.47,  # Sphere
-    "name": "B53_Warhead",
+    "name": "B53Warhead",
     "yield_kt": 9.0 * 1000,  # kt
+}
+
+rod_of_god = {
+    "mass": 8000.0,  # kg
+    "area": np.pi * 0.1**2,  # m^2
+    "Cd": 1.08,  # Long cylinder
+    "name": "RodOfGod",
 }
