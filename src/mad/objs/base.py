@@ -81,12 +81,14 @@ class SimulationInterface(ABC):
 
     def __init__(self):
         self.active: bool = True
+        self.history = History()
+        self.t = 0.0
 
     @abstractmethod
     def update(self, dt: float) -> list["BallisticObj"] | None:
         """Update internal state. May return a list of new BallisticObj spawned during the step
         (e.g. a separated stage or released payload)."""
-        pass
+        self.t += dt
 
     @abstractmethod
     def accelerations(self, planet: "Planet") -> NDArray:
