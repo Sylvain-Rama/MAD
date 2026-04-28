@@ -35,6 +35,7 @@ class GuidanceResults:
     state: str
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
+    release_velocity: NDArray | None = None  # Optimal RV release velocity vector (m/s)
 
 
 class Guidance(ABC):
@@ -164,6 +165,7 @@ class TabulatedBallistic(Guidance):
             optimal_range = float(np.dot(weights, table[idxs, 3])) * self.planet.radius
             gamma = float(np.dot(weights, table[idxs, 2]))
 
+        release_velocity = None
         if range_to_target <= optimal_range:
             # TODO: Continue correction for final approach.
             # Tried using a second KDTREE that queries gamma based on range error
@@ -176,6 +178,11 @@ class TabulatedBallistic(Guidance):
             #     f"velocity={velocity:.1f}m/s, range error: {(range_to_target - optimal_range)/1000:.1f}km.",
             # )
 
+            # Compute the optimal RV release velocity: same speed as the missile but
+            # aligned to the table's optimal gamma so the RV follows the correct ballistic arc.
+            v_mag = np.linalg.norm(missile.velocity)
+            release_velocity = v_mag * (np.sin(gamma) * r_hat + self._t_hat_sign * np.cos(gamma) * t_hat)
+
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
@@ -187,6 +194,7 @@ class TabulatedBallistic(Guidance):
             direction=direction,
             state=self.state,
             gamma=gamma,
+            release_velocity=release_velocity,
         )
 
 

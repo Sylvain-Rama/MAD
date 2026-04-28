@@ -277,22 +277,11 @@ class BallisticMissile(BallisticObj, GuidedObj):
             ):
                 payload_name = f"{self.payload.name}_{self.released_RVs + 1}"
 
-                # Rotate velocity to the optimal ballistic direction from the guidance table.
-                # The missile's actual flight-path angle at release may not match the table's
-                # optimal gamma (guidance steers with a 2× aggressiveness factor during boost).
-                # Keeping the speed magnitude but aligning with the table gamma puts the RV on
-                # the correct ballistic arc to the target.
-                release_velocity = self.velocity.copy()
-                gamma = self.guidance_results.gamma
-                if (
-                    gamma is not None
-                    and hasattr(self.guidance, "_t_hat_sign")
-                    and self.guidance._t_hat_sign is not None
-                ):
-                    r_hat, t_hat = self.guidance.local_frame(self)
-                    sign = self.guidance._t_hat_sign
-                    v_mag = np.linalg.norm(self.velocity)
-                    release_velocity = v_mag * (np.sin(gamma) * r_hat + sign * np.cos(gamma) * t_hat)
+                release_velocity = (
+                    self.guidance_results.release_velocity
+                    if self.guidance_results.release_velocity is not None
+                    else self.velocity.copy()
+                )
 
                 payload = Payload(
                     config=self.payload,
