@@ -2,9 +2,9 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, History, MovableObj
-from mad.objs.projectiles import ProjectileConfig, Projectile
-from mad.objs.planets import Planet
+from mad.objs import BallisticObj, GuidedObj, History, MovableObj
+from mad.objs import ProjectileConfig, Projectile
+from mad.objs import Planet
 from mad.logger import SourceLogger
 from mad.configs.physics import G0
 
