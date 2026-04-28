@@ -11,7 +11,7 @@ from mad.configs.physics import G0
 from copy import deepcopy
 
 if TYPE_CHECKING:
-    from mad.objs.guidances import Guidance
+    from mad.guidances import Guidance
 
 logger = SourceLogger()
 
