@@ -14,9 +14,7 @@ logger = SourceLogger()
 class GuidableObj(Protocol):
     """Structural interface expected by all Guidance implementations.
 
-    Any object that exposes these attributes can be guided — no concrete
-    inheritance from BallisticMissile is required.  Both BallisticMissile
-    and Payload satisfy this protocol."""
+    Any object that exposes these attributes can be guided."""
 
     position: NDArray
     velocity: NDArray
@@ -168,15 +166,9 @@ class TabulatedBallistic(Guidance):
         release_velocity = None
         if range_to_target <= optimal_range:
             # TODO: Continue correction for final approach.
-            # Tried using a second KDTREE that queries gamma based on range error
-            # instead of altitude/velocity, to fix any residual range error from the first table.
-            # This did not really do anything...
+            # See coasting phase for last missile stage.
 
             self.state = "Release RV"
-            # logger["Guidance"].info(
-            #     f"Released RV at t={t:.1f}s, altitude={altitude/1000:.1f}km, "
-            #     f"velocity={velocity:.1f}m/s, range error: {(range_to_target - optimal_range)/1000:.1f}km.",
-            # )
 
             # Compute the optimal RV release velocity: same speed as the missile but
             # aligned to the table's optimal gamma so the RV follows the correct ballistic arc.
@@ -186,6 +178,7 @@ class TabulatedBallistic(Guidance):
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
+        # Should disappear the day we have coasting phase.
         theta = self._t_hat_sign * gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat

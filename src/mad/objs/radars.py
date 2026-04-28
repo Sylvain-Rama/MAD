@@ -35,6 +35,7 @@ class Radar(MovableObj):
         radar_key = np.array(to_voxel_key(self.position, voxel_size=self.voxel_size))
 
         offsets_1d = np.arange(-range_voxels, range_voxels + 1)
+        self.max_value = np.max(np.abs(offsets_1d))
         offsets = np.array(list(itertools.product(offsets_1d, repeat=3)))  # (N, 3)
         candidate_keys = radar_key + offsets  # (N, 3)
 
@@ -50,6 +51,14 @@ class Radar(MovableObj):
 
         valid_keys = candidate_keys[within_range & above_surface]
         return {tuple(key) for key in valid_keys}
+
+    def get_detection_strength(self, obj: MovableObj) -> float:
+        """Returns a value between 0 and 1 representing the strength of the radar detection for the given object, based on its distance from the radar and its radar cross section (area * Cd)."""
+        obj_voxel = to_voxel_key(obj.position, voxel_size=self.voxel_size)
+        if tuple(obj_voxel) not in self.detection_voxels:
+            return 0.0
+        else:
+            return 1 - max(list(obj_voxel)) / self.max_value
 
     def detect(self, obj: MovableObj) -> bool:
         obj_voxel = to_voxel_key(obj.position, voxel_size=self.voxel_size)
