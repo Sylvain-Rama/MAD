@@ -42,12 +42,10 @@ class Simulation:
                     continue
                 spawned = obj.update(self.dt)
                 if spawned:
-                    for s in spawned:
-                        logger["Simulation"].info(f"{s.name} added to Simulation.")
                     new_objects.extend(spawned)
 
             if new_objects:
-                logger["Simulation"].debug(f"{len(new_objects)} new objects spawned this step.")
+                logger["Simulation"].info(f"New objects spawned this step: {[obj.name for obj in new_objects]}")
                 active_objs.extend(new_objects)
 
             # Integrate all active objects' positions and velocities according to planet's gravity and drag.

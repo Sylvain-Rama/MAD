@@ -68,10 +68,11 @@ class Payload(BallisticObj, GuidedObj):
     def accelerations(self, planet: Planet) -> NDArray:
 
         if self.distance(planet) <= planet.radius:
-            logger["Missile"].info(f"Warhead {self.name} detonated on the ground!")
             if self.guidance:
                 distance_to_target = self.guidance.planet.surface_distance(self, self.guidance.target)
-                logger["Missile"].info(f"Distance to target at detonation: {distance_to_target/1000:.2f} km.")
+                logger["Missile"].info(f"Warhead {self.name} hit target at {distance_to_target/1000:.2f} km.")
+            else:
+                logger["Missile"].info(f"Warhead {self.name} detonated on the ground!")
 
             self.active = False
             return np.zeros_like(self.velocity)
@@ -167,6 +168,8 @@ class BallisticMissileConfig:
     stages: list[MissileStage]
     guidance: "Guidance | None" = None
     payload: PayloadConfig | None = None
+    n_RVs: int = 1  # Number of reentry vehicles, used for terminal guidance.
+    RV_separation_interval: float = 2.0  # Time between RV separations, in seconds.
 
     @property
     def to_dict(self):
@@ -183,6 +186,10 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.guidance = cfg.guidance
         self.payload = cfg.payload
         self.t = t
+        self.n_RVs = cfg.n_RVs
+        self.released_RVs = 0
+        self.RV_separation_interval = cfg.RV_separation_interval
+        self.last_RV_separation_time = 0.0
 
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(
@@ -263,18 +270,52 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
 
         if self.guidance_results:
-            if self.guidance_results.state != "powered":
-                logger["Missile"].info(f"{self.name} switched to {self.guidance_results.state} phase at {self.t:.2f}.")
-                [setattr(stage, "active", False) for stage in self.stages]
-                if self.payload:
-                    payload = Payload(
-                        config=self.payload,
-                        position=self.position.copy(),
-                        velocity=self.velocity.copy(),
-                        t=deepcopy(self.t),
-                    )
-                    released_objects.append(payload)
-                    logger["Missile"].info(f"{self.name} released payload {payload.name} at {self.t:.2f}.")
+            if (
+                self.guidance_results.state == "Release RV"
+                and self.t - self.last_RV_separation_time > self.RV_separation_interval
+                and self.payload
+            ):
+                payload_name = f"{self.payload.name}_{self.released_RVs + 1}"
+
+                # Rotate velocity to the optimal ballistic direction from the guidance table.
+                # The missile's actual flight-path angle at release may not match the table's
+                # optimal gamma (guidance steers with a 2× aggressiveness factor during boost).
+                # Keeping the speed magnitude but aligning with the table gamma puts the RV on
+                # the correct ballistic arc to the target.
+                release_velocity = self.velocity.copy()
+                gamma = self.guidance_results.gamma
+                if (
+                    gamma is not None
+                    and hasattr(self.guidance, "_t_hat_sign")
+                    and self.guidance._t_hat_sign is not None
+                ):
+                    r_hat, t_hat = self.guidance.local_frame(self)
+                    sign = self.guidance._t_hat_sign
+                    v_mag = np.linalg.norm(self.velocity)
+                    release_velocity = v_mag * (np.sin(gamma) * r_hat + sign * np.cos(gamma) * t_hat)
+
+                payload = Payload(
+                    config=self.payload,
+                    position=self.position.copy(),
+                    velocity=release_velocity,
+                    t=deepcopy(self.t),
+                )
+                payload.name = payload_name
+                released_objects.append(payload)
+                logger["Missile"].info(f"{self.name} released payload {payload_name} at {self.t:.2f}.")
+                self.released_RVs += 1
+                self.last_RV_separation_time = deepcopy(self.t)
+
+                # Cut thrust immediately on first RV release without deactivating stages
+                # (stages must remain active to allow subsequent RV separations and keep the same mass).
+                for stage in self.stages:
+                    stage.thrust = 0.0
+                    stage.mass_flow_rate = 0.0
+
+        if self.released_RVs >= self.n_RVs:
+            [setattr(stage, "active", False) for stage in self.stages]
+            running_stage.active = False
+            logger["Missile"].info(f"{self.name} has released all RVs at {self.t:.2f}. Stages deactivated.")
 
         if not running_stage.active:
             stage_cfg = ProjectileConfig(

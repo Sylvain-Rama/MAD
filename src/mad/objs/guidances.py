@@ -84,6 +84,13 @@ class Guidance(ABC):
         pass
 
 
+class NoGuidance(Guidance):
+    """No guidance: the missile continues on its current trajectory without any course correction."""
+
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+
 class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
@@ -144,7 +151,7 @@ class TabulatedBallistic(Guidance):
                 missile_gamma / self.ballistic_guidance.gam_scale,
             ]
         )
-        k = min(3, len(table))
+        k = min(5, len(table))
         dists, idxs = self.ballistic_guidance.kdtree.query(query_point, k=k)
 
         if dists[0] < 1e-12:
@@ -163,16 +170,16 @@ class TabulatedBallistic(Guidance):
             # instead of altitude/velocity, to fix any residual range error from the first table.
             # This did not really do anything...
 
-            self.state = "ballistic"
-            logger["Guidance"].info(
-                f"Ballistic phase at t={t:.1f}s, altitude={altitude/1000:.1f}km, "
-                f"velocity={velocity:.1f}m/s, range error: {(range_to_target - optimal_range)/1000:.1f}km.",
-            )
+            self.state = "Release RV"
+            # logger["Guidance"].info(
+            #     f"Released RV at t={t:.1f}s, altitude={altitude/1000:.1f}km, "
+            #     f"velocity={velocity:.1f}m/s, range error: {(range_to_target - optimal_range)/1000:.1f}km.",
+            # )
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
-        theta = self._t_hat_sign * missile_gamma * missile.burned_fraction * 2
+        theta = self._t_hat_sign * gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
 
