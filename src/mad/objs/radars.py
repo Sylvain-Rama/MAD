@@ -48,16 +48,17 @@ class Radar(MovableObj):
         within_range = dist_from_radar <= self.range
 
         dist_from_planet = np.linalg.norm(voxel_centers - self.planet.position, axis=1)
-        above_surface = dist_from_planet >= self.planet.radius
+        # Check if voxel is above planet surface, accounting for voxel diagonal
+        # (worst case where radar is directly above the corner of the voxel)
+        above_surface = dist_from_planet >= self.planet.radius - np.sqrt(3) * self.voxel_size / 2
 
         valid_mask = within_range & above_surface
         valid_keys = candidate_keys[valid_mask]
-        offsets = valid_keys - radar_key
-        strengths = 1 - np.max(np.abs(offsets), axis=1) / self.max_value
+        valid_distances = dist_from_radar[valid_mask]
+        strengths = 1 - valid_distances / self.range
         return {tuple(key): float(strength) for key, strength in zip(valid_keys, strengths)}
 
     def get_detection_strength(self, obj: MovableObj) -> float:
-        """Returns a value between 0 and 1 representing the strength of the radar detection for the given object, based on its distance from the radar and its radar cross section (area * Cd)."""
         obj_voxel = to_voxel_key(obj.position, voxel_size=self.voxel_size)
         return self.detection_voxels.get(tuple(obj_voxel), 0.0)
 
