@@ -29,15 +29,16 @@ class Radar(MovableObj):
 
         self.detection_voxels = self.get_detection_voxels()
 
-    def get_detection_voxels(self) -> set[tuple[int, ...]]:
+    def get_detection_voxels(self) -> dict[tuple[int, ...], float]:
         range_voxels = int(np.ceil(self.range / self.voxel_size))
 
-        radar_key = np.array(to_voxel_key(self.position, voxel_size=self.voxel_size))
+        self.radar_key = np.array(to_voxel_key(self.position, voxel_size=self.voxel_size))
+        radar_key = self.radar_key
 
         offsets_1d = np.arange(-range_voxels, range_voxels + 1)
         self.max_value = np.max(np.abs(offsets_1d))
-        offsets = np.array(list(itertools.product(offsets_1d, repeat=3)))  # (N, 3)
-        candidate_keys = radar_key + offsets  # (N, 3)
+        all_offsets = np.array(list(itertools.product(offsets_1d, repeat=3)))  # (N, 3)
+        candidate_keys = radar_key + all_offsets  # (N, 3)
 
         # World-space centre of each candidate voxel
         voxel_centers = (candidate_keys + 0.5) * self.voxel_size  # (N, 3)
@@ -49,17 +50,17 @@ class Radar(MovableObj):
         dist_from_planet = np.linalg.norm(voxel_centers - self.planet.position, axis=1)
         above_surface = dist_from_planet >= self.planet.radius
 
-        valid_keys = candidate_keys[within_range & above_surface]
-        return {tuple(key) for key in valid_keys}
+        valid_mask = within_range & above_surface
+        valid_keys = candidate_keys[valid_mask]
+        offsets = valid_keys - radar_key
+        strengths = 1 - np.max(np.abs(offsets), axis=1) / self.max_value
+        return {tuple(key): float(strength) for key, strength in zip(valid_keys, strengths)}
 
     def get_detection_strength(self, obj: MovableObj) -> float:
         """Returns a value between 0 and 1 representing the strength of the radar detection for the given object, based on its distance from the radar and its radar cross section (area * Cd)."""
         obj_voxel = to_voxel_key(obj.position, voxel_size=self.voxel_size)
-        if tuple(obj_voxel) not in self.detection_voxels:
-            return 0.0
-        else:
-            return 1 - max(list(obj_voxel)) / self.max_value
+        return self.detection_voxels.get(tuple(obj_voxel), 0.0)
 
     def detect(self, obj: MovableObj) -> bool:
         obj_voxel = to_voxel_key(obj.position, voxel_size=self.voxel_size)
-        return obj_voxel in self.detection_voxels
+        return tuple(obj_voxel) in self.detection_voxels
