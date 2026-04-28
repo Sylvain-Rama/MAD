@@ -151,6 +151,9 @@ class MissileStage:
 
     def update(self, dt: float) -> None:
 
+        # TODO: Ability to keep the last stage active even if propellant is depleted,
+        # to allow for coasting phases between stage separations and more flexible guidance.
+
         self.t += dt
         if not self.active:
             return
