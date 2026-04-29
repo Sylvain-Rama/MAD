@@ -112,16 +112,30 @@ class Payload(BallisticObj, GuidedObj):
 
 @dataclass
 class MissileStageConfig:
-    dry_mass: float  # kg
-    propellant_mass: float  # kg
     thrust: float  # N = kg * m / s^2
     Isp: float  # s
     ref_radius: float  # m
-    Cd: float
+    Cd: float = 1.08  # smooth, long cylinder.
     name: str = "MissileStage"
+    dry_mass: float | None = None  # kg
+    propellant_mass: float | None = None  # kg
+    full_mass: float | None = None  # kg
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
+        # Convenience methods to specify any two of dry_mass, propellant_mass and full_mass
+        if self.full_mass is None:
+            if self.dry_mass is not None and self.propellant_mass is not None:
+                self.full_mass = self.dry_mass + self.propellant_mass
+        elif self.dry_mass is None:
+            if self.propellant_mass is not None:
+                self.dry_mass = self.full_mass - self.propellant_mass
+        elif self.propellant_mass is None:
+            if self.dry_mass is not None:
+                self.propellant_mass = self.full_mass - self.dry_mass
+        elif abs((self.dry_mass + self.propellant_mass) - self.full_mass) >= 10:  # 10 kg tolerance for inconsistency
+            # All three provided, check consistency.
+            raise ValueError(f"Inconsistent masses for {self.name}.")
 
     @property
     def to_dict(self):
