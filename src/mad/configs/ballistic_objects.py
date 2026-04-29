@@ -1,52 +1,78 @@
-"""Ballistic objects."""
+"""Configs for missile stages"""
 
-import numpy as np
+# See https://en.wikipedia.org/wiki/HGM-25A_Titan_I#Specifications
+titan1_stages = [
+    {
+        "dry_mass": 4000.0,
+        "propellant_mass": 76203.0 - 4000.0,
+        "thrust": 1900 * 1000,  # N
+        "Isp": 290.0,
+        "ref_radius": 1.5,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage1",
+    },
+    {
+        "dry_mass": 1725.0,
+        "propellant_mass": 28939 - 1725.0,
+        "thrust": 356 * 1000,  # N
+        "Isp": 308.0,
+        "ref_radius": 1.1,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage2",
+    },
+]
 
-titan_stage_1 = {
-    "dry_mass": 4000.0,
-    "propellant_mass": 76203.0 - 4000.0,
-    "thrust": 1900 * 1000,  # N
-    "Isp": 290.0,
-    "area": np.pi * 3.1**2,
-    "Cd": 1.08,  # smooth, long cylinder.
-    "name": "Stage1",
-}
+# See https://en.wikipedia.org/wiki/LGM-25C_Titan_II#Missile_characteristics
+titan2_stages = [
+    {
+        "dry_mass": 4319.0,
+        "propellant_mass": 121200.0 - 4319.0,
+        "thrust": 1900 * 1000,  # N
+        "Isp": 258.0,
+        "ref_radius": 1.5,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage1",
+    },
+    {
+        "dry_mass": 2301.0,
+        "propellant_mass": 28400 - 2301.0,
+        "thrust": 445 * 1000,  # N
+        "Isp": 316.0,
+        "ref_radius": 1.5,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage2",
+    },
+]
 
-titan_stage_2 = {
-    "dry_mass": 1725.0,
-    "propellant_mass": 28939 - 1725.0,
-    "thrust": 356 * 1000,  # N
-    "Isp": 316.0,
-    "area": np.pi * 2.3**2,
-    "Cd": 1.08,  # smooth, long cylinder.
-    "name": "Stage2",
-}
 
-rock = {
-    "mass": 1.0,  # kg
-    "area": np.pi * 0.05**2,  # m^2
-    "Cd": 0.47,  # Sphere
-    "name": "Rock",
-}
-
-rock_no_drag = {
-    "mass": 1.0,  # kg
-    "area": 0.0,  # m^2
-    "Cd": 0.0,  # No drag
-    "name": "RockNoDrag",
-}
-
-B53_warhead = {
-    "mass": 4000.0,  # kg
-    "area": np.pi * 0.5**2,  # m^2
-    "Cd": 0.47,  # Sphere
-    "name": "B53Warhead",
-    "yield_kt": 9.0 * 1000,  # kt
-}
-
-rod_of_god = {
-    "mass": 8000.0,  # kg
-    "area": np.pi * 0.1**2,  # m^2
-    "Cd": 1.08,  # Long cylinder
-    "name": "RodOfGod",
-}
+# Multiple research sources for minuteman stages
+# See https://minutemanmissile.com/solidrocketboosters.html
+minuteman_stages = [
+    {
+        "dry_mass": 23247.0 - 20715.0,
+        "propellant_mass": 20715.0,
+        "thrust": 930 * 1000,  # N
+        "Isp": 270.0,
+        "ref_radius": 0.75,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage1",
+    },
+    {
+        "dry_mass": 4708.0,
+        "propellant_mass": 5476.0 - 4708.0,
+        "thrust": 267 * 1000,  # N
+        "Isp": 290.0,
+        "ref_radius": 0.46,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage2",
+    },
+    {
+        "dry_mass": 1664.0,
+        "propellant_mass": 2034 - 1664.0,
+        "thrust": 152 * 1000,  # N
+        "Isp": 300.0,
+        "ref_radius": 0.46,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "Stage3",
+    },
+]

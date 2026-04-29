@@ -2,9 +2,9 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs import BallisticObj, GuidedObj, History, MovableObj
-from mad.objs import ProjectileConfig, Projectile
-from mad.objs import Planet
+from mad.objs.base import BallisticObj, GuidedObj, History, MovableObj
+from mad.objs.projectiles import ProjectileConfig, Projectile
+from mad.objs.planets import Planet
 from mad.logger import SourceLogger
 from mad.configs.physics import G0
 
@@ -19,12 +19,15 @@ logger = SourceLogger()
 @dataclass
 class PayloadConfig:
     mass: float  # kg
-    area: float  # m^2
+    ref_radius: float  # m
     Cd: float
     name: str = "Payload"
     yield_kt: float = 0.0  # kt
     guidance: "Guidance | None" = None
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
+
+    def __post_init__(self):
+        self.area = np.pi * self.ref_radius**2
 
 
 class Payload(BallisticObj, GuidedObj):
@@ -113,9 +116,12 @@ class MissileStageConfig:
     propellant_mass: float  # kg
     thrust: float  # N = kg * m / s^2
     Isp: float  # s
-    area: float  # m^2
+    ref_radius: float  # m
     Cd: float
     name: str = "MissileStage"
+
+    def __post_init__(self):
+        self.area = np.pi * self.ref_radius**2
 
     @property
     def to_dict(self):
@@ -131,8 +137,9 @@ class MissileStage:
         self.thrust = cfg.thrust
         self.Isp = cfg.Isp
 
-        self.area = cfg.area
+        self.ref_radius = cfg.ref_radius
         self.Cd = cfg.Cd
+        self.area = np.pi * self.ref_radius**2
 
         self.exhaust_velocity = cfg.Isp * G0
         self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
@@ -315,7 +322,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
                 velocity=self.velocity.tolist(),
                 mass=running_stage.dry_mass,
                 name=running_stage.name,
-                area=running_stage.area,
+                ref_radius=running_stage.ref_radius,
                 Cd=running_stage.Cd,
             )
 

@@ -14,8 +14,11 @@ class ProjectileConfig:
     mass: float  # kg
     velocity: list[float] | NDArray | None = None  # m / s
     name: str = "Projectile"
-    area: float = 0.01  # m^2
+    ref_radius: float = 0.01  # m
     Cd: float = 0.47  # sphere
+
+    def __post_init__(self):
+        self.area = np.pi * self.ref_radius**2
 
     @property
     def to_dict(self):
