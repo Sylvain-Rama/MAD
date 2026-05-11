@@ -145,6 +145,10 @@ class MissileStageConfig:
                 self.Isp = total_impulse / (self.propellant_mass * G0)
             else:
                 raise ValueError(f"Cannot compute Isp for {self.name} without propellant mass.")
+        else:
+            # We require Isp to be provided to compute burn time if not provided.
+            if self.burn_time is None:
+                raise ValueError(f"Burn time must be provided for {self.name} if Isp is not provided.")
 
     @property
     def to_dict(self):
@@ -154,16 +158,21 @@ class MissileStageConfig:
 class MissileStage:
     def __init__(self, cfg: MissileStageConfig):
         self.config = cfg
+        if cfg.dry_mass is None:
+            raise ValueError(f"dry_mass could not be determined for {cfg.name}.")
+        if cfg.propellant_mass is None:
+            raise ValueError(f"propellant_mass could not be determined for {cfg.name}.")
+        if cfg.Isp is None:
+            raise ValueError(f"Isp must be provided for {cfg.name} to compute exhaust velocity.")
+
         self.dry_mass = cfg.dry_mass
         self.propellant_mass = cfg.propellant_mass
-
         self.thrust = cfg.thrust
-        self.Isp = cfg.Isp
-
         self.ref_radius = cfg.ref_radius
         self.Cd = cfg.Cd
         self.area = np.pi * self.ref_radius**2
 
+        self.Isp = cfg.Isp
         self.exhaust_velocity = cfg.Isp * G0
         self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
 
