@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -9,7 +10,7 @@ from mad.logger import SourceLogger
 from mad.configs.physics import VOXEL_SIZE
 
 if TYPE_CHECKING:
-    from mad.objs.planets import Planet
+    from mad.simulation import HistoryCollector
 
 
 @dataclass
@@ -113,52 +114,4 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
         return None
 
 
-def gather_history(objs: list) -> dict[str, dict[str, NDArray]]:
-    """Extract the history of position, velocity, time, and gamma (if available) from a list of objects and return it as a dictionary."""
-    results = {}
-    for obj in objs:
-        pos = np.asarray(obj.position)
-        vel = np.asarray(obj.velocity)
-        time = np.asarray(obj.t)
-        gamma = np.asarray([x for x in obj.gamma if x is not None]) if obj.gamma else None
 
-        results[obj.name] = {
-            "time": time,
-            "position": pos,
-            "velocity": vel,
-        }
-        if gamma is not None:
-            results[obj.name]["gamma"] = gamma
-
-    return results
-
-
-def extract_history(objs: list, planet: Planet) -> dict[str, dict[str, NDArray]]:
-
-    results = {}
-    for obj in objs:
-        pos = np.asarray(obj.history.position)
-        vel = np.asarray(obj.history.velocity)
-        time = np.asarray(obj.history.time)
-        gamma = np.asarray([x for x in obj.history.gamma if x is not None]) if obj.history.gamma else None
-
-        posx, posz = pos[:, 0], pos[:, 1]
-
-        r = np.linalg.norm(pos, axis=1)
-        velout = np.linalg.norm(vel, axis=1)
-
-        energy = 0.5 * velout**2 - planet.mu / r
-        altitude = r - planet.radius
-
-        results[obj.name] = {
-            "time": time,
-            "altitude": altitude,
-            "velocity": velout,
-            "posx": posx,
-            "posz": posz,
-            "energy": energy,
-        }
-        if gamma is not None:
-            results[obj.name]["gamma"] = gamma
-
-    return results

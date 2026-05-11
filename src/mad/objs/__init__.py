@@ -1,4 +1,4 @@
-from mad.objs.base import MovableObj, BallisticObj, SimulationInterface, GuidedObj, History
+from mad.objs.base import MovableObj, BallisticObj, SimulationInterface, GuidedObj
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.missiles import (
     BallisticMissile,
@@ -26,7 +26,6 @@ __all__ = [
     "RadarConfig",
     "SimulationInterface",
     "GuidedObj",
-    "History",
     "Payload",
     "PayloadConfig",
 ]
