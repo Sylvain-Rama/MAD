@@ -2,9 +2,9 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs import BallisticObj, GuidedObj, History, MovableObj
-from mad.objs import ProjectileConfig, Projectile
-from mad.objs import Planet
+from mad.objs.base import BallisticObj, GuidedObj, History, MovableObj
+from mad.objs.projectiles import ProjectileConfig, Projectile
+from mad.objs.planets import Planet
 from mad.logger import SourceLogger
 from mad.configs.physics import G0
 
@@ -19,12 +19,15 @@ logger = SourceLogger()
 @dataclass
 class PayloadConfig:
     mass: float  # kg
-    area: float  # m^2
+    ref_radius: float  # m
     Cd: float
     name: str = "Payload"
     yield_kt: float = 0.0  # kt
     guidance: "Guidance | None" = None
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
+
+    def __post_init__(self):
+        self.area = np.pi * self.ref_radius**2
 
 
 class Payload(BallisticObj, GuidedObj):
@@ -109,13 +112,43 @@ class Payload(BallisticObj, GuidedObj):
 
 @dataclass
 class MissileStageConfig:
-    dry_mass: float  # kg
-    propellant_mass: float  # kg
     thrust: float  # N = kg * m / s^2
-    Isp: float  # s
-    area: float  # m^2
-    Cd: float
+    ref_radius: float  # m
+    Cd: float = 1.08  # smooth, long cylinder.
     name: str = "MissileStage"
+    dry_mass: float | None = None  # kg
+    propellant_mass: float | None = None  # kg
+    full_mass: float | None = None  # kg
+    Isp: float | None = None  # s
+    burn_time: float | None = None  # s, optional for now, can be computed from mass and thrust if not provided.
+
+    def __post_init__(self):
+        self.area = np.pi * self.ref_radius**2
+        # Convenience methods to specify any two of dry_mass, propellant_mass and full_mass
+        if self.full_mass is None:
+            if self.dry_mass is not None and self.propellant_mass is not None:
+                self.full_mass = self.dry_mass + self.propellant_mass
+        elif self.dry_mass is None:
+            if self.propellant_mass is not None:
+                self.dry_mass = self.full_mass - self.propellant_mass
+        elif self.propellant_mass is None:
+            if self.dry_mass is not None:
+                self.propellant_mass = self.full_mass - self.dry_mass
+        elif abs((self.dry_mass + self.propellant_mass) - self.full_mass) >= 10:  # 10 kg tolerance for inconsistency
+            # All three provided, check consistency.
+            raise ValueError(f"Inconsistent masses for {self.name}.")
+
+        if self.Isp is None and self.burn_time is not None:
+            # Compute Isp from burn time if not provided.
+            total_impulse = self.thrust * self.burn_time
+            if self.propellant_mass is not None and self.propellant_mass > 0:
+                self.Isp = total_impulse / (self.propellant_mass * G0)
+            else:
+                raise ValueError(f"Cannot compute Isp for {self.name} without propellant mass.")
+        else:
+            # We require Isp to be provided to compute burn time if not provided.
+            if self.burn_time is None:
+                raise ValueError(f"Burn time must be provided for {self.name} if Isp is not provided.")
 
     @property
     def to_dict(self):
@@ -125,15 +158,21 @@ class MissileStageConfig:
 class MissileStage:
     def __init__(self, cfg: MissileStageConfig):
         self.config = cfg
+        if cfg.dry_mass is None:
+            raise ValueError(f"dry_mass could not be determined for {cfg.name}.")
+        if cfg.propellant_mass is None:
+            raise ValueError(f"propellant_mass could not be determined for {cfg.name}.")
+        if cfg.Isp is None:
+            raise ValueError(f"Isp must be provided for {cfg.name} to compute exhaust velocity.")
+
         self.dry_mass = cfg.dry_mass
         self.propellant_mass = cfg.propellant_mass
-
         self.thrust = cfg.thrust
-        self.Isp = cfg.Isp
-
-        self.area = cfg.area
+        self.ref_radius = cfg.ref_radius
         self.Cd = cfg.Cd
+        self.area = np.pi * self.ref_radius**2
 
+        self.Isp = cfg.Isp
         self.exhaust_velocity = cfg.Isp * G0
         self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
 
@@ -315,7 +354,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
                 velocity=self.velocity.tolist(),
                 mass=running_stage.dry_mass,
                 name=running_stage.name,
-                area=running_stage.area,
+                ref_radius=running_stage.ref_radius,
                 Cd=running_stage.Cd,
             )
 
