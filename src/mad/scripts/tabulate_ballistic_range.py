@@ -109,7 +109,7 @@ def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gam
 
     simulated_object = run_simple_simulation([obj], planet, dt=DT, max_time=MAX_TIME)
 
-    final_pos = simulated_object[0].history.position[-1]
+    final_pos = simulated_object[0].position
 
     cos_a = np.clip(
         np.dot(start_pos, final_pos) / (np.linalg.norm(start_pos) * np.linalg.norm(final_pos)),

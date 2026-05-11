@@ -90,7 +90,7 @@ class HistoryCollector:
                 speed = float(np.linalg.norm(vel_arr))
                 records.append(
                     {
-                        "t": t,
+                        "time": t,
                         "name": name,
                         "_id": _id,
                         "position": pos,
@@ -104,7 +104,7 @@ class HistoryCollector:
                 )
         df = pd.DataFrame(records)
         if not df.empty:
-            df = df.drop_duplicates(subset=["_id", "t"]).reset_index(drop=True)
+            df = df.drop_duplicates(subset=["_id", "time"]).reset_index(drop=True)
         return df
 
 
@@ -174,7 +174,7 @@ class Simulation:
 # Convenience function for quick simulations without collision detection or logging.
 def run_simple_simulation(
     moving_objs: list[SimulationInterface], planet: Planet, dt: float = 0.1, max_time: float = 3600.0
-) -> dict[str, dict[str, list]]:
+) -> list[SimulationInterface]:
     """Run a simple simulation of the given objects moving under the influence of the planet's gravity and atmospheric drag.
     The objects must have their initial position and velocity set. The simulation runs until max_time
     or until all objects are inactive (e.g. impacted or ran out of propellant). Returns the collected history as a dictionary.
@@ -191,7 +191,7 @@ def run_simple_simulation(
             _ = obj.update(dt)
             obj.integrate(dt, planet)
 
-        collector.record(active_objs)
+
         t += dt
 
-    return collector.to_dict()
+    return active_objs
