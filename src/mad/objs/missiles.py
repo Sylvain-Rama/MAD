@@ -95,13 +95,6 @@ class Payload(BallisticObj, GuidedObj):
 
         self.velocity += 0.5 * (a0 + a1) * dt
 
-        self.history.update(
-            self.t,
-            self.position.tolist(),
-            self.velocity.tolist(),
-            self.guidance_results.gamma if self.guidance_results else None,
-        )
-
 
 @dataclass
 class MissileStageConfig:
@@ -138,10 +131,6 @@ class MissileStageConfig:
                 self.Isp = total_impulse / (self.propellant_mass * G0)
             else:
                 raise ValueError(f"Cannot compute Isp for {self.name} without propellant mass.")
-        else:
-            # We require Isp to be provided to compute burn time if not provided.
-            if self.burn_time is None:
-                raise ValueError(f"Burn time must be provided for {self.name} if Isp is not provided.")
 
     @property
     def to_dict(self):

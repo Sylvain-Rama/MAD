@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from time import time
+import pandas as pd
+import numpy as np
 from mad.logger import SourceLogger
 from mad.objs.planets import Planet
 from mad.objs.base import MovableObj, SimulationInterface
-from mad.utils import extract_history
 
 logger = SourceLogger()
 
@@ -35,6 +36,7 @@ class HistoryCollector:
     def __init__(self, fields: list[str]) -> None:
         self.fields = list(fields)
         self._data: dict[str, dict[str, list]] = {}
+        self._names: dict[str, str] = {}  # _id -> name
 
     def _columns_for(self, field: str) -> list[str]:
         return [field]
@@ -47,10 +49,11 @@ class HistoryCollector:
             key = obj._id
             if key not in self._data:
                 self._data[key] = {col: [] for f in self.fields for col in self._columns_for(f)}
+                self._names[key] = obj.name
             entry = self._data[key]
             for f in self.fields:
                 if f == "t":
-                    entry["t"].append(getattr(obj, "t", 0.0))
+                    entry["t"].append(float(obj.t))
                 elif f == "position":
                     entry["position"].append(obj.position.tolist())
                 elif f == "velocity":
@@ -62,6 +65,47 @@ class HistoryCollector:
     def to_dict(self) -> dict[str, dict[str, list]]:
         """Return collected history as ``{obj._id: {column: [values, ...]}}``."""
         return self._data
+
+    def extract_history(self) -> pd.DataFrame:
+        """Build a deduplicated DataFrame from a HistoryCollector.
+
+        Columns: ``t``, ``name``, ``_id``, ``position`` ([x, y, z]), ``velocity`` ([x, y, z]),
+        ``posx``, ``posz``, ``speed`` (m/s), ``gamma`` (rad, ``None`` when unavailable).
+        Rows are deduplicated on (``_id``, ``t``).
+        """
+        if not self._data:
+            return pd.DataFrame()  # type: ignore[return-value]
+
+        records = []
+        for _id, cols in self._data.items():
+            name = self._names.get(_id, _id)
+            positions = cols.get("position", [])
+            velocities = cols.get("velocity", [])
+            times = cols.get("t", [])
+            gammas = cols.get("gamma", [])
+            for i, (t, pos, vel) in enumerate(zip(times, positions, velocities)):
+                pos_arr = np.asarray(pos)
+                vel_arr = np.asarray(vel)
+                r = float(np.linalg.norm(pos_arr))
+                speed = float(np.linalg.norm(vel_arr))
+                records.append(
+                    {
+                        "t": t,
+                        "name": name,
+                        "_id": _id,
+                        "position": pos,
+                        "velocity": vel,
+                        "posx": float(pos_arr[0]),
+                        "posz": float(pos_arr[1]),
+                        "speed": speed,
+                        "altitude": r,
+                        "gamma": gammas[i] if i < len(gammas) else None,
+                    }
+                )
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df = df.drop_duplicates(subset=["_id", "t"]).reset_index(drop=True)
+        return df
 
 
 class Simulation:
@@ -122,9 +166,9 @@ class Simulation:
 
             t += self.dt
 
-        self.results = extract_history(active_objs, planet)
         stop = time()
         logger["Simulation"].info(f"Simulation ended at {t:.2f}s. Took {stop - start:.2f} s of real time.")
+        self.results = self.collector.extract_history()
 
 
 # Convenience function for quick simulations without collision detection or logging.
