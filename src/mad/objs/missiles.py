@@ -113,13 +113,14 @@ class Payload(BallisticObj, GuidedObj):
 @dataclass
 class MissileStageConfig:
     thrust: float  # N = kg * m / s^2
-    Isp: float  # s
     ref_radius: float  # m
     Cd: float = 1.08  # smooth, long cylinder.
     name: str = "MissileStage"
     dry_mass: float | None = None  # kg
     propellant_mass: float | None = None  # kg
     full_mass: float | None = None  # kg
+    Isp: float | None = None  # s
+    burn_time: float | None = None  # s, optional for now, can be computed from mass and thrust if not provided.
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
@@ -136,6 +137,14 @@ class MissileStageConfig:
         elif abs((self.dry_mass + self.propellant_mass) - self.full_mass) >= 10:  # 10 kg tolerance for inconsistency
             # All three provided, check consistency.
             raise ValueError(f"Inconsistent masses for {self.name}.")
+
+        if self.Isp is None and self.burn_time is not None:
+            # Compute Isp from burn time if not provided.
+            total_impulse = self.thrust * self.burn_time
+            if self.propellant_mass is not None and self.propellant_mass > 0:
+                self.Isp = total_impulse / (self.propellant_mass * G0)
+            else:
+                raise ValueError(f"Cannot compute Isp for {self.name} without propellant mass.")
 
     @property
     def to_dict(self):
