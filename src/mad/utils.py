@@ -87,6 +87,8 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
         )
         kdtree = KDTree(norm_inputs)
 
+        # TODO: Use the second KDTree for range-based lookup of gamma given alt, vel, and range.
+        # Removed the 2nd KDTree use for the moment.
         norm_inputs_range = np.column_stack(
             [
                 table[:, 0] / alt_scale,
@@ -109,6 +111,26 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
     except Exception as e:
         logger["I/O"].error(f"Error loading ballistic table from {file_path}: {e}")
         return None
+
+
+def gather_history(objs: list) -> dict[str, dict[str, NDArray]]:
+    """Extract the history of position, velocity, time, and gamma (if available) from a list of objects and return it as a dictionary."""
+    results = {}
+    for obj in objs:
+        pos = np.asarray(obj.position)
+        vel = np.asarray(obj.velocity)
+        time = np.asarray(obj.t)
+        gamma = np.asarray([x for x in obj.gamma if x is not None]) if obj.gamma else None
+
+        results[obj.name] = {
+            "time": time,
+            "position": pos,
+            "velocity": vel,
+        }
+        if gamma is not None:
+            results[obj.name]["gamma"] = gamma
+
+    return results
 
 
 def extract_history(objs: list, planet: Planet) -> dict[str, dict[str, NDArray]]:

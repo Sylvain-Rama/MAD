@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, History, MovableObj
+from mad.objs.base import BallisticObj, GuidedObj, MovableObj
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.logger import SourceLogger
@@ -45,13 +45,6 @@ class Payload(BallisticObj, GuidedObj):
         self.t = t
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
-
-        self.history = History(
-            time=[t],
-            position=[self.position.tolist()],
-            velocity=[self.velocity.tolist()],
-            gamma=[self.guidance_results.gamma if self.guidance_results else None],
-        )
 
     @property
     def thrust_acc(self) -> float:
@@ -240,13 +233,6 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
-        self.history = History(
-            time=[t],
-            position=[self.position.tolist()],
-            velocity=[self.velocity.tolist()],
-            gamma=[self.guidance_results.gamma if self.guidance_results else None],
-        )
-
     @property
     def mass(self):
         # We ignore the payload mass until the end, when it is released.
@@ -392,10 +378,3 @@ class BallisticMissile(BallisticObj, GuidedObj):
         a1 = self.accelerations(planet)
 
         self.velocity += 0.5 * (a0 + a1) * dt
-
-        self.history.update(
-            self.t,
-            self.position.tolist(),
-            self.velocity.tolist(),
-            self.guidance_results.gamma if self.guidance_results else None,
-        )
