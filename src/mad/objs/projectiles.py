@@ -1,7 +1,6 @@
 from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.planets import Planet
 from mad.objs.base import BallisticObj
 from mad.logger import SourceLogger
 
