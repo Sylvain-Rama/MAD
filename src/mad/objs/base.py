@@ -78,10 +78,12 @@ class SimulationInterface(ABC):
         """Return the total acceleration vector (gravity + thrust + drag + …) in m/s²."""
         pass
 
-    @abstractmethod
     def integrate(self, dt: float, planet: "Planet") -> None:
-        """Advance position and velocity by one time step. Override in subclasses."""
-        pass
+        """Advance position and velocity by one time step using Velocity Verlet integration."""
+        a0 = self.accelerations(planet)
+        self.position += self.velocity * dt + 0.5 * a0 * dt**2
+        a1 = self.accelerations(planet)
+        self.velocity += 0.5 * (a0 + a1) * dt
 
 
 class BallisticObj(MovableObj, SimulationInterface):

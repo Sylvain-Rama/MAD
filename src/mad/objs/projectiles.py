@@ -43,14 +43,6 @@ class Projectile(BallisticObj):
 
         return gravity_acc + drag_acc
 
-    def integrate(self, dt: float, planet: Planet) -> None:
-        # Velocity Verlet for solver.
-        a0 = self.accelerations(planet)
-        self.position += self.velocity * dt + 0.5 * a0 * dt**2
-        a1 = self.accelerations(planet)
-
-        self.velocity += 0.5 * (a0 + a1) * dt
-
     def update(self, dt: float):
         self.t += dt
         # Nothing to update internally: it's a rock...
