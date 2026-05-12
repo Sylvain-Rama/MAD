@@ -127,7 +127,7 @@ def main() -> None:
     ballistic_config = ProjectileConfig(
         position=[0.0, 0.0, 0.0],
         mass=float(config["mass"] if "mass" in config else config["dry_mass"]),
-        area=float(config["area"]),
+        ref_radius=float(config["ref_radius"]),
         Cd=float(config["Cd"]),
         name=str(config["name"]),
     )

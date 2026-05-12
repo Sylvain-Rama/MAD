@@ -191,7 +191,6 @@ def run_simple_simulation(
             _ = obj.update(dt)
             obj.integrate(dt, planet)
 
-
         t += dt
 
     return active_objs

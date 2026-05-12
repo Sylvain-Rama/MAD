@@ -1,16 +1,11 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 from numpy.typing import NDArray
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 from scipy.spatial import KDTree
 from mad.logger import SourceLogger
 from mad.configs.physics import VOXEL_SIZE
-
-if TYPE_CHECKING:
-    from mad.simulation import HistoryCollector
 
 
 @dataclass
@@ -112,6 +107,3 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
     except Exception as e:
         logger["I/O"].error(f"Error loading ballistic table from {file_path}: {e}")
         return None
-
-
-
