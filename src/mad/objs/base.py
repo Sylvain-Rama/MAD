@@ -63,6 +63,11 @@ class SimulationInterface(ABC):
     Subclasses must implement `update` and `accelerations`; `integrate` has a no-op default
     that subclasses are expected to override."""
 
+    # Declared here so type checkers know concrete subclasses (via MovableObj) provide these.
+    position: NDArray
+    velocity: NDArray
+    name: str
+
     def __init__(self):
         self.active: bool = True
         self.t = 0.0
