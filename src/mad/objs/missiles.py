@@ -87,14 +87,6 @@ class Payload(BallisticObj, GuidedObj):
 
         return gravity + drag + thrust
 
-    def integrate(self, dt: float, planet: Planet) -> None:
-        # Velocity Verlet for solver.
-        a0 = self.accelerations(planet)
-        self.position += self.velocity * dt + 0.5 * a0 * dt**2
-        a1 = self.accelerations(planet)
-
-        self.velocity += 0.5 * (a0 + a1) * dt
-
 
 @dataclass
 class MissileStageConfig:
@@ -359,11 +351,3 @@ class BallisticMissile(BallisticObj, GuidedObj):
             thrust = np.zeros_like(self.velocity)
 
         return gravity + drag + thrust
-
-    def integrate(self, dt: float, planet: Planet) -> None:
-        # Velocity Verlet for solver.
-        a0 = self.accelerations(planet)
-        self.position += self.velocity * dt + 0.5 * a0 * dt**2
-        a1 = self.accelerations(planet)
-
-        self.velocity += 0.5 * (a0 + a1) * dt
