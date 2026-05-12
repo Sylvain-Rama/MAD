@@ -171,7 +171,6 @@ class TestProjectileIntegration:
 
     def test_energy_conservation_no_drag(self, earth):
         """Mechanical energy should be conserved for a drag-free projectile."""
-        r0 = earth.radius + 800_000.0
         v0 = [0.0, 7000.0]
         proj = _surface_projectile(earth, velocity=v0, alt=800_000.0, ref_radius=0.0, Cd=0.0)
 
