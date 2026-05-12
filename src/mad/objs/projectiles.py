@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.planets import Planet
-from mad.objs.base import BallisticObj, History
+from mad.objs.base import BallisticObj
 from mad.logger import SourceLogger
 
 logger = SourceLogger()
@@ -29,7 +29,6 @@ class Projectile(BallisticObj):
     def __init__(self, config: ProjectileConfig, t: float = 0.0):
         super().__init__(config.position, config.velocity, config.name, config.mass, config.area, config.Cd)
         self.config = config
-        self.history = History(position=[self.position.tolist()], velocity=[self.velocity.tolist()], time=[t])
         self.t = t
 
     def accelerations(self, planet) -> NDArray:
@@ -51,8 +50,6 @@ class Projectile(BallisticObj):
         a1 = self.accelerations(planet)
 
         self.velocity += 0.5 * (a0 + a1) * dt
-
-        self.history.update(self.t, self.position.tolist(), self.velocity.tolist())
 
     def update(self, dt: float):
         self.t += dt

@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, History, MovableObj
+from mad.objs.base import BallisticObj, GuidedObj, MovableObj
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.logger import SourceLogger
@@ -45,13 +45,6 @@ class Payload(BallisticObj, GuidedObj):
         self.t = t
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
-
-        self.history = History(
-            time=[t],
-            position=[self.position.tolist()],
-            velocity=[self.velocity.tolist()],
-            gamma=[self.guidance_results.gamma if self.guidance_results else None],
-        )
 
     @property
     def thrust_acc(self) -> float:
@@ -102,13 +95,6 @@ class Payload(BallisticObj, GuidedObj):
 
         self.velocity += 0.5 * (a0 + a1) * dt
 
-        self.history.update(
-            self.t,
-            self.position.tolist(),
-            self.velocity.tolist(),
-            self.guidance_results.gamma if self.guidance_results else None,
-        )
-
 
 @dataclass
 class MissileStageConfig:
@@ -145,10 +131,6 @@ class MissileStageConfig:
                 self.Isp = total_impulse / (self.propellant_mass * G0)
             else:
                 raise ValueError(f"Cannot compute Isp for {self.name} without propellant mass.")
-        else:
-            # We require Isp to be provided to compute burn time if not provided.
-            if self.burn_time is None:
-                raise ValueError(f"Burn time must be provided for {self.name} if Isp is not provided.")
 
     @property
     def to_dict(self):
@@ -239,13 +221,6 @@ class BallisticMissile(BallisticObj, GuidedObj):
         )
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
-
-        self.history = History(
-            time=[t],
-            position=[self.position.tolist()],
-            velocity=[self.velocity.tolist()],
-            gamma=[self.guidance_results.gamma if self.guidance_results else None],
-        )
 
     @property
     def mass(self):
@@ -392,10 +367,3 @@ class BallisticMissile(BallisticObj, GuidedObj):
         a1 = self.accelerations(planet)
 
         self.velocity += 0.5 * (a0 + a1) * dt
-
-        self.history.update(
-            self.t,
-            self.position.tolist(),
-            self.velocity.tolist(),
-            self.guidance_results.gamma if self.guidance_results else None,
-        )

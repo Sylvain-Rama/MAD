@@ -1,27 +1,11 @@
 import numpy as np
 from numpy.typing import NDArray
-from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 from mad.utils import to_vec3
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
-
-
-@dataclass
-class History:
-    time: list = field(default_factory=list)
-    position: list = field(default_factory=list)
-    velocity: list = field(default_factory=list)
-    gamma: list = field(default_factory=list)
-
-    def update(self, time: float, position: list, velocity: list, gamma: float | None = None):
-        self.time.append(time)
-        self.position.append(position)
-        self.velocity.append(velocity)
-        if gamma is not None:
-            self.gamma.append(gamma)
 
 
 class MovableObj:
@@ -81,7 +65,6 @@ class SimulationInterface(ABC):
 
     def __init__(self):
         self.active: bool = True
-        self.history = History()
         self.t = 0.0
 
     @abstractmethod
