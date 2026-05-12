@@ -7,10 +7,10 @@ from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets import EARTH_SETTINGS
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_earth():
     cfg = dict(EARTH_SETTINGS)
@@ -21,6 +21,7 @@ def _make_earth():
 # ---------------------------------------------------------------------------
 # MovableObj
 # ---------------------------------------------------------------------------
+
 
 class TestMovableObj:
     def test_init_list(self):
@@ -88,6 +89,7 @@ class TestMovableObj:
 # BallisticObj
 # ---------------------------------------------------------------------------
 
+
 class TestBallisticObj:
     """BallisticObj is abstract; test its interface via Projectile."""
 
@@ -120,6 +122,7 @@ class TestBallisticObj:
 # ---------------------------------------------------------------------------
 # SimulationInterface.integrate (Velocity Verlet)
 # ---------------------------------------------------------------------------
+
 
 class TestVelocityVerletIntegration:
     """The shared integrator lives on SimulationInterface and is inherited
@@ -180,4 +183,3 @@ class TestVelocityVerletIntegration:
 
         ef = energy(proj)
         assert abs(ef - e0) / abs(e0) < 1e-4  # <0.01% drift over 500 steps
-

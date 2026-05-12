@@ -8,10 +8,10 @@ from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets import EARTH_SETTINGS
 from mad.configs.physics import G
 
-
 # ---------------------------------------------------------------------------
 # Fixture
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def earth():
@@ -23,6 +23,7 @@ def earth():
 # ---------------------------------------------------------------------------
 # PlanetConfig
 # ---------------------------------------------------------------------------
+
 
 class TestPlanetConfig:
     def test_required_fields(self):
@@ -51,6 +52,7 @@ class TestPlanetConfig:
 # Planet — construction
 # ---------------------------------------------------------------------------
 
+
 class TestPlanetInit:
     def test_mu(self, earth):
         expected_mu = EARTH_SETTINGS["mass"] * G
@@ -66,6 +68,7 @@ class TestPlanetInit:
 # ---------------------------------------------------------------------------
 # Derived orbital quantities
 # ---------------------------------------------------------------------------
+
 
 class TestOrbitalProperties:
     def test_escape_velocity(self, earth):
@@ -91,6 +94,7 @@ class TestOrbitalProperties:
 # ---------------------------------------------------------------------------
 # gravity()
 # ---------------------------------------------------------------------------
+
 
 class TestGravity:
     def test_gravity_points_inward(self, earth):
@@ -121,6 +125,7 @@ class TestGravity:
 # ---------------------------------------------------------------------------
 # drag()
 # ---------------------------------------------------------------------------
+
 
 class TestDrag:
     def test_no_drag_above_atmosphere(self, earth):
@@ -170,6 +175,7 @@ class TestDrag:
 # surface_distance()
 # ---------------------------------------------------------------------------
 
+
 class TestSurfaceDistance:
     def test_distance_to_self_is_zero(self, earth):
         p = MovableObj(position=[earth.radius, 0.0, 0.0])
@@ -185,14 +191,13 @@ class TestSurfaceDistance:
     def test_distance_symmetric(self, earth):
         p1 = earth.create_2D_point()
         p2 = earth.create_2D_point_at_distance(p1, 1000.0)
-        assert earth.surface_distance(p1, p2) == pytest.approx(
-            earth.surface_distance(p2, p1), rel=1e-9
-        )
+        assert earth.surface_distance(p1, p2) == pytest.approx(earth.surface_distance(p2, p1), rel=1e-9)
 
 
 # ---------------------------------------------------------------------------
 # create_2D_point / create_2D_point_at_distance
 # ---------------------------------------------------------------------------
+
 
 class TestPointCreation:
     def test_2d_point_at_surface(self, earth):

@@ -6,10 +6,10 @@ from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.planets import Planet, PlanetConfig
 from mad.configs.planets import EARTH_SETTINGS
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def earth():
@@ -34,6 +34,7 @@ def _surface_projectile(earth, velocity=None, *, alt=500_000.0, ref_radius=0.0, 
 # ---------------------------------------------------------------------------
 # ProjectileConfig
 # ---------------------------------------------------------------------------
+
 
 class TestProjectileConfig:
     def test_area_computed_from_ref_radius(self):
@@ -61,6 +62,7 @@ class TestProjectileConfig:
 # Projectile — construction
 # ---------------------------------------------------------------------------
 
+
 class TestProjectileInit:
     def test_mass_and_area_propagated(self, earth):
         proj = _surface_projectile(earth, mass=42.0)
@@ -85,6 +87,7 @@ class TestProjectileInit:
 # Projectile — update
 # ---------------------------------------------------------------------------
 
+
 class TestProjectileUpdate:
     def test_update_advances_time(self, earth):
         proj = _surface_projectile(earth)
@@ -100,6 +103,7 @@ class TestProjectileUpdate:
 # ---------------------------------------------------------------------------
 # Projectile — accelerations
 # ---------------------------------------------------------------------------
+
 
 class TestProjectileAccelerations:
     def test_no_drag_above_surface(self, earth):
@@ -136,6 +140,7 @@ class TestProjectileAccelerations:
 # ---------------------------------------------------------------------------
 # Projectile — integration (end-to-end physics)
 # ---------------------------------------------------------------------------
+
 
 class TestProjectileIntegration:
     def test_lands_after_enough_steps(self, earth):

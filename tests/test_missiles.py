@@ -17,10 +17,10 @@ from mad.configs.ballistic_objects import titan1_stages
 from mad.configs.warheads import B53_warhead
 from mad.configs.physics import G0
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def earth():
@@ -63,23 +63,18 @@ def two_stage_missile(earth):
 # MissileStageConfig
 # ---------------------------------------------------------------------------
 
+
 class TestMissileStageConfig:
     def test_full_mass_computed_from_dry_and_propellant(self):
-        cfg = MissileStageConfig(
-            thrust=1_000.0, ref_radius=0.5, dry_mass=100.0, propellant_mass=900.0, Isp=300.0
-        )
+        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=0.5, dry_mass=100.0, propellant_mass=900.0, Isp=300.0)
         assert cfg.full_mass == pytest.approx(1_000.0)
 
     def test_dry_mass_computed_from_full_and_propellant(self):
-        cfg = MissileStageConfig(
-            thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, propellant_mass=900.0, Isp=300.0
-        )
+        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, propellant_mass=900.0, Isp=300.0)
         assert cfg.dry_mass == pytest.approx(100.0)
 
     def test_propellant_mass_computed_from_full_and_dry(self):
-        cfg = MissileStageConfig(
-            thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, dry_mass=100.0, Isp=300.0
-        )
+        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, dry_mass=100.0, Isp=300.0)
         assert cfg.propellant_mass == pytest.approx(900.0)
 
     def test_inconsistent_masses_raises(self):
@@ -115,7 +110,10 @@ class TestMissileStageConfig:
         with pytest.raises((ValueError, TypeError)):
             MissileStage(
                 MissileStageConfig(
-                    thrust=1_000.0, ref_radius=0.5, dry_mass=100.0, propellant_mass=900.0
+                    thrust=1_000.0,
+                    ref_radius=0.5,
+                    dry_mass=100.0,
+                    propellant_mass=900.0,
                     # no Isp, no burn_time
                 )
             )
@@ -124,6 +122,7 @@ class TestMissileStageConfig:
 # ---------------------------------------------------------------------------
 # MissileStage
 # ---------------------------------------------------------------------------
+
 
 class TestMissileStage:
     def test_initial_mass(self, stage, stage_cfg):
@@ -150,7 +149,7 @@ class TestMissileStage:
     def test_becomes_inactive_when_propellant_depleted(self, stage):
         stage.propellant_mass = 0.001  # near zero
         stage.update(10.0)  # burns the last propellant; propellant reaches 0
-        stage.update(0.0)   # next call detects propellant==0 and sets active=False
+        stage.update(0.0)  # next call detects propellant==0 and sets active=False
         assert stage.active is False
 
     def test_update_when_inactive_is_noop(self, stage):
@@ -167,6 +166,7 @@ class TestMissileStage:
 # PayloadConfig
 # ---------------------------------------------------------------------------
 
+
 class TestPayloadConfig:
     def test_area_computed(self, payload_cfg):
         assert payload_cfg.area == pytest.approx(np.pi * B53_warhead["ref_radius"] ** 2, rel=1e-9)
@@ -182,6 +182,7 @@ class TestPayloadConfig:
 # ---------------------------------------------------------------------------
 # Payload
 # ---------------------------------------------------------------------------
+
 
 class TestPayload:
     def test_thrust_acc(self, payload_cfg, earth):
@@ -227,6 +228,7 @@ class TestPayload:
 # BallisticMissile — properties
 # ---------------------------------------------------------------------------
 
+
 class TestBallisticMissileProperties:
     def test_mass_is_sum_of_stages(self, two_stage_missile):
         expected = sum(s.mass for s in two_stage_missile.stages)
@@ -253,6 +255,7 @@ class TestBallisticMissileProperties:
 # ---------------------------------------------------------------------------
 # BallisticMissile — update (stage separation)
 # ---------------------------------------------------------------------------
+
 
 class TestBallisticMissileUpdate:
     def test_update_advances_time(self, two_stage_missile):
@@ -297,6 +300,7 @@ class TestBallisticMissileUpdate:
 # BallisticMissile — accelerations
 # ---------------------------------------------------------------------------
 
+
 class TestBallisticMissileAccelerations:
     def test_accelerations_returns_array(self, two_stage_missile, earth):
         two_stage_missile.velocity = np.array([0.0, 100.0, 0.0])
@@ -328,6 +332,7 @@ class TestBallisticMissileAccelerations:
 # ---------------------------------------------------------------------------
 # BallisticMissile — ballistic_range
 # ---------------------------------------------------------------------------
+
 
 class TestBallisticRange:
     def test_ballistic_range_positive(self, two_stage_missile, earth):
