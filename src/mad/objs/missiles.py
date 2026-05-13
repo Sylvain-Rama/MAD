@@ -179,8 +179,8 @@ class BallisticMissileConfig:
     stages: list[MissileStage]
     guidance: "Guidance | None" = None
     payload: ReleasableConfig | None = None
-    n_RVs: int = 1  # Number of reentry vehicles, used for terminal guidance.
-    RV_separation_interval: float = 2.0  # Time between RV separations, in seconds.
+    n_payloads: int = 1  # Number of reentry vehicles, used for terminal guidance.
+    payload_separation_interval: float = 2.0  # Time between payload separations, in seconds.
 
     @property
     def to_dict(self):
@@ -197,10 +197,10 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.guidance = cfg.guidance
         self.payload = cfg.payload
         self.t = t
-        self.n_RVs = cfg.n_RVs
-        self.released_RVs = 0
-        self.RV_separation_interval = cfg.RV_separation_interval
-        self.last_RV_separation_time = 0.0
+        self.n_payloads = cfg.n_payloads
+        self.released_payloads = 0
+        self.payload_separation_interval = cfg.payload_separation_interval
+        self.last_payload_separation_time = 0.0
 
         self.initial_mass = deepcopy(self.mass)
         self.final_mass = deepcopy(
@@ -212,7 +212,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
     @property
     def mass(self):
         # We ignore the payload mass until the end, when it is released.
-        # Allows us to not have to worry about the transition from missile to payload.
+        # Allows to not worry about the transition from missile to payload.
         return sum(stage.mass for stage in self.stages)
 
     @property
@@ -253,7 +253,8 @@ class BallisticMissile(BallisticObj, GuidedObj):
             f"BallisticMissile {self.name}, {a}.\n"
             f"Stages: {", ".join([x.name for x in self.stages])}.\n"
             f"Available deltaV: {self.deltav:.2f} m/s.\n"
-            f"Burned Fraction: {self.burned_fraction:.2f}."
+            f"Guidance: {self.guidance.__class__.__name__ if self.guidance else 'None'}.\n"
+            f"Payloads: {self.payload.name if self.payload else 'None'}.\n"
         )
 
     @property
@@ -276,10 +277,10 @@ class BallisticMissile(BallisticObj, GuidedObj):
         if self.guidance_results:
             if (
                 self.guidance_results.state == "release_payload"
-                and self.t - self.last_RV_separation_time > self.RV_separation_interval
+                and self.t - self.last_payload_separation_time > self.payload_separation_interval
                 and self.payload
             ):
-                payload_name = f"{self.payload.name}_{self.released_RVs + 1}"
+                payload_name = f"{self.payload.name}_{self.released_payloads + 1}"
 
                 release_velocity = (
                     self.guidance_results.release_velocity
@@ -295,19 +296,19 @@ class BallisticMissile(BallisticObj, GuidedObj):
                 payload.name = payload_name
                 released_objects.append(payload)
                 logger["Missile"].info(f"{self.name} released payload {payload_name} at {self.t:.2f}.")
-                self.released_RVs += 1
-                self.last_RV_separation_time = deepcopy(self.t)
+                self.released_payloads += 1
+                self.last_payload_separation_time = deepcopy(self.t)
 
-                # Cut thrust immediately on first RV release without deactivating stages
-                # (stages must remain active to allow subsequent RV separations and keep the same mass).
+                # Cut thrust immediately on first payload release without deactivating stages
+                # (stages must remain active to allow subsequent payload separations and keep the same mass).
                 for stage in self.stages:
                     stage.thrust = 0.0
                     stage.mass_flow_rate = 0.0
 
-        if self.released_RVs >= self.n_RVs:
+        if self.released_payloads >= self.n_payloads:
             [setattr(stage, "active", False) for stage in self.stages]
             running_stage.active = False
-            logger["Missile"].info(f"{self.name} has released all RVs at {self.t:.2f}. Stages deactivated.")
+            logger["Missile"].info(f"{self.name} has released all payloads at {self.t:.2f}. Stages deactivated.")
 
         if not running_stage.active:
             stage_cfg = ProjectileConfig(

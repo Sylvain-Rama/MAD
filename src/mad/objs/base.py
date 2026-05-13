@@ -151,7 +151,7 @@ class GuidedObj(ABC):
 class Payload(BallisticObj):
     """Base class for all objects that can be released (deployed) from a missile.
 
-    Subclasses (e.g. ReentryVehicle, Sputnik) inherit the common position/velocity/t
+    Subclasses (e.g. ReentryVehicle, Satellite) inherit the common position/velocity/t
     initialisation and are the concrete deployed objects returned by ReleasableConfig.create().
     """
 
