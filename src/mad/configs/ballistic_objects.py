@@ -76,3 +76,25 @@ minuteman_stages = [
         "name": "Stage3",
     },
 ]
+
+# For Sputnik rocket: https://en.wikipedia.org/wiki/Sputnik_(rocket)
+sputnik_stages = [
+    {
+        "dry_mass": 3400.0,
+        "full_mass": 43_000.0,
+        "thrust": 4 * 389 * 1000,  # N
+        "Isp": 250.0,
+        "ref_radius": 3.6,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "BlocBVGD",
+    },
+    {
+        "dry_mass": 7500.0,
+        "full_mass": 94_000.0,
+        "thrust": 970 * 1000,  # N
+        "Isp": 308.0,
+        "ref_radius": 1.5,  # m
+        "Cd": 1.08,  # smooth, long cylinder.
+        "name": "BlocA",
+    },
+]
