@@ -6,6 +6,7 @@ from mad.guidances.base_guidances import (
     ProportionalNavigation,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
+from mad.guidances.satellite_guidances import LEOInsertionGuidance, LEOInsertionState
 
 __all__ = [
     "GuidableObj",
@@ -14,4 +15,6 @@ __all__ = [
     "RCSGuidance",
     "ProportionalNavigation",
     "TabulatedBallistic",
+    "LEOInsertionGuidance",
+    "LEOInsertionState",
 ]

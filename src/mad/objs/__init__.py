@@ -1,31 +1,36 @@
-from mad.objs.base import MovableObj, BallisticObj, SimulationInterface, GuidedObj
+from mad.objs.base import MovableObj, BallisticObj, SimulationInterface, GuidedObj, Payload, ReleasableConfig
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.missiles import (
     BallisticMissile,
     BallisticMissileConfig,
     MissileStage,
     MissileStageConfig,
-    PayloadConfig,
-    Payload,
+    ReentryVehicle,
+    RVConfig,
 )
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.radars import Radar, RadarConfig
+from mad.objs.satellites import Sputnik, SatelliteConfig
 
 __all__ = [
     "Planet",
     "PlanetConfig",
     "MovableObj",
     "BallisticObj",
+    "Payload",
+    "ReleasableConfig",
     "BallisticMissile",
     "BallisticMissileConfig",
     "MissileStage",
     "MissileStageConfig",
+    "ReentryVehicle",
+    "RVConfig",
     "Projectile",
     "ProjectileConfig",
     "Radar",
     "RadarConfig",
     "SimulationInterface",
     "GuidedObj",
-    "Payload",
-    "PayloadConfig",
+    "Sputnik",
+    "SatelliteConfig",
 ]

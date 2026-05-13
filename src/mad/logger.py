@@ -13,6 +13,7 @@ SOURCE_COLORS = {
     "Projectile": "<blue>",
     "Unknown": "<yellow>",
     "I/O": "<cyan>",
+    "Satellite": "<magenta>",
 }
 
 

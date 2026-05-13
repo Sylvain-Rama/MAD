@@ -87,7 +87,6 @@ class LEOInsertionGuidance(Guidance):
         # Cached prograde unit vector; only used when target is None.
         self._prograde_hat: NDArray | None = None
 
-
     def _resolve_t_hat(self, missile: GuidableObj, r_hat: NDArray) -> NDArray:
         """Return the tangential unit vector that defines the pitch-over plane.
 
@@ -116,7 +115,6 @@ class LEOInsertionGuidance(Guidance):
 
         return self._prograde_hat  # type: ignore[return-value]
 
-
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         r = np.linalg.norm(missile.position)
         altitude = r - self.planet.radius
@@ -129,7 +127,6 @@ class LEOInsertionGuidance(Guidance):
         t_hat = self._resolve_t_hat(missile, r_hat)
         v_circ = np.sqrt(self.planet.mu / self.target_radius_m)
         v_horiz_mag = abs(np.dot(missile.velocity, t_hat))
-
 
         if abs(altitude - self.target_altitude_m) <= self.altitude_tol_m:
             self.state = LEOInsertionState.ORBIT_INSERTION
