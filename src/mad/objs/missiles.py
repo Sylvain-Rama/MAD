@@ -280,7 +280,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
         if self.guidance_results:
             if (
-                self.guidance_results.state == "Release RV"
+                self.guidance_results.state == "release_payload"
                 and self.t - self.last_RV_separation_time > self.RV_separation_interval
                 and self.payload
             ):
