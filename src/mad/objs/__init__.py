@@ -10,7 +10,7 @@ from mad.objs.missiles import (
 )
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.radars import Radar, RadarConfig
-from mad.objs.satellites import Sputnik, SatelliteConfig
+from mad.objs.satellites import Satellite, Sputnik, SatelliteConfig
 
 __all__ = [
     "Planet",
@@ -32,5 +32,6 @@ __all__ = [
     "SimulationInterface",
     "GuidedObj",
     "Sputnik",
+    "Satellite",
     "SatelliteConfig",
 ]

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from mad.objs.base import Payload
 from mad.objs.projectiles import ProjectileConfig
+from mad.guidances import Guidance
 from mad.logger import SourceLogger
 import numpy as np
 from numpy.typing import NDArray
@@ -14,15 +15,16 @@ class SatelliteConfig:
     ref_radius: float  # m
     Cd: float = 0.47  # sphere
     name: str = "Satellite"
+    guidance: Guidance | None = None
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Sputnik":
-        return Sputnik(config=self, position=position, velocity=velocity, t=t)
+    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Satellite":
+        return Satellite(config=self, position=position, velocity=velocity, t=t)
 
 
-class Sputnik(Payload):
+class Satellite(Payload):
     def __init__(
         self,
         config: "ProjectileConfig | SatelliteConfig",
@@ -42,6 +44,7 @@ class Sputnik(Payload):
         self.config = config
 
     def accelerations(self, planet) -> NDArray:
+        # Typically, we can ignore drag for stellites.
 
         if self.distance(planet) <= planet.radius:
             logger["Satellite"].info(f"{self.name} landed on the ground!")
@@ -52,9 +55,16 @@ class Sputnik(Payload):
 
         return gravity_acc
 
-    def update(self, dt: float):
+    def update(self, dt: float) -> None:
         self.t += dt
-        # Sputniks are indestructible and unaffected by drag, we only need to beep from time to time.
+
+        return None
+
+
+class Sputnik(Satellite):
+    def update(self, dt: float) -> None:
+        self.t += dt
+        # Sputniks beep from time to time.
         if self.t // 60 == 0:
             logger["Satellite"].info(f"{self.name} -- Beep Beep!")
 
