@@ -1,11 +1,11 @@
-from mad.guidances.guidances import (
+from mad.guidances.base_guidances import (
     GuidableObj,
     Guidance,
     NoGuidance,
     RCSGuidance,
     ProportionalNavigation,
-    TabulatedBallistic,
 )
+from mad.guidances.ICBM_guidances import TabulatedBallistic
 
 __all__ = [
     "GuidableObj",
