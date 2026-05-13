@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from mad.utils import to_vec3
 
 if TYPE_CHECKING:
@@ -145,4 +145,41 @@ class GuidedObj(ABC):
     @abstractmethod
     def thrust_acc(self) -> float:
         """Maximum available propulsion acceleration (m/s²)."""
+        ...
+
+
+class Payload(BallisticObj):
+    """Base class for all objects that can be released (deployed) from a missile.
+
+    Subclasses (e.g. ReentryVehicle, Sputnik) inherit the common position/velocity/t
+    initialisation and are the concrete deployed objects returned by ReleasableConfig.create().
+    """
+
+    def __init__(
+        self,
+        position: list[float] | NDArray,
+        velocity: list[float] | NDArray | None,
+        name: str,
+        mass: float,
+        area: float,
+        Cd: float,
+        t: float = 0.0,
+    ):
+        super().__init__(position, velocity, name, mass, area, Cd)
+        self.t = t
+
+
+@runtime_checkable
+class ReleasableConfig(Protocol):
+    """Protocol for config objects that can produce a Payload via a factory method.
+
+    Any dataclass with a ``name`` field, a ``mass`` field, and a ``create()``
+    method satisfies this protocol and can be used as a missile payload config.
+    """
+
+    name: str
+    mass: float
+
+    def create(self, position: NDArray, velocity: NDArray, t: float) -> Payload:
+        """Instantiate and return the deployed object at the given state."""
         ...

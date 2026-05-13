@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, MovableObj
+from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.logger import SourceLogger
@@ -17,11 +17,11 @@ logger = SourceLogger()
 
 
 @dataclass
-class PayloadConfig:
+class RVConfig:
     mass: float  # kg
     ref_radius: float  # m
     Cd: float
-    name: str = "Payload"
+    name: str = "ReentryVehicle"
     yield_kt: float = 0.0  # kt
     guidance: "Guidance | None" = None
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
@@ -29,20 +29,15 @@ class PayloadConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
+    def create(self, position: NDArray, velocity: NDArray, t: float) -> "ReentryVehicle":
+        return ReentryVehicle(config=self, position=position, velocity=velocity, t=t)
 
-class Payload(BallisticObj, GuidedObj):
-    def __init__(self, config: PayloadConfig, position: NDArray, velocity=None, t=0.0):
-        super().__init__(
-            position=position,
-            velocity=velocity,
-            name=config.name,
-            mass=config.mass,
-            area=config.area,
-            Cd=config.Cd,
-        )
+
+class ReentryVehicle(Payload, GuidedObj):
+    def __init__(self, config: RVConfig, position: NDArray, velocity=None, t=0.0):
+        Payload.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd, t)
         self.yield_kt = config.yield_kt
         self.guidance = config.guidance
-        self.t = t
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
@@ -183,7 +178,7 @@ class MissileStage:
 class BallisticMissileConfig:
     stages: list[MissileStage]
     guidance: "Guidance | None" = None
-    payload: PayloadConfig | None = None
+    payload: ReleasableConfig | None = None
     n_RVs: int = 1  # Number of reentry vehicles, used for terminal guidance.
     RV_separation_interval: float = 2.0  # Time between RV separations, in seconds.
 
@@ -292,8 +287,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
                     else self.velocity.copy()
                 )
 
-                payload = Payload(
-                    config=self.payload,
+                payload = self.payload.create(
                     position=self.position.copy(),
                     velocity=release_velocity,
                     t=deepcopy(self.t),
