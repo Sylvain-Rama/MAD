@@ -100,28 +100,6 @@ class GravityTurn(Guidance):
         return GuidanceResults(direction=self.gravity_turn_direction(missile, gamma), state=self.state)
 
 
-class RCSGuidance(Guidance):
-    """Simple guidance that uses RCS thrusters to always point directly at the target, without any powered flight phase."""
-
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        v_norm = np.linalg.norm(missile.velocity)
-        if v_norm < 1e-8:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
-        v_hat = missile.velocity / v_norm
-
-        los = self.target.position - missile.position
-
-        # Remove the component along the current velocity so thrust is purely a
-        # course correction (perpendicular to flight path).  This makes guidance
-        # stable at any thrust level: higher thrust curves the trajectory more
-        # sharply toward the target instead of causing downrange overshoot.
-        correction = los - np.dot(los, v_hat) * v_hat
-        norm = np.linalg.norm(correction)
-        if norm < 1e-8:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
-        return GuidanceResults(direction=correction / norm, state=self.state)
-
-
 class ProportionalNavigation(Guidance):
     """Proportional Navigation (PN) terminal guidance for reentry vehicles.
 
