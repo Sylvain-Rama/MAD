@@ -86,7 +86,7 @@ sputnik_stages = [
         "Isp": 250.0,
         "ref_radius": 3.6,  # m
         "Cd": 1.08,  # smooth, long cylinder.
-        "name": "BlocBVGD",
+        "name": "Bloc_BVGD",
     },
     {
         "dry_mass": 7500.0,
@@ -95,6 +95,6 @@ sputnik_stages = [
         "Isp": 308.0,
         "ref_radius": 1.5,  # m
         "Cd": 1.08,  # smooth, long cylinder.
-        "name": "BlocA",
+        "name": "Bloc_A",
     },
 ]
