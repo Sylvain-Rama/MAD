@@ -128,6 +128,20 @@ class LEOInsertionGuidance(Guidance):
         v_circ = np.sqrt(self.planet.mu / self.target_radius_m)
         v_horiz_mag = abs(np.dot(missile.velocity, t_hat))
 
+        # Fallback: all propellant spent and vehicle has reached the target altitude zone.
+        # Release on whatever trajectory is available rather than waiting for full orbital speed.
+        if missile.burned_fraction >= 1.0 and altitude >= self.target_altitude_m - self.altitude_tol_m:
+            logger["Guidance"].info(
+                f"All propellant spent at altitude {altitude / 1e3:.1f} km, "
+                f"v_horiz = {v_horiz_mag:.1f} m/s (target {v_circ:.1f} m/s). Releasing payload."
+            )
+            self.state = LEOInsertionState.RELEASE_PAYLOAD
+            return GuidanceResults(
+                direction=np.zeros(3),
+                state=self.state,
+                release_velocity=missile.velocity.copy(),
+            )
+
         if abs(altitude - self.target_altitude_m) <= self.altitude_tol_m:
             self.state = LEOInsertionState.ORBIT_INSERTION
 

@@ -209,15 +209,21 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
+        # Cached values used during the coasting phase (all stages separated, payload not yet released).
+        self._coasting_area: float = self.stages[-1].area
+        self._coasting_mass: float = self.payload.mass if self.payload else 0.0
+
     @property
     def mass(self):
         # We ignore the payload mass until the end, when it is released.
         # Allows to not worry about the transition from missile to payload.
-        return sum(stage.mass for stage in self.stages)
+        if self.stages:
+            return sum(stage.mass for stage in self.stages)
+        return self._coasting_mass
 
     @property
     def area(self):
-        return self.stages[-1].area
+        return self.stages[-1].area if self.stages else self._coasting_area
 
     @property
     def deltav(self):
@@ -234,6 +240,8 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
     @property
     def burned_fraction(self) -> float:
+        if not self.stages:
+            return 1.0
         # Extremely imprecise, as it does not take into account we lose stages
         return np.clip((self.initial_mass - self.mass) / (self.initial_mass - self.final_mass), 0, 1)
 
@@ -259,6 +267,8 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
     @property
     def thrust_acc(self) -> float:
+        if not self.stages:
+            return 0.0
         running_stage = self.stages[0]
         if not running_stage.active:
             return 0.0
@@ -269,8 +279,9 @@ class BallisticMissile(BallisticObj, GuidedObj):
         released_objects = []
         self.t += dt
 
-        running_stage = self.stages[0]
-        running_stage.update(dt)
+        running_stage = self.stages[0] if self.stages else None
+        if running_stage is not None:
+            running_stage.update(dt)
 
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
 
@@ -306,11 +317,16 @@ class BallisticMissile(BallisticObj, GuidedObj):
                     stage.mass_flow_rate = 0.0
 
         if self.released_payloads >= self.n_payloads:
-            [setattr(stage, "active", False) for stage in self.stages]
-            running_stage.active = False
+            for stage in self.stages:
+                stage.active = False
+            if running_stage is not None:
+                running_stage.active = False
+            if not self.stages:
+                # Coasting phase: no stages left, deactivate directly.
+                self.active = False
             logger["Missile"].info(f"{self.name} has released all payloads at {self.t:.2f}. Stages deactivated.")
 
-        if not running_stage.active:
+        if running_stage is not None and not running_stage.active:
             stage_cfg = ProjectileConfig(
                 position=self.position.tolist(),
                 velocity=self.velocity.tolist(),
@@ -320,11 +336,15 @@ class BallisticMissile(BallisticObj, GuidedObj):
                 Cd=running_stage.Cd,
             )
 
+            self._coasting_area = running_stage.area  # Cache before removing the stage.
             del self.stages[0]
             logger["Missile"].info(f"{self.name} - {running_stage.name} separated at {self.t:.2f}.")
             if len(self.stages) == 0:
-                self.active = False
-                logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
+                if self.released_payloads >= self.n_payloads or self.payload is None:
+                    self.active = False
+                    logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
+                else:
+                    logger["Missile"].info(f"{self.name} entering coast phase at {self.t:.2f}.")
             else:
                 self.stages[0].t = self.t
 
@@ -333,6 +353,11 @@ class BallisticMissile(BallisticObj, GuidedObj):
         return released_objects if released_objects else None
 
     def accelerations(self, planet: Planet) -> NDArray:
+        if self.distance(planet) <= planet.radius:
+            logger["Missile"].info(f"{self.name} impacted the ground at {self.t:.2f}.")
+            self.active = False
+            return np.zeros_like(self.velocity)
+
         gravity = planet.gravity(self)
         drag = planet.drag(self)
 
