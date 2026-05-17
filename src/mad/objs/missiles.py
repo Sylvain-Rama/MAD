@@ -94,6 +94,7 @@ class MissileStageConfig:
     full_mass: float | None = None  # kg
     Isp: float | None = None  # s
     burn_time: float | None = None  # s, optional for now, can be computed from mass and thrust if not provided.
+    parallel: bool = False  # If True, this stage ignites simultaneously with the stage before it.
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
@@ -145,6 +146,7 @@ class MissileStage:
         self.exhaust_velocity = cfg.Isp * G0
         self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
 
+        self.parallel: bool = cfg.parallel
         self.active: bool = True
         self.name = cfg.name
         self.t = 0.0
@@ -266,22 +268,39 @@ class BallisticMissile(BallisticObj, GuidedObj):
         )
 
     @property
+    def _active_burn_group(self) -> list["MissileStage"]:
+        """Stage 0 plus any consecutive following stages whose ``parallel`` flag is True.
+
+        All stages in this group burn simultaneously.  The group shrinks as
+        individual stages deplete and separate; the next sequential stage only
+        ignites once the group is completely exhausted.
+        """
+        if not self.stages:
+            return []
+        group = [self.stages[0]]
+        for stage in self.stages[1:]:
+            if stage.parallel:
+                group.append(stage)
+            else:
+                break
+        return group
+
+    @property
     def thrust_acc(self) -> float:
         if not self.stages:
             return 0.0
-        running_stage = self.stages[0]
-        if not running_stage.active:
-            return 0.0
-
-        return running_stage.thrust_force / self.mass
+        total_thrust = sum(s.thrust_force for s in self._active_burn_group if s.active)
+        return total_thrust / self.mass if total_thrust > 0 else 0.0
 
     def update(self, dt: float) -> list[BallisticObj] | None:
         released_objects = []
         self.t += dt
 
-        running_stage = self.stages[0] if self.stages else None
-        if running_stage is not None:
-            running_stage.update(dt)
+        # Snapshot the active burn group before any mutations so that stage-removal
+        # logic below can reliably tell which stages were already burning.
+        burn_group = self._active_burn_group
+        for stage in burn_group:
+            stage.update(dt)
 
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
 
@@ -319,36 +338,38 @@ class BallisticMissile(BallisticObj, GuidedObj):
         if self.released_payloads >= self.n_payloads:
             for stage in self.stages:
                 stage.active = False
-            if running_stage is not None:
-                running_stage.active = False
             if not self.stages:
                 # Coasting phase: no stages left, deactivate directly.
                 self.active = False
             logger["Missile"].info(f"{self.name} has released all payloads at {self.t:.2f}. Stages deactivated.")
 
-        if running_stage is not None and not running_stage.active:
+        # Separate every depleted stage in the burn group (may be >1 for parallel stages).
+        depleted = [s for s in burn_group if not s.active]
+        for dep in depleted:
             stage_cfg = ProjectileConfig(
                 position=self.position.tolist(),
                 velocity=self.velocity.tolist(),
-                mass=running_stage.dry_mass,
-                name=running_stage.name,
-                ref_radius=running_stage.ref_radius,
-                Cd=running_stage.Cd,
+                mass=dep.dry_mass,
+                name=dep.name,
+                ref_radius=dep.ref_radius,
+                Cd=dep.Cd,
             )
+            self._coasting_area = dep.area  # Cache before removing.
+            self.stages.remove(dep)
+            logger["Missile"].info(f"{self.name} - {dep.name} separated at {self.t:.2f}.")
+            released_objects.append(Projectile(stage_cfg, t=deepcopy(self.t)))
 
-            self._coasting_area = running_stage.area  # Cache before removing the stage.
-            del self.stages[0]
-            logger["Missile"].info(f"{self.name} - {running_stage.name} separated at {self.t:.2f}.")
+        if depleted:
             if len(self.stages) == 0:
                 if self.released_payloads >= self.n_payloads or self.payload is None:
                     self.active = False
                     logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
                 else:
                     logger["Missile"].info(f"{self.name} entering coast phase at {self.t:.2f}.")
-            else:
+            elif self.stages[0] not in burn_group:
+                # A new sequential stage is now at the front; record when it started.
                 self.stages[0].t = self.t
-
-            released_objects.append(Projectile(stage_cfg, t=deepcopy(self.t)))
+                logger["Missile"].info(f"{self.name} - {self.stages[0].name} ignited at {self.t:.2f}.")
 
         return released_objects if released_objects else None
 

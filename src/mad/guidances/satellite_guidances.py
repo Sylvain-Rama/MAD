@@ -63,6 +63,13 @@ class LEOInsertionGuidance(Guidance):
     min_turn_altitude_m :
         Altitude above the surface at which pitch-over begins (metres).
         Defaults to 1 000 m.
+    turn_end_altitude_m :
+        Altitude at which the pitch programme completes and the vehicle thrusts
+        purely in the tangential (horizontal) direction (metres).  Setting this
+        well below ``target_altitude_m`` greatly reduces gravity and steering
+        losses: the vehicle pitches over early and then coasts / thrusts
+        horizontally to gain orbital speed before reaching the target orbit.
+        Defaults to 80 % of ``target_altitude_m``.
     altitude_tol_m :
         Half-width of the altitude band (metres) around ``target_altitude_m``
         in which orbit insertion is triggered.
@@ -75,12 +82,14 @@ class LEOInsertionGuidance(Guidance):
         target_altitude_m: float,
         target: MovableObj | None = None,
         min_turn_altitude_m: float = 1_000.0,
+        turn_end_altitude_m: float | None = None,
         altitude_tol_m: float | None = None,
     ):
         super().__init__(planet, target=target)  # type: ignore[arg-type]  # target may be None
         self.target_altitude_m = target_altitude_m
         self.target_radius_m = planet.radius + target_altitude_m
         self.min_turn_altitude_m = min_turn_altitude_m
+        self.turn_end_altitude_m = turn_end_altitude_m if turn_end_altitude_m is not None else 0.8 * target_altitude_m
         self.altitude_tol_m = altitude_tol_m if altitude_tol_m is not None else 0.05 * target_altitude_m
         self.state = LEOInsertionState.VERTICAL_RISE
 
@@ -164,8 +173,10 @@ class LEOInsertionGuidance(Guidance):
         # Cosine-ease pitch schedule: smooth start and end to the turn.
         #   p = 0  → θ = 0       (vertical)
         #   p = 1  → θ = π/2     (horizontal)
+        # Progress saturates at 1 once turn_end_altitude_m is reached, after
+        # which the vehicle thrusts purely tangentially until orbit insertion.
         progress = np.clip(
-            (altitude - self.min_turn_altitude_m) / (self.target_altitude_m - self.min_turn_altitude_m),
+            (altitude - self.min_turn_altitude_m) / (self.turn_end_altitude_m - self.min_turn_altitude_m),
             0.0,
             1.0,
         )

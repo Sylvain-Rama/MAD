@@ -78,6 +78,8 @@ minuteman_stages = [
 ]
 
 # For Sputnik rocket: https://en.wikipedia.org/wiki/Sputnik_(rocket)
+# Bloc_BVGD (4 strap-on boosters) and Bloc_A (core) fire simultaneously from T=0;
+# Bloc_BVGD separates first (~71 s), Bloc_A continues to orbital speed.
 sputnik_stages = [
     {
         "dry_mass": 3400.0,
@@ -87,6 +89,7 @@ sputnik_stages = [
         "ref_radius": 3.6,  # m
         "Cd": 0.5,  # Pointy end
         "name": "Bloc_BVGD",
+        "parallel": False,  # First stage — ignites at T=0 by default.
     },
     {
         "dry_mass": 7500.0,
@@ -96,5 +99,6 @@ sputnik_stages = [
         "ref_radius": 1.5,  # m
         "Cd": 0.5,  # Pointy end
         "name": "Bloc_A",
+        "parallel": True,  # Core stage fires in parallel with Bloc_BVGD from T=0.
     },
 ]
