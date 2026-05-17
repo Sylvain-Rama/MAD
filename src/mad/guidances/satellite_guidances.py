@@ -137,19 +137,28 @@ class LEOInsertionGuidance(Guidance):
         v_circ = np.sqrt(self.planet.mu / self.target_radius_m)
         v_horiz_mag = abs(np.dot(missile.velocity, t_hat))
 
-        # Fallback: all propellant spent and vehicle has reached the target altitude zone.
-        # Release on whatever trajectory is available rather than waiting for full orbital speed.
-        if missile.burned_fraction >= 1.0 and altitude >= self.target_altitude_m - self.altitude_tol_m:
-            logger["Guidance"].info(
-                f"All propellant spent at altitude {altitude / 1e3:.1f} km, "
-                f"v_horiz = {v_horiz_mag:.1f} m/s (target {v_circ:.1f} m/s). Releasing payload."
-            )
-            self.state = LEOInsertionState.RELEASE_PAYLOAD
-            return GuidanceResults(
-                direction=np.zeros(3),
-                state=self.state,
-                release_velocity=missile.velocity.copy(),
-            )
+        # Fallback: all propellant spent — release payload when either:
+        #   (a) the vehicle has reached the target altitude band, or
+        #   (b) the vehicle is at/past apogee (radial velocity ≤ 0) above 80 km.
+        # Case (b) ensures the payload is deployed at the highest possible point
+        # when the rocket is underpowered to reach the nominal target altitude.
+        # NOTE: use has_thrust (stages list empty) rather than burned_fraction, which
+        # is an imprecise formula that can return >= 1.0 a few seconds early.
+        if not missile.has_thrust:
+            v_r = np.dot(missile.velocity, r_hat)
+            at_target_band = altitude >= self.target_altitude_m - self.altitude_tol_m
+            at_apogee = v_r <= 0.0 and altitude > 80_000.0
+            if at_target_band or at_apogee:
+                logger["Guidance"].info(
+                    f"All propellant spent at altitude {altitude / 1e3:.1f} km, "
+                    f"v_horiz = {v_horiz_mag:.1f} m/s (target {v_circ:.1f} m/s). Releasing payload."
+                )
+                self.state = LEOInsertionState.RELEASE_PAYLOAD
+                return GuidanceResults(
+                    direction=np.zeros(3),
+                    state=self.state,
+                    release_velocity=missile.velocity.copy(),
+                )
 
         if abs(altitude - self.target_altitude_m) <= self.altitude_tol_m:
             self.state = LEOInsertionState.ORBIT_INSERTION

@@ -212,7 +212,9 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
         # Cached values used during the coasting phase (all stages separated, payload not yet released).
-        self._coasting_area: float = self.stages[-1].area
+        # Use the payload's own area/Cd so the drag-to-mass ratio is physically correct once stages drop away.
+        self._coasting_area: float = getattr(self.payload, 'area', self.stages[-1].area) if self.payload else self.stages[-1].area
+        self._coasting_Cd: float = getattr(self.payload, 'Cd', self.Cd) if self.payload else self.Cd
         self._coasting_mass: float = self.payload.mass if self.payload else 0.0
 
     @property
@@ -226,6 +228,11 @@ class BallisticMissile(BallisticObj, GuidedObj):
     @property
     def area(self):
         return self.stages[-1].area if self.stages else self._coasting_area
+
+    @property
+    def has_thrust(self) -> bool:
+        """True while at least one stage is still present (stages are removed upon propellant depletion)."""
+        return bool(self.stages)
 
     @property
     def deltav(self):
@@ -354,7 +361,6 @@ class BallisticMissile(BallisticObj, GuidedObj):
                 ref_radius=dep.ref_radius,
                 Cd=dep.Cd,
             )
-            self._coasting_area = dep.area  # Cache before removing.
             self.stages.remove(dep)
             logger["Missile"].info(f"{self.name} - {dep.name} separated at {self.t:.2f}.")
             released_objects.append(Projectile(stage_cfg, t=deepcopy(self.t)))
@@ -365,6 +371,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
                     self.active = False
                     logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
                 else:
+                    self.Cd = self._coasting_Cd
                     logger["Missile"].info(f"{self.name} entering coast phase at {self.t:.2f}.")
             elif self.stages[0] not in burn_group:
                 # A new sequential stage is now at the front; record when it started.

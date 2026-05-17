@@ -25,6 +25,9 @@ class GuidableObj(Protocol):
     @property
     def burned_fraction(self) -> float: ...
 
+    @property
+    def has_thrust(self) -> bool: ...
+
 
 @dataclass
 class GuidanceResults:
