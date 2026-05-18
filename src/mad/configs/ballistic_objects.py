@@ -54,7 +54,7 @@ minuteman_stages = [
         "thrust": 930 * 1000,  # N
         "Isp": 270.0,
         "ref_radius": 0.75,  # m
-        "Cd": 1.08,  # smooth, long cylinder.
+        "Cd": 0.5,  # smooth, long cylinder.
         "name": "Stage1",
     },
     {
@@ -63,7 +63,7 @@ minuteman_stages = [
         "thrust": 267 * 1000,  # N
         "Isp": 290.0,
         "ref_radius": 0.46,  # m
-        "Cd": 1.08,  # smooth, long cylinder.
+        "Cd": 0.5,  # smooth, long cylinder.
         "name": "Stage2",
     },
     {
@@ -72,7 +72,7 @@ minuteman_stages = [
         "thrust": 152 * 1000,  # N
         "Isp": 300.0,
         "ref_radius": 0.46,  # m
-        "Cd": 1.08,  # smooth, long cylinder.
+        "Cd": 0.5,  # smooth, long cylinder.
         "name": "Stage3",
     },
 ]
@@ -84,8 +84,8 @@ sputnik_stages = [
     {
         "dry_mass": 3400.0,
         "full_mass": 43_000.0,
-        "thrust": 4 * 389 * 1000,  # N
-        "Isp": 280.0,
+        "thrust": 4 * 450 * 1000,  # N
+        "Isp": 310.0,
         "ref_radius": 3.6,  # m
         "Cd": 0.5,  # Pointy end
         "name": "Bloc_BVGD",
@@ -95,7 +95,7 @@ sputnik_stages = [
         "dry_mass": 7500.0,
         "full_mass": 94_000.0,
         "thrust": 970 * 1000,  # N
-        "Isp": 340.0,
+        "Isp": 380.0,
         "ref_radius": 1.5,  # m
         "Cd": 0.5,  # Pointy end
         "name": "Bloc_A",
