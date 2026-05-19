@@ -18,7 +18,7 @@ class LEOInsertionState(StrEnum):
 
 
 class LEOInsertionGuidance(Guidance):
-    """Guides a launch vehicle to a circular low-Earth orbit at a desired altitude.
+    """Guides a launch vehicle to a low-Earth orbit (circular or elliptical) at a desired perigee altitude.
 
     Three sequential phases
     -----------------------
@@ -30,11 +30,15 @@ class LEOInsertionGuidance(Guidance):
        ``θ = (π/2) · (1 − cos(π·p)) / 2``  where *p* ∈ [0, 1] is the altitude
        progress fraction, giving a smooth start and end to the turn.
     3. **orbit_insertion** – once the vehicle is within ``altitude_tol_m`` of
-       the target altitude, thrust purely in the tangential direction to reach
-       circular-orbit speed ``v_circ = √(μ/r_target)``.
+       ``target_altitude_m``, thrust purely in the tangential direction to reach
+       the required perigee speed.  For a **circular** orbit this is
+       ``v_circ = √(μ/r_p)``; for an **elliptical** orbit (when
+       ``apogee_altitude_m`` is supplied) the vis-viva perigee speed is used:
+       ``v_p = √(μ · (2/r_p − 1/a))`` where ``a = (r_p + r_a) / 2``.
        ``release_payload`` is declared when the horizontal speed reaches
-       99 % of ``v_circ``; the current velocity is set as ``release_velocity``
-       so the missile releases the satellite at the correct orbital velocity.
+       99 % of the target speed; the current velocity is set as
+       ``release_velocity`` so the missile releases the satellite at the
+       correct orbital velocity.
 
     Tangential direction
     --------------------
@@ -54,7 +58,12 @@ class LEOInsertionGuidance(Guidance):
     planet :
         The central body (must expose ``planet.radius`` and ``planet.mu``).
     target_altitude_m :
-        Desired circular-orbit altitude above the surface in **metres**.
+        Perigee altitude above the surface in **metres**.  The vehicle is
+        released here (or as close to it as propellant allows).
+    apogee_altitude_m :
+        Apogee altitude in **metres** for an elliptical target orbit.
+        When ``None`` (default) a circular orbit at ``target_altitude_m``
+        is targeted.
     target :
         Optional reference point whose direction from the vehicle defines the
         desired orbital plane.  Pass any ``MovableObj`` (e.g. a ground target
@@ -80,6 +89,7 @@ class LEOInsertionGuidance(Guidance):
         self,
         planet,
         target_altitude_m: float,
+        apogee_altitude_m: float | None = None,
         target: MovableObj | None = None,
         min_turn_altitude_m: float = 1_000.0,
         turn_end_altitude_m: float | None = None,
@@ -92,6 +102,16 @@ class LEOInsertionGuidance(Guidance):
         self.turn_end_altitude_m = turn_end_altitude_m if turn_end_altitude_m is not None else 0.8 * target_altitude_m
         self.altitude_tol_m = altitude_tol_m if altitude_tol_m is not None else 0.05 * target_altitude_m
         self.state = LEOInsertionState.VERTICAL_RISE
+
+        # Target orbital speed at perigee.
+        # Circular:    v = √(μ / r_p)
+        # Elliptical:  v = √(μ · (2/r_p − 1/a)),  a = (r_p + r_a) / 2  [vis-viva]
+        if apogee_altitude_m is not None:
+            r_a = planet.radius + apogee_altitude_m
+            semi_major_axis = (self.target_radius_m + r_a) / 2.0
+            self._v_target = np.sqrt(planet.mu * (2.0 / self.target_radius_m - 1.0 / semi_major_axis))
+        else:
+            self._v_target = np.sqrt(planet.mu / self.target_radius_m)
 
         # Cached prograde unit vector; only used when target is None.
         self._prograde_hat: NDArray | None = None
@@ -134,7 +154,6 @@ class LEOInsertionGuidance(Guidance):
             return GuidanceResults(direction=r_hat.copy(), state=self.state)
 
         t_hat = self._resolve_t_hat(missile, r_hat)
-        v_circ = np.sqrt(self.planet.mu / self.target_radius_m)
         v_horiz_mag = abs(np.dot(missile.velocity, t_hat))
 
         # Fallback: all propellant spent — release payload when either:
@@ -151,7 +170,7 @@ class LEOInsertionGuidance(Guidance):
             if at_target_band or at_apogee:
                 logger["Guidance"].info(
                     f"All propellant spent at altitude {altitude / 1e3:.1f} km, "
-                    f"v_horiz = {v_horiz_mag:.1f} m/s (target {v_circ:.1f} m/s). Releasing payload."
+                    f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s). Releasing payload."
                 )
                 self.state = LEOInsertionState.RELEASE_PAYLOAD
                 return GuidanceResults(
@@ -163,10 +182,10 @@ class LEOInsertionGuidance(Guidance):
         if abs(altitude - self.target_altitude_m) <= self.altitude_tol_m:
             self.state = LEOInsertionState.ORBIT_INSERTION
 
-            if v_horiz_mag >= 0.99 * v_circ:
+            if v_horiz_mag >= 0.99 * self._v_target:
                 logger["Guidance"].info(
-                    f"LEO orbit achieved at altitude {altitude / 1e3:.1f} km, "
-                    f"v_horiz = {v_horiz_mag:.1f} m/s (target {v_circ:.1f} m/s)."
+                    f"Orbit insertion achieved at altitude {altitude / 1e3:.1f} km, "
+                    f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s)."
                 )
                 self.state = LEOInsertionState.RELEASE_PAYLOAD
                 return GuidanceResults(
