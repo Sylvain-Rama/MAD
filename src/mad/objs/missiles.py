@@ -95,6 +95,7 @@ class MissileStageConfig:
     Isp: float | None = None  # s
     burn_time: float | None = None  # s, optional for now, can be computed from mass and thrust if not provided.
     parallel: bool = False  # If True, this stage ignites simultaneously with the stage before it.
+    separation_retrograde_dv: float = 0.0  # m/s retrograde delta-v applied to the stage hull at separation.
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
@@ -147,6 +148,7 @@ class MissileStage:
         self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
 
         self.parallel: bool = cfg.parallel
+        self.separation_retrograde_dv: float = cfg.separation_retrograde_dv
         self.active: bool = True
         self.name = cfg.name
         self.t = 0.0
@@ -353,9 +355,14 @@ class BallisticMissile(BallisticObj, GuidedObj):
         # Separate every depleted stage in the burn group (may be >1 for parallel stages).
         depleted = [s for s in burn_group if not s.active]
         for dep in depleted:
+            speed = np.linalg.norm(self.velocity)
+            if dep.separation_retrograde_dv > 0 and speed > 1e-6:
+                sep_velocity = self.velocity - dep.separation_retrograde_dv * (self.velocity / speed)
+            else:
+                sep_velocity = self.velocity
             stage_cfg = ProjectileConfig(
                 position=self.position.tolist(),
-                velocity=self.velocity.tolist(),
+                velocity=sep_velocity.tolist(),
                 mass=dep.dry_mass,
                 name=dep.name,
                 ref_radius=dep.ref_radius,

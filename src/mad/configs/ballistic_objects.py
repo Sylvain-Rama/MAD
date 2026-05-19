@@ -84,7 +84,7 @@ sputnik_stages = [
     {
         "dry_mass": 3400.0,
         "full_mass": 43_000.0,
-        "thrust": 4 * 450 * 1000,  # N
+        "thrust": 4 * 520 * 1000,  # N
         "Isp": 310.0,
         "ref_radius": 3.6,  # m
         "Cd": 0.5,  # Pointy end
@@ -100,5 +100,6 @@ sputnik_stages = [
         "Cd": 0.5,  # Pointy end
         "name": "Bloc_A",
         "parallel": True,  # Core stage fires in parallel with Bloc_BVGD from T=0.
+        "separation_retrograde_dv": 75.0,  # m/s retrograde kick at separation to ensure reentry.
     },
 ]
