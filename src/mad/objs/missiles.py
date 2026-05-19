@@ -215,8 +215,10 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
         # Cached values used during the coasting phase (all stages separated, payload not yet released).
         # Use the payload's own area/Cd so the drag-to-mass ratio is physically correct once stages drop away.
-        self._coasting_area: float = getattr(self.payload, 'area', self.stages[-1].area) if self.payload else self.stages[-1].area
-        self._coasting_Cd: float = getattr(self.payload, 'Cd', self.Cd) if self.payload else self.Cd
+        self._coasting_area: float = (
+            getattr(self.payload, "area", self.stages[-1].area) if self.payload else self.stages[-1].area
+        )
+        self._coasting_Cd: float = getattr(self.payload, "Cd", self.Cd) if self.payload else self.Cd
         self._coasting_mass: float = self.payload.mass if self.payload else 0.0
 
     @property

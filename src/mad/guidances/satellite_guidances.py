@@ -88,19 +88,19 @@ class LEOInsertionGuidance(Guidance):
     def __init__(
         self,
         planet,
-        target_altitude_m: float,
+        perigee_altitude_m: float,
         apogee_altitude_m: float | None = None,
         target: MovableObj | None = None,
-        min_turn_altitude_m: float = 1_000.0,
+        min_turn_altitude_m: float = 0.0,
         turn_end_altitude_m: float | None = None,
         altitude_tol_m: float | None = None,
     ):
         super().__init__(planet, target=target)  # type: ignore[arg-type]  # target may be None
-        self.target_altitude_m = target_altitude_m
-        self.target_radius_m = planet.radius + target_altitude_m
+        self.perigee_altitude_m = perigee_altitude_m
+        self.perigee_radius_m = planet.radius + perigee_altitude_m
         self.min_turn_altitude_m = min_turn_altitude_m
-        self.turn_end_altitude_m = turn_end_altitude_m if turn_end_altitude_m is not None else 0.8 * target_altitude_m
-        self.altitude_tol_m = altitude_tol_m if altitude_tol_m is not None else 0.05 * target_altitude_m
+        self.turn_end_altitude_m = turn_end_altitude_m if turn_end_altitude_m is not None else 0.8 * perigee_altitude_m
+        self.altitude_tol_m = altitude_tol_m if altitude_tol_m is not None else 0.05 * perigee_altitude_m
         self.state = LEOInsertionState.VERTICAL_RISE
 
         # Target orbital speed at perigee.
@@ -108,10 +108,14 @@ class LEOInsertionGuidance(Guidance):
         # Elliptical:  v = √(μ · (2/r_p − 1/a)),  a = (r_p + r_a) / 2  [vis-viva]
         if apogee_altitude_m is not None:
             r_a = planet.radius + apogee_altitude_m
-            semi_major_axis = (self.target_radius_m + r_a) / 2.0
-            self._v_target = np.sqrt(planet.mu * (2.0 / self.target_radius_m - 1.0 / semi_major_axis))
+            semi_major_axis = (self.perigee_radius_m + r_a) / 2.0
+            self._v_target = np.sqrt(planet.mu * (2.0 / self.perigee_radius_m - 1.0 / semi_major_axis))
         else:
-            self._v_target = np.sqrt(planet.mu / self.target_radius_m)
+            self._v_target = np.sqrt(planet.mu / self.perigee_radius_m)
+
+        # Sign convention: +1 if local t_hat from local_frame is prograde, -1 if retrograde.
+        # Resolved once on the first _resolve_t_hat call when a target is set.
+        self._t_hat_sign: float | None = None
 
         # Cached prograde unit vector; only used when target is None.
         self._prograde_hat: NDArray | None = None
@@ -127,7 +131,11 @@ class LEOInsertionGuidance(Guidance):
         if self.target is not None:
             _, t_hat = self.local_frame(missile)
             if np.linalg.norm(t_hat) > 1e-8:
-                return t_hat
+                if self._t_hat_sign is None:
+                    rt_hat = self.target.normalize
+                    prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+                    self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
+                return self._t_hat_sign * t_hat
 
         # Fall back to prograde from velocity.
         v_horiz = missile.velocity - np.dot(missile.velocity, r_hat) * r_hat
@@ -163,9 +171,13 @@ class LEOInsertionGuidance(Guidance):
         # when the rocket is underpowered to reach the nominal target altitude.
         # NOTE: use has_thrust (stages list empty) rather than burned_fraction, which
         # is an imprecise formula that can return >= 1.0 a few seconds early.
+        # NOTE: 80 km is a rough "above the atmosphere" threshold (close to the US/NASA definition of space).
+        # By that altitude, any v_r ≤ 0 crossing is almost certainly a genuine apogee rather than
+        # a pitch-programme artefact — so it's safe to interpret it as "the rocket is underpowered and coasting back down"
+        # and release the payload at the best available point.
         if not missile.has_thrust:
             v_r = np.dot(missile.velocity, r_hat)
-            at_target_band = altitude >= self.target_altitude_m - self.altitude_tol_m
+            at_target_band = altitude >= self.perigee_altitude_m - self.altitude_tol_m
             at_apogee = v_r <= 0.0 and altitude > 80_000.0
             if at_target_band or at_apogee:
                 logger["Guidance"].info(
@@ -179,7 +191,7 @@ class LEOInsertionGuidance(Guidance):
                     release_velocity=missile.velocity.copy(),
                 )
 
-        if abs(altitude - self.target_altitude_m) <= self.altitude_tol_m:
+        if abs(altitude - self.perigee_altitude_m) <= self.altitude_tol_m:
             self.state = LEOInsertionState.ORBIT_INSERTION
 
             if v_horiz_mag >= 0.99 * self._v_target:
