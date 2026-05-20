@@ -42,6 +42,10 @@ class ReentryVehicle(Payload, GuidedObj):
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
+    def has_thrust(self) -> bool:
+        return self.RCS_thrust > 0
+
+    @property
     def thrust_acc(self) -> float:
         return self.RCS_thrust / self.mass
 
@@ -206,6 +210,9 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.last_payload_separation_time = 0.0
 
         self.initial_mass = deepcopy(self.mass)
+        # TODO: final_mass is used as the normalization bound for burned_fraction, which drives
+        # the steering law.  Using only the first payload's mass preserves the original calibration
+        # but is incorrect for heterogeneous or variable-count payload lists.
         self.final_mass = deepcopy(
             sum(stage.dry_mass for stage in self.stages) + (self.payloads[0].mass if self.payloads else 0.0)
         )

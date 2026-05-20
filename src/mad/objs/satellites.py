@@ -64,8 +64,17 @@ class Satellite(Payload):
 class Sputnik(Satellite):
     def update(self, dt: float) -> None:
         self.t += dt
-        # Sputniks beep from time to time.
-        if self.t // 60 == 0:
+        # Sputnik beep from time to time.
+        if self.t % 4000 < dt:
             logger["Satellite"].info(f"{self.name} -- Beep Beep!")
 
         return None
+
+
+@dataclass
+class SputnikConfig(SatelliteConfig):
+    name: str = "Sputnik"
+
+    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Sputnik":
+        logger["Satellite"].info("Sputnik released into orbit -- Beep Beep!")
+        return Sputnik(config=self, position=position, velocity=velocity, t=t)
