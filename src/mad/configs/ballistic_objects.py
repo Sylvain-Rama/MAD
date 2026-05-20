@@ -54,7 +54,7 @@ minuteman_stages = [
         "thrust": 930 * 1000,  # N
         "Isp": 270.0,
         "ref_radius": 0.75,  # m
-        "Cd": 1.08,  # smooth, long cylinder.
+        "Cd": 0.5,  # smooth, long cylinder.
         "name": "Stage1",
     },
     {
@@ -63,7 +63,7 @@ minuteman_stages = [
         "thrust": 267 * 1000,  # N
         "Isp": 290.0,
         "ref_radius": 0.46,  # m
-        "Cd": 1.08,  # smooth, long cylinder.
+        "Cd": 0.5,  # smooth, long cylinder.
         "name": "Stage2",
     },
     {
@@ -72,7 +72,34 @@ minuteman_stages = [
         "thrust": 152 * 1000,  # N
         "Isp": 300.0,
         "ref_radius": 0.46,  # m
-        "Cd": 1.08,  # smooth, long cylinder.
+        "Cd": 0.5,  # smooth, long cylinder.
         "name": "Stage3",
+    },
+]
+
+# For Sputnik rocket: https://en.wikipedia.org/wiki/Sputnik_(rocket)
+# Bloc_BVGD (4 strap-on boosters) and Bloc_A (core) fire simultaneously from T=0;
+# Bloc_BVGD separates first (~71 s), Bloc_A continues to orbital speed.
+sputnik_stages = [
+    {
+        "dry_mass": 3400.0,
+        "full_mass": 43_000.0,
+        "thrust": 4 * 520 * 1000,  # N
+        "Isp": 310.0,
+        "ref_radius": 3.6,  # m
+        "Cd": 0.5,  # Pointy end
+        "name": "Bloc_BVGD",
+        "parallel": False,  # First stage — ignites at T=0 by default.
+    },
+    {
+        "dry_mass": 7500.0,
+        "full_mass": 94_000.0,
+        "thrust": 970 * 1000,  # N
+        "Isp": 380.0,
+        "ref_radius": 1.5,  # m
+        "Cd": 0.5,  # Pointy end
+        "name": "Bloc_A",
+        "parallel": True,  # Core stage fires in parallel with Bloc_BVGD from T=0.
+        "separation_retrograde_dv": 75.0,  # m/s retrograde kick at separation to ensure reentry.
     },
 ]

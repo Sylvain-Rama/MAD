@@ -1,13 +1,14 @@
-"""Tests for mad.objs.missiles — MissileStageConfig, MissileStage, PayloadConfig,
-Payload, BallisticMissileConfig, and BallisticMissile."""
+"""Tests for mad.objs.missiles — MissileStageConfig, MissileStage, RVConfig,
+ReentryVehicle, BallisticMissileConfig, and BallisticMissile."""
 
 import numpy as np
 import pytest
 from mad.objs.missiles import (
     MissileStageConfig,
     MissileStage,
-    PayloadConfig,
-    Payload,
+    RVConfig,
+    RVConfig,
+    ReentryVehicle,
     BallisticMissileConfig,
     BallisticMissile,
 )
@@ -47,8 +48,8 @@ def stage(stage_cfg):
 
 
 @pytest.fixture
-def payload_cfg():
-    return PayloadConfig(**B53_warhead)
+def RV_cfg():
+    return RVConfig(**B53_warhead)
 
 
 @pytest.fixture
@@ -163,62 +164,65 @@ class TestMissileStage:
 
 
 # ---------------------------------------------------------------------------
-# PayloadConfig
+# RVConfig
 # ---------------------------------------------------------------------------
 
 
-class TestPayloadConfig:
-    def test_area_computed(self, payload_cfg):
-        assert payload_cfg.area == pytest.approx(np.pi * B53_warhead["ref_radius"] ** 2, rel=1e-9)
+class TestRVConfig:
+    def test_area_computed(self, RV_cfg):
+        assert RV_cfg.area == pytest.approx(np.pi * B53_warhead["ref_radius"] ** 2, rel=1e-9)
 
-    def test_defaults(self, payload_cfg):
-        assert payload_cfg.guidance is None
-        assert payload_cfg.RCS_thrust == pytest.approx(500.0)
+    def test_defaults(self, RV_cfg):
+        assert RV_cfg.guidance is None
+        assert RV_cfg.RCS_thrust == pytest.approx(500.0)
 
-    def test_yield(self, payload_cfg):
-        assert payload_cfg.yield_kt == pytest.approx(9_000.0)
+    def test_yield(self, RV_cfg):
+        assert RV_cfg.yield_kt == pytest.approx(9_000.0)
+
+    def test_alias(self, RV_cfg):
+        assert isinstance(RV_cfg, RVConfig)
 
 
 # ---------------------------------------------------------------------------
-# Payload
+# ReentryVehicle
 # ---------------------------------------------------------------------------
 
 
-class TestPayload:
-    def test_thrust_acc(self, payload_cfg, earth):
+class TestReentryVehicle:
+    def test_thrust_acc(self, RV_cfg, earth):
         r = earth.radius + 500_000.0
-        p = Payload(payload_cfg, position=[r, 0.0])
-        expected = payload_cfg.RCS_thrust / payload_cfg.mass
+        p = ReentryVehicle(RV_cfg, position=[r, 0.0])
+        expected = RV_cfg.RCS_thrust / RV_cfg.mass
         assert p.thrust_acc == pytest.approx(expected)
 
-    def test_burned_fraction_is_half(self, payload_cfg, earth):
+    def test_burned_fraction_is_half(self, RV_cfg, earth):
         r = earth.radius + 500_000.0
-        p = Payload(payload_cfg, position=[r, 0.0])
+        p = ReentryVehicle(RV_cfg, position=[r, 0.0])
         assert p.burned_fraction == pytest.approx(0.5)
 
-    def test_update_advances_time(self, payload_cfg, earth):
+    def test_update_advances_time(self, RV_cfg, earth):
         r = earth.radius + 500_000.0
-        p = Payload(payload_cfg, position=[r, 0.0], t=0.0)
+        p = ReentryVehicle(RV_cfg, position=[r, 0.0], t=0.0)
         p.update(5.0)
         assert p.t == pytest.approx(5.0)
 
-    def test_update_returns_none(self, payload_cfg, earth):
+    def test_update_returns_none(self, RV_cfg, earth):
         r = earth.radius + 500_000.0
-        p = Payload(payload_cfg, position=[r, 0.0])
+        p = ReentryVehicle(RV_cfg, position=[r, 0.0])
         assert p.update(1.0) is None
 
-    def test_accelerations_without_guidance(self, payload_cfg, earth):
+    def test_accelerations_without_guidance(self, RV_cfg, earth):
         """Without guidance the acceleration should be gravity + drag only."""
         r = earth.radius + 500_000.0
-        p = Payload(payload_cfg, position=[r, 0.0], velocity=[0.0, 0.0])
+        p = ReentryVehicle(RV_cfg, position=[r, 0.0], velocity=[0.0, 0.0])
         acc = p.accelerations(earth)
         gravity = earth.gravity(p)
         drag = earth.drag(p)
         np.testing.assert_allclose(acc, gravity + drag, rtol=1e-9)
 
-    def test_goes_inactive_below_surface(self, payload_cfg, earth):
+    def test_goes_inactive_below_surface(self, RV_cfg, earth):
         below = earth.radius - 1.0
-        p = Payload(payload_cfg, position=[below, 0.0])
+        p = ReentryVehicle(RV_cfg, position=[below, 0.0])
         acc = p.accelerations(earth)
         assert p.active is False
         np.testing.assert_array_equal(acc, [0.0, 0.0, 0.0])
