@@ -206,7 +206,9 @@ class BallisticMissile(BallisticObj, GuidedObj):
         self.last_payload_separation_time = 0.0
 
         self.initial_mass = deepcopy(self.mass)
-        self.final_mass = deepcopy(sum(stage.dry_mass for stage in self.stages))
+        self.final_mass = deepcopy(
+            sum(stage.dry_mass for stage in self.stages) + (self.payloads[0].mass if self.payloads else 0.0)
+        )
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
@@ -390,20 +392,8 @@ class BallisticMissile(BallisticObj, GuidedObj):
             return np.zeros_like(self.velocity)
 
         gravity = planet.gravity(self)
-        if self.stages:
-            drag = planet.drag(self)
-        elif self.payloads:
-            # Coasting phase: payload cluster is the aerodynamic body; compute drag with its mass.
-            coasting_mass = sum(p.mass for p in self.payloads)
-            alt = max(0.0, float(np.linalg.norm(self.position - planet.position)) - planet.radius)
-            rho = planet.rho0 * np.exp(-alt / planet.atmosphere_height) if alt > 0 else 0.0
-            v_mag = np.linalg.norm(self.velocity)
-            if rho > 0 and v_mag > 0:
-                drag = -0.5 * rho * self.Cd * self.area * v_mag * self.velocity / coasting_mass
-            else:
-                drag = np.zeros_like(self.velocity)
-        else:
-            drag = np.zeros_like(self.velocity)
+
+        drag = planet.drag(self) if self.stages else np.zeros_like(self.velocity)  # No drag if all stages separated and payloads not yet released.
 
         # If there is no thrust, no need to check for direction: we cannot act on it.
         if self.thrust_acc > 0:
