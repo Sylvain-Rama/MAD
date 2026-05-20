@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
@@ -40,6 +40,10 @@ class ReentryVehicle(Payload, GuidedObj):
         self.guidance = config.guidance
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
+
+    @property
+    def has_thrust(self) -> bool:
+        return self.RCS_thrust > 0
 
     @property
     def thrust_acc(self) -> float:
@@ -179,13 +183,15 @@ class MissileStage:
 class BallisticMissileConfig:
     stages: list[MissileStage]
     guidance: "Guidance | None" = None
-    payload: ReleasableConfig | None = None
-    n_payloads: int = 1  # Number of reentry vehicles, used for terminal guidance.
+    payloads: list[ReleasableConfig] = field(default_factory=list)
     payload_separation_interval: float = 2.0  # Time between payload separations, in seconds.
 
     @property
     def to_dict(self):
         return asdict(self)
+    
+    def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "BallisticMissile":
+        return BallisticMissile(position=position, cfg=self, velocity=velocity, t=t)
 
 
 class BallisticMissile(BallisticObj, GuidedObj):
@@ -196,35 +202,34 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
         self.stages = cfg.stages
         self.guidance = cfg.guidance
-        self.payload = cfg.payload
+        self.payloads: list[ReleasableConfig] = list(cfg.payloads)  # mutable copy; entries popped on release
         self.t = t
-        self.n_payloads = cfg.n_payloads
+        self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction
         self.released_payloads = 0
         self.payload_separation_interval = cfg.payload_separation_interval
         self.last_payload_separation_time = 0.0
 
         self.initial_mass = deepcopy(self.mass)
+        # TODO: final_mass is used as the normalization bound for burned_fraction, which drives
+        # the steering law.  Using only the first payload's mass preserves the original calibration
+        # but is incorrect for heterogeneous or variable-count payload lists.
         self.final_mass = deepcopy(
-            sum(stage.dry_mass for stage in self.stages) + (self.payload.mass if self.payload else 0.0)
+            sum(stage.dry_mass for stage in self.stages) + (self.payloads[0].mass if self.payloads else 0.0)
         )
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
 
-        # Cached values used during the coasting phase (all stages separated, payload not yet released).
-        # Use the payload's own area/Cd so the drag-to-mass ratio is physically correct once stages drop away.
+        # Cached area/Cd for the coasting phase (all stages separated, payloads not yet released).
+        # Use the first payload's properties so the drag-to-mass ratio is physically correct.
         self._coasting_area: float = (
-            getattr(self.payload, "area", self.stages[-1].area) if self.payload else self.stages[-1].area
+            getattr(self.payloads[0], "area", self.stages[-1].area) if self.payloads else self.stages[-1].area
         )
-        self._coasting_Cd: float = getattr(self.payload, "Cd", self.Cd) if self.payload else self.Cd
-        self._coasting_mass: float = self.payload.mass if self.payload else 0.0
+        self._coasting_Cd: float = getattr(self.payloads[0], "Cd", self.Cd) if self.payloads else self.Cd
 
     @property
     def mass(self):
-        # We ignore the payload mass until the end, when it is released.
-        # Allows to not worry about the transition from missile to payload.
-        if self.stages:
-            return sum(stage.mass for stage in self.stages)
-        return self._coasting_mass
+        # Payload masses are excluded: they only exist once released as independent objects.
+        return sum(stage.mass for stage in self.stages)
 
     @property
     def area(self):
@@ -272,7 +277,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
             f"Stages: {", ".join([x.name for x in self.stages])}.\n"
             f"Available deltaV: {self.deltav:.2f} m/s.\n"
             f"Guidance: {self.guidance.__class__.__name__ if self.guidance else 'None'}.\n"
-            f"Payloads: {self.payload.name if self.payload else 'None'}.\n"
+            f"Payloads: {', '.join(p.name for p in self.payloads) if self.payloads else 'None'}.\n"
         )
 
     @property
@@ -316,9 +321,10 @@ class BallisticMissile(BallisticObj, GuidedObj):
             if (
                 self.guidance_results.state == "release_payload"
                 and self.t - self.last_payload_separation_time > self.payload_separation_interval
-                and self.payload
+                and self.payloads
             ):
-                payload_name = f"{self.payload.name}_{self.released_payloads + 1}"
+                next_cfg = self.payloads.pop(0)
+                payload_name = f"{next_cfg.name}_{self.released_payloads + 1}"
 
                 release_velocity = (
                     self.guidance_results.release_velocity
@@ -326,7 +332,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
                     else self.velocity.copy()
                 )
 
-                payload = self.payload.create(
+                payload = next_cfg.create(
                     position=self.position.copy(),
                     velocity=release_velocity,
                     t=deepcopy(self.t),
@@ -343,7 +349,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
                     stage.thrust = 0.0
                     stage.mass_flow_rate = 0.0
 
-        if self.released_payloads >= self.n_payloads:
+        if self.n_payloads > 0 and self.released_payloads >= self.n_payloads:
             for stage in self.stages:
                 stage.active = False
             if not self.stages:
@@ -373,7 +379,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
         if depleted:
             if len(self.stages) == 0:
-                if self.released_payloads >= self.n_payloads or self.payload is None:
+                if not self.payloads:
                     self.active = False
                     logger["Missile"].info(f"{self.name} inactivated at {self.t:.2f}.")
                 else:
@@ -393,7 +399,8 @@ class BallisticMissile(BallisticObj, GuidedObj):
             return np.zeros_like(self.velocity)
 
         gravity = planet.gravity(self)
-        drag = planet.drag(self)
+
+        drag = planet.drag(self) if self.stages else np.zeros_like(self.velocity)  # No drag if all stages separated and payloads not yet released.
 
         # If there is no thrust, no need to check for direction: we cannot act on it.
         if self.thrust_acc > 0:
