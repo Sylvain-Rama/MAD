@@ -87,13 +87,13 @@ class ReentryVehicle(Payload, GuidedObj):
 class MissileStageConfig:
     thrust: float  # N = kg * m / s^2
     ref_radius: float  # m
-    Cd: float = 1.08  # smooth, long cylinder.
+    Cd: float = 0.5  # Pointy end.
     name: str = "MissileStage"
     dry_mass: float | None = None  # kg
     propellant_mass: float | None = None  # kg
     full_mass: float | None = None  # kg
     Isp: float | None = None  # s
-    burn_time: float | None = None  # s, optional for now, can be computed from mass and thrust if not provided.
+    burn_time: float | None = None  # s, optional for now, used to calculate Isp if needed.
     parallel: bool = False  # If True, this stage ignites simultaneously with the stage before it.
     separation_retrograde_dv: float = 0.0  # m/s retrograde delta-v applied to the stage hull at separation.
 
@@ -162,9 +162,6 @@ class MissileStage:
         return self.thrust if self.propellant_mass > 0 else 0.0
 
     def update(self, dt: float) -> None:
-
-        # TODO: Ability to keep the last stage active even if propellant is depleted,
-        # to allow for coasting phases between stage separations and more flexible guidance.
 
         self.t += dt
         if not self.active:
