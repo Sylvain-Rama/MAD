@@ -390,8 +390,20 @@ class BallisticMissile(BallisticObj, GuidedObj):
             return np.zeros_like(self.velocity)
 
         gravity = planet.gravity(self)
-        # During coasting (no stages), mass is zero so drag is skipped to avoid division by zero.
-        drag = planet.drag(self) if self.mass > 0 else np.zeros_like(self.velocity)
+        if self.stages:
+            drag = planet.drag(self)
+        elif self.payloads:
+            # Coasting phase: payload cluster is the aerodynamic body; compute drag with its mass.
+            coasting_mass = sum(p.mass for p in self.payloads)
+            alt = max(0.0, float(np.linalg.norm(self.position - planet.position)) - planet.radius)
+            rho = planet.rho0 * np.exp(-alt / planet.atmosphere_height) if alt > 0 else 0.0
+            v_mag = np.linalg.norm(self.velocity)
+            if rho > 0 and v_mag > 0:
+                drag = -0.5 * rho * self.Cd * self.area * v_mag * self.velocity / coasting_mass
+            else:
+                drag = np.zeros_like(self.velocity)
+        else:
+            drag = np.zeros_like(self.velocity)
 
         # If there is no thrust, no need to check for direction: we cannot act on it.
         if self.thrust_acc > 0:
