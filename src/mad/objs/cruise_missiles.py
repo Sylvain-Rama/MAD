@@ -1,12 +1,10 @@
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
-from mad.objs.projectiles import ProjectileConfig, Projectile
+from mad.objs.base import BallisticObj, GuidedObj
 from mad.objs.planets import Planet
 from mad.logger import SourceLogger
-from mad.configs.physics import G0
 
 
 
@@ -18,14 +16,66 @@ logger = SourceLogger()
 
 @dataclass
 class CruiseMissileConfig:
-    mass: float  # kg
-    ref_radius: float  # m
+    mass: float           # kg
+    ref_radius: float     # m
     Cd: float
+    thrust_acc: float = 50.0     # m/s² — acceleration to reach cruise speed quickly
     name: str = "CruiseMissile"
     guidance: "Guidance | None" = None
-    
+
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
     def create(self, position: NDArray, velocity: NDArray, t: float) -> "CruiseMissile":
         return CruiseMissile(config=self, position=position, velocity=velocity, t=t)
+
+
+class CruiseMissile(BallisticObj, GuidedObj):
+    def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray, t: float):
+        BallisticObj.__init__(self, position=position, velocity=velocity, name=config.name,
+                              mass=config.mass, area=config.area, Cd=config.Cd)
+        self.config = config
+        self.guidance = config.guidance
+        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
+        self.t = t
+
+    @property
+    def burned_fraction(self) -> float:
+        return 1.0
+
+    @property
+    def has_thrust(self) -> bool:
+        return True
+
+    @property
+    def thrust_acc(self) -> float:
+        return self.config.thrust_acc
+
+    def update(self, dt: float) -> None:
+        self.t += dt
+        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
+        return None
+
+    def accelerations(self, planet: Planet) -> NDArray:
+        if self.distance(planet) <= planet.radius:
+            logger["Missile"].info(f"{self.name} hit the ground.")
+            self.active = False
+            return np.zeros_like(self.velocity)
+
+        gravity = planet.gravity(self)
+        drag = planet.drag(self)
+
+        thrust = np.zeros_like(self.velocity)
+        if self.guidance_results is not None:
+            d = self.guidance_results.direction
+            d_norm = np.linalg.norm(d)
+            if d_norm > 1e-8:
+                desired_acc = self.guidance_results.magnitude
+                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
+                thrust = acc * (d / d_norm)
+
+        return gravity + drag + thrust
+    
+
+
+
