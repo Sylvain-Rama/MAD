@@ -1,8 +1,5 @@
 import numpy as np
 from numpy.typing import NDArray
-import matplotlib.pyplot as plt
-import matplotlib.figure
-import matplotlib.patches
 from mad.objs.base import MovableObj, BallisticObj
 from mad.configs.physics import G
 from dataclasses import dataclass, asdict
@@ -102,7 +99,8 @@ class Planet(MovableObj):
         return MovableObj(position=(self.radius + altitude) * v, name=name)
 
     def point_at_distance(self, obj: MovableObj, distance_km: float, name="RangedObj", dims: int = 2) -> MovableObj:
-        # Create a new random object at set distance from another point on the planet.2D mode for easy plot.
+        # Create a new random object at set distance from another point on the planet. 
+        # 2D or 3D mode.
 
         u = obj.normalize[:dims]
         sigma = (distance_km * 1000) / self.radius
@@ -116,52 +114,4 @@ class Planet(MovableObj):
 
         return MovableObj(position=self.radius * point, name=name)
 
-    def plot_2D_with_points(
-        self, points: list[MovableObj] | None, ax=None, display="planet"
-    ) -> matplotlib.figure.Figure | None:
-        # 2D plot of the planet. If using point in 2D, they will appear at the circumference.
-        plot_fig = False
-        if ax is None:
-            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(4, 4))
-            plot_fig = True
-
-        if display == "arc" and points is not None and len(points) == 2:
-
-            theta1 = np.degrees(
-                np.arctan2(points[0].position[1] - self.position[1], points[0].position[0] - self.position[0])
-            )
-            theta2 = np.degrees(
-                np.arctan2(points[1].position[1] - self.position[1], points[1].position[0] - self.position[0])
-            )
-            planet_body = matplotlib.patches.Arc(
-                (float(self.position[0]), float(self.position[1])),
-                2 * self.radius,
-                2 * self.radius,
-                angle=0,
-                theta1=min(theta1, theta2),
-                theta2=max(theta1, theta2),
-                ec="black",
-                label=self.name,
-                ls="--",
-            )
-            ax.add_patch(planet_body)
-        elif display == "planet":
-            planet_body = matplotlib.patches.Circle(
-                (float(self.position[0]), float(self.position[1])),
-                radius=self.radius,
-                ec="black",
-                fill=False,
-                label=self.name,
-                ls="--",
-            )
-            ax.add_patch(planet_body)
-
-        if points is not None:
-            for point in points:
-                ax.scatter(x=point.position[0], y=point.position[1], s=50, label=point.name)
-
-        ax.set_aspect("equal")
-        ax.legend()
-        ax.grid()
-
-        return fig if plot_fig else None  # type: ignore
+    
