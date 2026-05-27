@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from mad.objs.base import Payload
 from mad.objs.projectiles import ProjectileConfig
 from mad.guidances import Guidance
-from mad.logger import SourceLogger
+from mad.utils.logger import SourceLogger
 import numpy as np
 from numpy.typing import NDArray
 

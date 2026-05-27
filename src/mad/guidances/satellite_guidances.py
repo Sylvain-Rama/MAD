@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 from mad.objs.base import MovableObj
 from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults
-from mad.logger import SourceLogger
+from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
 

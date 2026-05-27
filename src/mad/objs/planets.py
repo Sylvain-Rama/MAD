@@ -91,22 +91,24 @@ class Planet(MovableObj):
 
         return self.radius * angle
 
-    def create_2D_point(self, altitude: float = 10, name="SurfaceObj") -> MovableObj:
-        # Create a random object at the 2D surface (+ altitude) of the planet.
+    def random_point_at_surface(self, altitude: float = 10, name: str = "SurfaceObj", dims: int = 2) -> MovableObj:
+        # Create a random object at the 2D or 3D surface (+ altitude) of the planet.
 
-        v = np.random.normal(size=2)
+        if not 0 < dims < 4:
+            raise ValueError("Dimensiosn for the point definition must be between 1 and 3")
+        v = np.random.normal(size=dims)
         v /= np.linalg.norm(v)
 
         return MovableObj(position=(self.radius + altitude) * v, name=name)
 
-    def create_2D_point_at_distance(self, obj: MovableObj, distance_km: float, name="RangedObj") -> MovableObj:
+    def point_at_distance(self, obj: MovableObj, distance_km: float, name="RangedObj", dims: int = 2) -> MovableObj:
         # Create a new random object at set distance from another point on the planet.2D mode for easy plot.
 
-        u = obj.normalize[:2]
+        u = obj.normalize[:dims]
         sigma = (distance_km * 1000) / self.radius
 
         # random orthogonal direction
-        v = np.random.normal(size=2)
+        v = np.random.normal(size=dims)
         v -= np.dot(v, u) * u
         v /= np.linalg.norm(v)
 
