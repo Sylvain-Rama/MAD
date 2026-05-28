@@ -8,7 +8,7 @@ from mad.objs.planets import Planet
 
 
 def plot_2D_planet_with_points(
-    self, planet: Planet, points: list[MovableObj] | None = None, ax=None, display="planet"
+    planet: Planet, points: list[MovableObj] | None = None, ax=None, display="planet"
 ) -> matplotlib.figure.Figure | None:
     # 2D plot of the planet. If using point in 2D, they will appear at the circumference.
     plot_fig = False
