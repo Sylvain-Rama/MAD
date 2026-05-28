@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
-from mad.logger import SourceLogger
+from mad.utils.logger import SourceLogger
 from mad.configs.physics import G0
 
 from copy import deepcopy
@@ -189,7 +189,7 @@ class BallisticMissileConfig:
     @property
     def to_dict(self):
         return asdict(self)
-    
+
     def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "BallisticMissile":
         return BallisticMissile(position=position, cfg=self, velocity=velocity, t=t)
 
@@ -400,7 +400,9 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
         gravity = planet.gravity(self)
 
-        drag = planet.drag(self) if self.stages else np.zeros_like(self.velocity)  # No drag if all stages separated and payloads not yet released.
+        drag = (
+            planet.drag(self) if self.stages else np.zeros_like(self.velocity)
+        )  # No drag if all stages separated and payloads not yet released.
 
         # If there is no thrust, no need to check for direction: we cannot act on it.
         if self.thrust_acc > 0:

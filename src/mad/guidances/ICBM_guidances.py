@@ -4,8 +4,8 @@ from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults
 
 import numpy as np
 
-from mad.logger import SourceLogger
-from mad.utils import load_ballistic_table
+from mad.utils.logger import SourceLogger
+from mad.utils.ballistic_tables import load_ballistic_table
 
 logger = SourceLogger()
 

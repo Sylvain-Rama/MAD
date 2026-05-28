@@ -189,31 +189,31 @@ class TestSurfaceDistance:
         assert earth.surface_distance(p1, p2) == pytest.approx(expected, rel=1e-6)
 
     def test_distance_symmetric(self, earth):
-        p1 = earth.create_2D_point()
-        p2 = earth.create_2D_point_at_distance(p1, 1000.0)
+        p1 = earth.random_point_at_surface()
+        p2 = earth.point_at_distance(p1, 1000.0)
         assert earth.surface_distance(p1, p2) == pytest.approx(earth.surface_distance(p2, p1), rel=1e-9)
 
 
 # ---------------------------------------------------------------------------
-# create_2D_point / create_2D_point_at_distance
+# point_at_distance()
 # ---------------------------------------------------------------------------
 
 
 class TestPointCreation:
     def test_2d_point_at_surface(self, earth):
-        p = earth.create_2D_point(altitude=0)
+        p = earth.random_point_at_surface(altitude=0)
         r = np.linalg.norm(p.position)
         assert r == pytest.approx(earth.radius, rel=1e-9)
 
     def test_2d_point_at_altitude(self, earth):
         alt = 500.0
-        p = earth.create_2D_point(altitude=alt)
+        p = earth.random_point_at_surface(altitude=alt)
         r = np.linalg.norm(p.position)
         assert r == pytest.approx(earth.radius + alt, rel=1e-9)
 
     def test_2d_point_at_distance_km(self, earth):
-        p1 = earth.create_2D_point(altitude=0)
+        p1 = earth.random_point_at_surface(altitude=0)
         distance_km = 1000.0
-        p2 = earth.create_2D_point_at_distance(p1, distance_km=distance_km)
+        p2 = earth.point_at_distance(p1, distance_km=distance_km)
         actual_km = earth.surface_distance(p1, p2) / 1000.0
         assert actual_km == pytest.approx(distance_km, rel=1e-6)
