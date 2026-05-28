@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
-from mad.logger import SourceLogger
+from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
 

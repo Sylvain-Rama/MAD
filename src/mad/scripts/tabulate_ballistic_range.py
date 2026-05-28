@@ -26,8 +26,8 @@ from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets import EARTH_SETTINGS
 from mad.configs.warheads import B53_warhead, rod_of_god
 from mad.simulation import run_simple_simulation
-from mad.logger import SourceLogger, configure_logger
-from mad.utils import BALLISTIC_FIELD_NAMES
+from mad.utils.logger import SourceLogger, configure_logger
+from mad.utils.ballistic_tables import BALLISTIC_FIELD_NAMES
 
 configure_logger(active_sources=["I/O"])
 logger = SourceLogger()

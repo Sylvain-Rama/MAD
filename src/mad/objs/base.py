@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
-from mad.utils import to_vec3
+from mad.utils.base_utils import to_vec3
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet

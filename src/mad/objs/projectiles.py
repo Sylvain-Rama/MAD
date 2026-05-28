@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import BallisticObj
-from mad.logger import SourceLogger
+from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
 

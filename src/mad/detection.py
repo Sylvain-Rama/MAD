@@ -1,7 +1,7 @@
 from mad.objs.base import MovableObj
 import numpy as np
 from collections import defaultdict
-from mad.logger import SourceLogger
+from mad.utils.logger import SourceLogger
 from mad.configs.physics import VOXEL_SIZE
 
 logger = SourceLogger()
