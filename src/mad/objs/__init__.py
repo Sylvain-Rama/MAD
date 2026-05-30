@@ -11,6 +11,7 @@ from mad.objs.missiles import (
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.radars import Radar, RadarConfig
 from mad.objs.satellites import Satellite, Sputnik, SatelliteConfig, SputnikConfig
+from mad.objs.cruise_missiles import CruiseMissile, CruiseMissileConfig
 
 __all__ = [
     "Planet",
@@ -35,4 +36,6 @@ __all__ = [
     "Satellite",
     "SputnikConfig",
     "SatelliteConfig",
+    "CruiseMissile",
+    "CruiseMissileConfig",
 ]

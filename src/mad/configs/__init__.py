@@ -2,6 +2,7 @@ from mad.configs.ballistic_objects import titan1_stages, titan2_stages, minutema
 from mad.configs.planets import EARTH_SETTINGS
 from mad.configs.satellites import sputnik
 from mad.configs.warheads import B53_warhead, rod_of_god
+from mad.configs.cruise_missiles import tomahawk, tomahawk_guidance
 
 __all__ = [
     "titan1_stages",
@@ -12,4 +13,6 @@ __all__ = [
     "sputnik",
     "B53_warhead",
     "rod_of_god",
+    "tomahawk",
+    "tomahawk_guidance",
 ]

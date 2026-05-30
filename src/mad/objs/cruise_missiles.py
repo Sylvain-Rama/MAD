@@ -24,12 +24,12 @@ class CruiseMissileConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> "CruiseMissile":
+    def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "CruiseMissile":
         return CruiseMissile(config=self, position=position, velocity=velocity, t=t)
 
 
 class CruiseMissile(BallisticObj, GuidedObj):
-    def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray, t: float):
+    def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
         BallisticObj.__init__(
             self,
             position=position,
