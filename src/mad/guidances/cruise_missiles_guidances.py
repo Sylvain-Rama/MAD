@@ -163,7 +163,7 @@ class CruiseWaypointGuidance(Guidance):
         # lookahead direction instead of self.target.
         r_hat, _ = self.local_frame(missile)
         lookahead_hat = lookahead_pt / np.linalg.norm(lookahead_pt)
-        t_hat = np.cross(np.cross(lookahead_hat, r_hat), r_hat)
+        t_hat = np.cross(np.cross(r_hat, lookahead_hat), r_hat)
         t_norm = np.linalg.norm(t_hat)
         if t_norm > 1e-8:
             t_hat /= t_norm
