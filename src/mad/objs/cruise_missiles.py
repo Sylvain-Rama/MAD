@@ -4,9 +4,7 @@ from numpy.typing import NDArray
 from typing import TYPE_CHECKING
 from mad.objs.base import BallisticObj, GuidedObj
 from mad.objs.planets import Planet
-from mad.logger import SourceLogger
-
-
+from mad.utils.logger import SourceLogger
 
 if TYPE_CHECKING:
     from mad.guidances import Guidance
@@ -16,10 +14,10 @@ logger = SourceLogger()
 
 @dataclass
 class CruiseMissileConfig:
-    mass: float           # kg
-    ref_radius: float     # m
+    mass: float  # kg
+    ref_radius: float  # m
     Cd: float
-    thrust_acc: float = 50.0     # m/s² — acceleration to reach cruise speed quickly
+    thrust_acc: float = 50.0  # m/s² — acceleration to reach cruise speed quickly
     name: str = "CruiseMissile"
     guidance: "Guidance | None" = None
 
@@ -32,8 +30,15 @@ class CruiseMissileConfig:
 
 class CruiseMissile(BallisticObj, GuidedObj):
     def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray, t: float):
-        BallisticObj.__init__(self, position=position, velocity=velocity, name=config.name,
-                              mass=config.mass, area=config.area, Cd=config.Cd)
+        BallisticObj.__init__(
+            self,
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=config.mass,
+            area=config.area,
+            Cd=config.Cd,
+        )
         self.config = config
         self.guidance = config.guidance
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
@@ -75,7 +80,3 @@ class CruiseMissile(BallisticObj, GuidedObj):
                 thrust = acc * (d / d_norm)
 
         return gravity + drag + thrust
-    
-
-
-

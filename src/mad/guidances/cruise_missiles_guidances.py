@@ -6,8 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.interpolate import CubicSpline
 
-from mad.logger import SourceLogger
-
+from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
 
@@ -18,10 +17,6 @@ class CruiseGuidanceConfig:
     cruise_altitude_m: float
     max_range_m: float
     waypoints: list[MovableObj]
-
-
-def define_trajectory(points: list[MovableObj], dt: float = 1.0):
-    pass
 
 
 class CruiseWaypointGuidance(Guidance):
@@ -58,13 +53,10 @@ class CruiseWaypointGuidance(Guidance):
 
         self._build_spline()
 
-
     def _build_spline(self) -> None:
         """Fit a cubic spline through waypoints projected to cruise altitude."""
         alt = self.cfg.cruise_altitude_m
-        pts = np.array(
-            [(self.planet.radius + alt) * wp.normalize for wp in self.cfg.waypoints]
-        )  # (N, 3)
+        pts = np.array([(self.planet.radius + alt) * wp.normalize for wp in self.cfg.waypoints])  # (N, 3)
 
         # Arc-length parameterisation
         diffs = np.diff(pts, axis=0)
@@ -85,12 +77,13 @@ class CruiseWaypointGuidance(Guidance):
         """Evaluate the spline at arc-length parameter s (clamped to valid range)."""
         assert self._spline_x is not None and self._spline_y is not None and self._spline_z is not None
         s = float(np.clip(s, 0.0, self._total_arc))
-        return np.array([
-            float(self._spline_x(s)),
-            float(self._spline_y(s)),
-            float(self._spline_z(s)),
-        ])
-
+        return np.array(
+            [
+                float(self._spline_x(s)),
+                float(self._spline_y(s)),
+                float(self._spline_z(s)),
+            ]
+        )
 
     def _advance_progress(self, missile: GuidableObj) -> None:
         """Move _progress_s to the nearest spline point within a forward search window.
@@ -104,14 +97,15 @@ class CruiseWaypointGuidance(Guidance):
         s_end = min(s_start + search_window, self._total_arc)
 
         candidates = np.linspace(s_start, s_end, 100)
-        pts = np.column_stack([
-            self._spline_x(candidates),
-            self._spline_y(candidates),
-            self._spline_z(candidates),
-        ])
+        pts = np.column_stack(
+            [
+                self._spline_x(candidates),
+                self._spline_y(candidates),
+                self._spline_z(candidates),
+            ]
+        )
         dists = np.linalg.norm(pts - missile.position, axis=1)
         self._progress_s = float(candidates[int(np.argmin(dists))])
-
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Terminal condition: missile is within 500 m of the target.
@@ -119,9 +113,7 @@ class CruiseWaypointGuidance(Guidance):
         if dist_to_target < 500.0:
             if self.state != "terminal":
                 self.state = "terminal"
-                logger["Guidance"].info(
-                    f"{missile.name} reached terminal range ({dist_to_target:.0f} m from target)."
-                )
+                logger["Guidance"].info(f"{missile.name} reached terminal range ({dist_to_target:.0f} m from target).")
             return GuidanceResults(direction=np.zeros(3), state=self.state)
 
         # Update progress along the spline.
@@ -159,4 +151,3 @@ class CruiseWaypointGuidance(Guidance):
         magnitude: float | None = None if speed < self.cfg.max_speed_m_s else 0.0
 
         return GuidanceResults(direction=direction, state=self.state, magnitude=magnitude)
-
