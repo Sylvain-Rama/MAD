@@ -13,18 +13,13 @@ logger = SourceLogger()
 
 @dataclass
 class CruiseGuidanceConfig:
-    max_speed_m_s: float
-    cruise_altitude_m: float
-    max_range_m: float
     waypoints: list[MovableObj]
-    thrust_acc: float = 30.0  # m/s²; used to compute gravity-compensating radial component
 
 
 class CruiseWaypointGuidance(Guidance):
     """Waypoint guidance for cruise missiles using a cubic spline trajectory.
 
-    A cubic spline is fitted through all waypoints (each projected radially to
-    ``cruise_altitude_m``).  The first waypoint is the launch site; the last is
+    A cubic spline is fitted through all waypoints.  The first waypoint is the launch site; the last is
     the final target.  Between waypoints the missile stays near cruise altitude
     and does not exceed ``max_speed_m_s``.
 
@@ -38,9 +33,8 @@ class CruiseWaypointGuidance(Guidance):
     # Lookahead distance along the spline (m).  Can be tuned per scenario.
     _LOOKAHEAD_M: float = 50_000.0
 
-    def __init__(self, planet, target: MovableObj, config: CruiseGuidanceConfig):
+    def __init__(self, planet, target: MovableObj, waypoints: list[MovableObj]):
         super().__init__(planet, target)
-        self.cfg = config
 
         # Per-axis cubic splines and arc-length knot vector, built in _build_spline.
         self._spline_x: CubicSpline | None = None
@@ -51,6 +45,7 @@ class CruiseWaypointGuidance(Guidance):
 
         # Monotonically non-decreasing progress along the spline (arc-length, m).
         self._progress_s: float = 0.0
+        self.waypoints = waypoints
 
         self._build_spline()
 
@@ -65,9 +60,9 @@ class CruiseWaypointGuidance(Guidance):
         chord is at most ``_DENSIFY_STEP_M`` of arc, keeping the spline near the
         sphere surface at ``cruise_altitude_m``.
         """
-        alt = self.cfg.cruise_altitude_m
-        r = self.planet.radius + alt
-        normals = [wp.normalize for wp in self.cfg.waypoints]
+
+        r = self.planet.radius
+        normals = [wp.normalize for wp in self.waypoints]
 
         # Densify each segment with SLERP-interpolated points at cruise altitude.
         dense_pts: list[NDArray] = []
@@ -102,7 +97,7 @@ class CruiseWaypointGuidance(Guidance):
         self._spline_z = CubicSpline(s, pts[:, 2])
 
         logger["Guidance"].info(
-            f"CruiseWaypointGuidance: spline built over {len(self.cfg.waypoints)} waypoints "
+            f"CruiseWaypointGuidance: spline built over {len(self.waypoints)} waypoints "
             f"({len(pts)} dense points), total arc length {self._total_arc / 1000:.1f} km."
         )
 
@@ -141,9 +136,9 @@ class CruiseWaypointGuidance(Guidance):
         self._progress_s = float(candidates[int(np.argmin(dists))])
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        # Terminal condition: missile is within 500 m of the target.
+        # Terminal condition: missile is within 100 m of the target.
         dist_to_target = np.linalg.norm(missile.position - self.target.position)
-        if dist_to_target < 500.0:
+        if dist_to_target < 100.0:
             if self.state != "terminal":
                 self.state = "terminal"
                 logger["Guidance"].info(f"{missile.name} reached terminal range ({dist_to_target:.0f} m from target).")
@@ -157,10 +152,7 @@ class CruiseWaypointGuidance(Guidance):
         s_lookahead = min(self._progress_s + self._LOOKAHEAD_M, self._total_arc)
         lookahead_pt = self._eval_spline(s_lookahead)
 
-        # Local frame: r_hat is the outward radial unit vector.
-        # t_hat is the tangential unit vector on the sphere surface pointing toward the
-        # lookahead point — same double-cross logic as local_frame but using the
-        # lookahead direction instead of self.target.
+        # Tangential unit vector on the sphere surface pointing toward the lookahead point.
         r_hat, _ = self.local_frame(missile)
         lookahead_hat = lookahead_pt / np.linalg.norm(lookahead_pt)
         t_hat = np.cross(np.cross(r_hat, lookahead_hat), r_hat)
@@ -170,37 +162,4 @@ class CruiseWaypointGuidance(Guidance):
         else:
             t_hat = np.zeros(3)
 
-        # Radial component: base fraction to counteract gravity (level flight) plus
-        # a proportional altitude-error correction.
-        current_alt = np.linalg.norm(missile.position) - self.planet.radius
-        g = self.planet.mu / np.linalg.norm(missile.position) ** 2
-        # Exact tangent of the thrust angle that balances gravity at full thrust_acc.
-        base_radial = g / np.sqrt(max(self.cfg.thrust_acc**2 - g**2, 1e-6))
-        # Altitude PD controller: blend of gravity compensation and error correction.
-        # alt_frac < base_radial lets gravity pull the missile down gently (no active diving).
-        # alt_frac > base_radial climbs toward cruise altitude.
-        alt_error = self.cfg.cruise_altitude_m - current_alt
-        v_radial = float(np.dot(missile.velocity, r_hat))
-        Kp = 1.0 / max(self.cfg.cruise_altitude_m * 5.0, 1.0)  # proportional gain [1/m]
-        Kd = 0.01  # small derivative: gentle damping, avoids over-correction
-        correction = Kp * alt_error - Kd * v_radial
-        # clip: no active downward thrust (alt_frac >= 0), don't exceed 1.
-        alt_frac = np.clip(base_radial + correction, 0.0, 1.0)
-
-        # Blend: tangential component (toward lookahead on sphere) + radial altitude correction.
-        raw = t_hat + alt_frac * r_hat
-        raw_norm = np.linalg.norm(raw)
-        if raw_norm < 1e-8:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
-        direction = raw / raw_norm
-
-        # Speed limiter: when max speed is exceeded, only apply radial thrust to
-        # balance gravity (hover at current altitude) without accelerating further.
-        speed = float(np.linalg.norm(missile.velocity))
-        magnitude: float | None = None
-        if speed >= self.cfg.max_speed_m_s:
-            direction = r_hat
-            g_mag = self.planet.mu / np.linalg.norm(missile.position) ** 2
-            magnitude = float(g_mag)  # just enough to balance gravity
-
-        return GuidanceResults(direction=direction, state=self.state, magnitude=magnitude)
+        return GuidanceResults(direction=t_hat, state=self.state)
