@@ -10,4 +10,5 @@ tomahawk_guidance = {
     "max_speed_m_s": 900 * 1000 / 3600,  # 600 - 900 km/h
     "max_range_m": 1_600 * 1000,  # 1600 km
     "cruise_altitude_m": 50.0,
+    "thrust_acc": 30.0,  # must match CruiseMissileConfig.thrust_acc
 }

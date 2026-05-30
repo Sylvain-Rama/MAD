@@ -17,6 +17,7 @@ class CruiseGuidanceConfig:
     cruise_altitude_m: float
     max_range_m: float
     waypoints: list[MovableObj]
+    thrust_acc: float = 30.0  # m/s²; used to compute gravity-compensating radial component
 
 
 class CruiseWaypointGuidance(Guidance):
@@ -53,10 +54,42 @@ class CruiseWaypointGuidance(Guidance):
 
         self._build_spline()
 
+    # Spacing between densification points along great-circle arcs (m).
+    _DENSIFY_STEP_M: float = 200_000.0
+
     def _build_spline(self) -> None:
-        """Fit a cubic spline through waypoints projected to cruise altitude."""
+        """Fit a cubic spline through waypoints densified along great-circle arcs.
+
+        A plain Cartesian spline through sparse waypoints cuts through (or far above)
+        the sphere for long ranges.  We insert intermediate points via SLERP so every
+        chord is at most ``_DENSIFY_STEP_M`` of arc, keeping the spline near the
+        sphere surface at ``cruise_altitude_m``.
+        """
         alt = self.cfg.cruise_altitude_m
-        pts = np.array([(self.planet.radius + alt) * wp.normalize for wp in self.cfg.waypoints])  # (N, 3)
+        r = self.planet.radius + alt
+        normals = [wp.normalize for wp in self.cfg.waypoints]
+
+        # Densify each segment with SLERP-interpolated points at cruise altitude.
+        dense_pts: list[NDArray] = []
+        for i in range(len(normals) - 1):
+            n0 = normals[i]
+            n1 = normals[i + 1]
+            cos_sigma = float(np.clip(np.dot(n0, n1), -1.0, 1.0))
+            sigma = np.arccos(cos_sigma)
+            arc_len = r * sigma
+            n_steps = max(2, int(np.ceil(arc_len / self._DENSIFY_STEP_M)) + 1)
+            # Exclude the last point of each segment to avoid duplicates;
+            # include it only on the final segment.
+            end = n_steps if i == len(normals) - 2 else n_steps - 1
+            for j in range(end):
+                frac = j / (n_steps - 1)
+                if sigma < 1e-10:
+                    n = n0
+                else:
+                    n = (np.sin((1.0 - frac) * sigma) * n0 + np.sin(frac * sigma) * n1) / np.sin(sigma)
+                dense_pts.append(r * n)
+
+        pts = np.array(dense_pts)
 
         # Arc-length parameterisation
         diffs = np.diff(pts, axis=0)
@@ -69,8 +102,8 @@ class CruiseWaypointGuidance(Guidance):
         self._spline_z = CubicSpline(s, pts[:, 2])
 
         logger["Guidance"].info(
-            f"CruiseWaypointGuidance: spline built over {len(self.cfg.waypoints)} waypoints, "
-            f"total arc length {self._total_arc / 1000:.1f} km."
+            f"CruiseWaypointGuidance: spline built over {len(self.cfg.waypoints)} waypoints "
+            f"({len(pts)} dense points), total arc length {self._total_arc / 1000:.1f} km."
         )
 
     def _eval_spline(self, s: float) -> NDArray:
@@ -124,30 +157,50 @@ class CruiseWaypointGuidance(Guidance):
         s_lookahead = min(self._progress_s + self._LOOKAHEAD_M, self._total_arc)
         lookahead_pt = self._eval_spline(s_lookahead)
 
-        # Lateral direction: normalised vector toward lookahead.
-        lateral = lookahead_pt - missile.position
-        lat_norm = np.linalg.norm(lateral)
-        if lat_norm > 1e-8:
-            lateral = lateral / lat_norm
+        # Local frame: r_hat is the outward radial unit vector.
+        # t_hat is the tangential unit vector on the sphere surface pointing toward the
+        # lookahead point — same double-cross logic as local_frame but using the
+        # lookahead direction instead of self.target.
+        r_hat, _ = self.local_frame(missile)
+        lookahead_hat = lookahead_pt / np.linalg.norm(lookahead_pt)
+        t_hat = np.cross(np.cross(lookahead_hat, r_hat), r_hat)
+        t_norm = np.linalg.norm(t_hat)
+        if t_norm > 1e-8:
+            t_hat /= t_norm
         else:
-            lateral = np.zeros(3)
+            t_hat = np.zeros(3)
 
-        # Altitude correction: proportional radial feedback.
-        # alt_frac is dimensionless — it equals 1 when the error equals LOOKAHEAD_M.
-        r_hat = missile.normalize
+        # Radial component: base fraction to counteract gravity (level flight) plus
+        # a proportional altitude-error correction.
         current_alt = np.linalg.norm(missile.position) - self.planet.radius
+        g = self.planet.mu / np.linalg.norm(missile.position) ** 2
+        # Exact tangent of the thrust angle that balances gravity at full thrust_acc.
+        base_radial = g / np.sqrt(max(self.cfg.thrust_acc**2 - g**2, 1e-6))
+        # Altitude PD controller: blend of gravity compensation and error correction.
+        # alt_frac < base_radial lets gravity pull the missile down gently (no active diving).
+        # alt_frac > base_radial climbs toward cruise altitude.
         alt_error = self.cfg.cruise_altitude_m - current_alt
-        alt_frac = np.clip(alt_error / self._LOOKAHEAD_M, -1.0, 1.0)
+        v_radial = float(np.dot(missile.velocity, r_hat))
+        Kp = 1.0 / max(self.cfg.cruise_altitude_m * 5.0, 1.0)  # proportional gain [1/m]
+        Kd = 0.01  # small derivative: gentle damping, avoids over-correction
+        correction = Kp * alt_error - Kd * v_radial
+        # clip: no active downward thrust (alt_frac >= 0), don't exceed 1.
+        alt_frac = np.clip(base_radial + correction, 0.0, 1.0)
 
-        # Blend: lateral component dominates; radial term corrects altitude.
-        raw = lateral + alt_frac * r_hat
+        # Blend: tangential component (toward lookahead on sphere) + radial altitude correction.
+        raw = t_hat + alt_frac * r_hat
         raw_norm = np.linalg.norm(raw)
         if raw_norm < 1e-8:
             return GuidanceResults(direction=np.zeros(3), state=self.state)
         direction = raw / raw_norm
 
-        # Speed limiter: cut thrust once max speed is reached.
+        # Speed limiter: when max speed is exceeded, only apply radial thrust to
+        # balance gravity (hover at current altitude) without accelerating further.
         speed = float(np.linalg.norm(missile.velocity))
-        magnitude: float | None = None if speed < self.cfg.max_speed_m_s else 0.0
+        magnitude: float | None = None
+        if speed >= self.cfg.max_speed_m_s:
+            direction = r_hat
+            g_mag = self.planet.mu / np.linalg.norm(missile.position) ** 2
+            magnitude = float(g_mag)  # just enough to balance gravity
 
         return GuidanceResults(direction=direction, state=self.state, magnitude=magnitude)
