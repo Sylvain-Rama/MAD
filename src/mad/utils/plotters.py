@@ -2,8 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.figure
 import matplotlib.patches
 import numpy as np
-from numpy.typing import NDArray
-from mad.objs.base import MovableObj, BallisticObj
+from mad.objs.base import MovableObj
 from mad.objs.planets import Planet
 
 

@@ -6,6 +6,7 @@ from mad.guidances.base_guidances import (
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, LEOInsertionState, RCSGuidance
+from mad.guidances.cruise_missiles_guidances import CruiseWaypointGuidance, CruiseGuidanceConfig
 
 __all__ = [
     "GuidableObj",
@@ -16,4 +17,6 @@ __all__ = [
     "TabulatedBallistic",
     "LEOInsertionGuidance",
     "LEOInsertionState",
+    "CruiseWaypointGuidance",
+    "CruiseGuidanceConfig",
 ]

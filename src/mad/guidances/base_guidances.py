@@ -1,4 +1,5 @@
 from mad.objs.base import MovableObj
+from mad.objs import Planet
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -48,7 +49,7 @@ class Guidance(ABC):
     should override it after calling ``super().__init__``.
     """
 
-    def __init__(self, planet, target: MovableObj):
+    def __init__(self, planet: Planet, target: MovableObj):
         self.planet = planet
         self.target = target
         self.state = "powered"
@@ -121,7 +122,7 @@ class ProportionalNavigation(Guidance):
 
     def __init__(
         self,
-        planet,
+        planet: Planet,
         target: MovableObj,
         N: float = 4.0,
         activation_altitude_km: float | None = 300.0,
