@@ -68,6 +68,8 @@ class CruiseMissile(BallisticObj, GuidedObj):
             self.motor_active = False
         self.t += dt
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
+        if self.guidance_results is not None and self.guidance_results.state == "terminal":
+            self.motor_active = False
         return None
 
     def accelerations(self, planet: Planet) -> NDArray:
