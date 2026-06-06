@@ -5,3 +5,4 @@ G0: float = 9.80665  # m/s^2, value for earth
 VOXEL_SIZE: float = 50_000.0  # m, size of voxels for broad-phase collision detection and radar detection
 POUNDS_FORCE_TO_NEWTONS: float = 4.44822  # N/lbf
 MACHS_TO_METERS_S: float = 340.29  # m/s, speed of sound at sea level
+MILES_TO_METERS: float = 1609.34  # m/mi
