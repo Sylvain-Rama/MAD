@@ -10,7 +10,6 @@ class PlanetConfig:
     position: list[float]
     radius: float
     mass: float
-    spin_rate: float
     velocity: list[float] | None = None
     name: str = "Planet"
     rho0: float = 1.225
@@ -26,7 +25,6 @@ class Planet(MovableObj):
         super().__init__(config.position, config.velocity, config.name)
         self.mass = config.mass
         self.radius = config.radius
-        self.spin_rate = config.spin_rate
         self.atmosphere_height = config.atmosphere_height
         self.rho0 = config.rho0
         self.mu = self.mass * G
