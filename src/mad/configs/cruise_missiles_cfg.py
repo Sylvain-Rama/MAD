@@ -1,4 +1,4 @@
-from mad.configs.physics import MACHS_TO_METERS_S
+from mad.configs.physics_cfg import MACHS_TO_METERS_S
 
 # See https://en.wikipedia.org/wiki/Tomahawk_missile
 tomahawk = {

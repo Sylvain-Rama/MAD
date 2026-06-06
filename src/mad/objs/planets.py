@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import MovableObj, BallisticObj
-from mad.configs.physics import G
+from mad.configs.physics_cfg import G
 from dataclasses import dataclass, asdict
 
 

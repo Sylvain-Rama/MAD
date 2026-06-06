@@ -5,8 +5,8 @@ import pytest
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import MovableObj
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.configs.planets import EARTH_SETTINGS
-from mad.configs.physics import G
+from mad.configs.planets_cfg import EARTH_SETTINGS
+from mad.configs.physics_cfg import G
 
 # ---------------------------------------------------------------------------
 # Fixture

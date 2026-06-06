@@ -3,7 +3,7 @@ import itertools
 from mad.objs import MovableObj
 from mad.objs import Planet
 from mad.utils.base_utils import to_voxel_key
-from mad.configs.physics import VOXEL_SIZE
+from mad.configs.physics_cfg import VOXEL_SIZE
 
 from dataclasses import dataclass, asdict
 
