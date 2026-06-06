@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.planets import Planet, PlanetConfig
-from mad.configs.planets import EARTH_SETTINGS
+from mad.configs.planets_cfg import EARTH_SETTINGS
 
 # ---------------------------------------------------------------------------
 # Fixtures

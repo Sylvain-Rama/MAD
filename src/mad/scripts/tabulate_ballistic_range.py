@@ -23,8 +23,7 @@ from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.configs.planets import EARTH_SETTINGS
-from mad.configs.warheads import B53_warhead, rod_of_god
+from mad.configs import EARTH_SETTINGS, B53_warhead, rod_of_god
 from mad.simulation import run_simple_simulation
 from mad.utils.logger import SourceLogger, configure_logger
 from mad.utils.ballistic_tables import BALLISTIC_FIELD_NAMES

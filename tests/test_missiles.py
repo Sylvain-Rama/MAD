@@ -7,16 +7,15 @@ from mad.objs.missiles import (
     MissileStageConfig,
     MissileStage,
     RVConfig,
-    RVConfig,
     ReentryVehicle,
     BallisticMissileConfig,
     BallisticMissile,
 )
 from mad.objs.planets import Planet, PlanetConfig
-from mad.configs.planets import EARTH_SETTINGS
-from mad.configs.ballistic_objects import titan1_stages
-from mad.configs.warheads import B53_warhead
-from mad.configs.physics import G0
+from mad.configs.planets_cfg import EARTH_SETTINGS
+from mad.configs.ballistic_objects_cfg import titan1_stages
+from mad.configs.warheads_cfg import B53_warhead
+from mad.configs.physics_cfg import G0
 
 # ---------------------------------------------------------------------------
 # Fixtures

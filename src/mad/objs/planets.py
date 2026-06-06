@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import MovableObj, BallisticObj
-from mad.configs.physics import G
+from mad.configs.physics_cfg import G
 from dataclasses import dataclass, asdict
 
 
@@ -10,7 +10,6 @@ class PlanetConfig:
     position: list[float]
     radius: float
     mass: float
-    spin_rate: float
     velocity: list[float] | None = None
     name: str = "Planet"
     rho0: float = 1.225
@@ -26,7 +25,6 @@ class Planet(MovableObj):
         super().__init__(config.position, config.velocity, config.name)
         self.mass = config.mass
         self.radius = config.radius
-        self.spin_rate = config.spin_rate
         self.atmosphere_height = config.atmosphere_height
         self.rho0 = config.rho0
         self.mu = self.mass * G

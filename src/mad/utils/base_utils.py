@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from mad.configs.physics import VOXEL_SIZE
+from mad.configs.physics_cfg import VOXEL_SIZE
 
 
 def to_vec3(arr: list | NDArray) -> NDArray:

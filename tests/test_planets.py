@@ -5,8 +5,8 @@ import pytest
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import MovableObj
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.configs.planets import EARTH_SETTINGS
-from mad.configs.physics import G
+from mad.configs.planets_cfg import EARTH_SETTINGS
+from mad.configs.physics_cfg import G
 
 # ---------------------------------------------------------------------------
 # Fixture
@@ -31,7 +31,6 @@ class TestPlanetConfig:
             position=[0.0, 0.0, 0.0],
             radius=6_371_000.0,
             mass=5.972e24,
-            spin_rate=7.0882359e-5,
         )
         assert cfg.name == "Planet"
         assert cfg.rho0 == pytest.approx(1.225)
@@ -41,7 +40,6 @@ class TestPlanetConfig:
             position=[0.0, 0.0, 0.0],
             radius=6_371_000.0,
             mass=5.972e24,
-            spin_rate=7.0882359e-5,
         )
         d = cfg.to_dict
         assert isinstance(d, dict)

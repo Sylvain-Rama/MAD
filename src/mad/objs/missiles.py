@@ -6,7 +6,7 @@ from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, Releasab
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.utils.logger import SourceLogger
-from mad.configs.physics import G0
+from mad.configs.physics_cfg import G0
 
 from copy import deepcopy
 
