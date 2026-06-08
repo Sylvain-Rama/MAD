@@ -53,6 +53,9 @@ class Guidance(ABC):
         self.planet = planet
         self.target = target
         self.state = "powered"
+        # Sign convention: +1 if local t_hat from local_frame is prograde (toward target), -1 if retrograde.
+        # Resolved once on the first _resolve_t_hat_sign call.
+        self._t_hat_sign: float | None = None
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
@@ -80,6 +83,18 @@ class Guidance(ABC):
         theta = optimal_gamma * missile.burned_fraction
         d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
         return d / np.linalg.norm(d)
+
+    def _resolve_t_hat_sign(self, r_hat: NDArray, t_hat: NDArray) -> float:
+        """Return (and cache) the sign that makes ``t_hat`` point prograde toward ``self.target``.
+
+        Returns +1.0 if ``t_hat`` already points in the prograde direction, -1.0 otherwise.
+        The result is cached so the orientation is determined only on the first call.
+        """
+        if self._t_hat_sign is None:
+            rt_hat = self.target.normalize
+            prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+            self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
+        return self._t_hat_sign
 
     @abstractmethod
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:

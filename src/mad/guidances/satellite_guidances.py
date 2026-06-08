@@ -113,10 +113,6 @@ class LEOInsertionGuidance(Guidance):
         else:
             self._v_target = np.sqrt(planet.mu / self.perigee_radius_m)
 
-        # Sign convention: +1 if local t_hat from local_frame is prograde, -1 if retrograde.
-        # Resolved once on the first _resolve_t_hat call when a target is set.
-        self._t_hat_sign: float | None = None
-
         # Cached prograde unit vector; only used when target is None.
         self._prograde_hat: NDArray | None = None
 
@@ -131,11 +127,7 @@ class LEOInsertionGuidance(Guidance):
         if self.target is not None:
             _, t_hat = self.local_frame(missile)
             if np.linalg.norm(t_hat) > 1e-8:
-                if self._t_hat_sign is None:
-                    rt_hat = self.target.normalize
-                    prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
-                    self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
-                return self._t_hat_sign * t_hat
+                return self._resolve_t_hat_sign(r_hat, t_hat) * t_hat
 
         # Fall back to prograde from velocity.
         v_horiz = missile.velocity - np.dot(missile.velocity, r_hat) * r_hat
