@@ -2,6 +2,7 @@ from mad.guidances.base_guidances import (
     GuidableObj,
     Guidance,
     NoGuidance,
+    PurePursuit,
     ProportionalNavigation,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
@@ -12,6 +13,7 @@ __all__ = [
     "GuidableObj",
     "Guidance",
     "NoGuidance",
+    "PurePursuit",
     "RCSGuidance",
     "ProportionalNavigation",
     "TabulatedBallistic",

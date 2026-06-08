@@ -108,6 +108,23 @@ class NoGuidance(Guidance):
         return GuidanceResults(direction=np.zeros(3), state=self.state)
 
 
+class PurePursuit(Guidance):
+    """Pure-pursuit guidance: always thrust directly toward the target's current position.
+
+    Unlike ``ProportionalNavigation``, the guidance direction is the unit vector from
+    the missile to the target — i.e. it is a *forward* direction, not a perpendicular
+    correction.  This makes it compatible with ``CruiseMissile``, which applies the
+    guidance direction as forward thrust.
+    """
+
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        los = self.target.position - missile.position
+        los_norm = np.linalg.norm(los)
+        if los_norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+        return GuidanceResults(direction=los / los_norm, state=self.state)
+
+
 class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
@@ -142,11 +159,13 @@ class ProportionalNavigation(Guidance):
         N: float = 4.0,
         activation_altitude_km: float | None = 300.0,
         activation_range_km: float | None = None,
+        altitude_gain: float = 0.005,
     ):
         super().__init__(planet, target)
         self.N = N
         self.activation_altitude_m = activation_altitude_km * 1000.0 if activation_altitude_km is not None else None
         self.activation_range_m = activation_range_km * 1000.0 if activation_range_km is not None else None
+        self.altitude_gain = altitude_gain
         self._prev_los_hat: NDArray | None = None
         self._prev_t: float | None = None
         self._armed: bool = False
@@ -209,6 +228,15 @@ class ProportionalNavigation(Guidance):
         # PN command: a = N * v_c * los_rate_hat, in the plane perpendicular to LOS.
         # Then project onto the plane perpendicular to velocity so RCS doesn't brake.
         a_cmd = self.N * v_c * los_rate / los_rate_norm
+        a_cmd = a_cmd - np.dot(a_cmd, v_hat) * v_hat
+
+        # Altitude matching: add a radial term proportional to the altitude error between
+        # the missile and the target.  This lets the guidance correct vertical separation
+        # (e.g. interceptor at cruise altitude vs low-flying target) in addition to the
+        # standard lateral PN correction.  Re-project perpendicular to velocity afterwards.
+        r_hat = missile.position / np.linalg.norm(missile.position)
+        alt_error = np.linalg.norm(self.target.position) - np.linalg.norm(missile.position)
+        a_cmd += self.altitude_gain * alt_error * r_hat
         a_cmd = a_cmd - np.dot(a_cmd, v_hat) * v_hat
 
         cmd_norm = np.linalg.norm(a_cmd)
