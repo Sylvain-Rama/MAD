@@ -29,6 +29,9 @@ class GuidableObj(Protocol):
     @property
     def has_thrust(self) -> bool: ...
 
+    @property
+    def thrust_acc(self) -> float: ...
+
 
 @dataclass
 class GuidanceResults:
@@ -121,6 +124,7 @@ class PurePursuit(Guidance):
         los = self.target.position - missile.position
         los_norm = np.linalg.norm(los)
         if los_norm < 1e-8:
+            logger["Guidance"].warning("Missile is on top of the target; no guidance direction.")
             return GuidanceResults(direction=np.zeros(3), state=self.state)
         return GuidanceResults(direction=los / los_norm, state=self.state)
 

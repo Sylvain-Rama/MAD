@@ -14,27 +14,40 @@ logger = SourceLogger()
 @dataclass
 class CruiseGuidanceConfig:
     waypoints: list[MovableObj]
+    max_speed_m_s: float = 300.0  # m/s — top cruise speed
+    altitude_settling_time_s: float = 30.0  # desired altitude settling time (critical damping)
+    cruise_altitude_m: float = 100.0
 
 
 class CruiseWaypointGuidance(Guidance):
     """Waypoint guidance for cruise missiles using a cubic spline trajectory.
 
     A cubic spline is fitted through all waypoints.  The first waypoint is the launch site; the last is
-    the final target.  Between waypoints the missile stays near cruise altitude
-    and does not exceed ``max_speed_m_s``.
+    the final target. Between waypoints, guidance computes a tangential command
+    toward a spline lookahead point and a radial command that regulates altitude.
 
-    Guidance direction is the blend of:
+        Guidance direction is the blend of:
       - a lateral component pointing toward a lookahead point on the spline, and
-      - a radial component that corrects altitude error (proportional feedback).
-
-    Thrust magnitude is set to zero once ``max_speed_m_s`` is reached.
+            - a radial component that corrects altitude error (PD feedback + gravity compensation).
     """
 
     # Lookahead distance along the spline (m).  Can be tuned per scenario.
     _LOOKAHEAD_M: float = 50_000.0
 
-    def __init__(self, planet, target: MovableObj, waypoints: list[MovableObj]):
+    def __init__(
+        self,
+        planet,
+        target: MovableObj,
+        waypoints: list[MovableObj] | None = None,
+        config: CruiseGuidanceConfig | None = None,
+    ):
         super().__init__(planet, target)
+
+        if config is None:
+            if waypoints is None:
+                raise ValueError("Either waypoints or config must be provided.")
+            config = CruiseGuidanceConfig(waypoints=waypoints)
+        self.config = config
 
         # Per-axis cubic splines and arc-length knot vector, built in _build_spline.
         self._spline_x: CubicSpline | None = None
@@ -45,7 +58,7 @@ class CruiseWaypointGuidance(Guidance):
 
         # Monotonically non-decreasing progress along the spline (arc-length, m).
         self._progress_s: float = 0.0
-        self.waypoints = waypoints
+        self.waypoints = self.config.waypoints
 
         self._build_spline()
 
@@ -61,7 +74,7 @@ class CruiseWaypointGuidance(Guidance):
         sphere surface at ``cruise_altitude_m``.
         """
 
-        r = self.planet.radius
+        r = self.planet.radius + self.config.cruise_altitude_m
         normals = [wp.normalize for wp in self.waypoints]
 
         # Densify each segment with SLERP-interpolated points at cruise altitude.
@@ -162,4 +175,27 @@ class CruiseWaypointGuidance(Guidance):
         else:
             t_hat = np.zeros(3)
 
-        return GuidanceResults(direction=t_hat, state=self.state)
+        # Altitude hold: gravity compensation + critically-damped PD radial control.
+        # Returns a fractional vector (components are fractions of thrust_acc) so
+        # CruiseMissile can apply `thrust_acc * direction` directly without re-normalizing,
+        # preserving the absolute radial and tangential acceleration magnitudes.
+        pos_norm = float(np.linalg.norm(missile.position))
+        current_alt = pos_norm - self.planet.radius
+        alt_error = self.config.cruise_altitude_m - current_alt
+        v_radial = float(np.dot(missile.velocity, r_hat))
+        g_mag = self.planet.mu / max(pos_norm**2, 1e-9)
+        omega_n = 4.0 / max(self.config.altitude_settling_time_s, 1.0)
+        Kp = omega_n**2
+        Kd = 2.0 * omega_n
+        available_acc = max(float(getattr(missile, "thrust_acc", 0.0)), 1e-9)
+        radial_acc = np.clip(g_mag + Kp * alt_error - Kd * v_radial, -available_acc, available_acc)
+        radial_frac = radial_acc / available_acc  # in (-1, 1]
+
+        # Include tangential thrust only when below the speed cap.
+        speed = float(np.linalg.norm(missile.velocity))
+        if speed < self.config.max_speed_m_s:
+            cmd = t_hat + radial_frac * r_hat
+        else:
+            cmd = radial_frac * r_hat
+
+        return GuidanceResults(direction=cmd, state=self.state)
