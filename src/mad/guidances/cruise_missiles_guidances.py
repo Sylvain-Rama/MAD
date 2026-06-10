@@ -38,15 +38,10 @@ class CruiseWaypointGuidance(Guidance):
         self,
         planet,
         target: MovableObj,
-        waypoints: list[MovableObj] | None = None,
-        config: CruiseGuidanceConfig | None = None,
+        config: CruiseGuidanceConfig,
     ):
         super().__init__(planet, target)
 
-        if config is None:
-            if waypoints is None:
-                raise ValueError("Either waypoints or config must be provided.")
-            config = CruiseGuidanceConfig(waypoints=waypoints)
         self.config = config
 
         # Per-axis cubic splines and arc-length knot vector, built in _build_spline.
@@ -198,4 +193,89 @@ class CruiseWaypointGuidance(Guidance):
         else:
             cmd = radial_frac * r_hat
 
+        return GuidanceResults(direction=cmd, state=self.state)
+
+
+class PurePursuit(Guidance):
+    """Pure-pursuit guidance with altitude hold.
+
+    The horizontal component points toward the target's current position
+    (projected onto the local tangential plane).  The radial component
+    applies a gravity-compensating critically-damped PD controller to
+    maintain ``cruise_altitude_m`` above the planet surface.
+
+    Parameters
+    ----------
+    planet:
+        Planet object used for gravity and radius.
+    target:
+        Target to pursue.
+    cruise_altitude_m:
+        Desired altitude above the planet surface (metres).  Defaults to
+        the missile's altitude at the first guidance call.
+    altitude_settling_time_s:
+        Desired altitude settling time in seconds (critical damping).
+    terminal_range_m:
+        Distance to the target (metres) at which the guidance switches from
+        altitude-hold cruise to direct 3-D line-of-sight pursuit, allowing
+        the missile to close on a target at any altitude.  The motor stays
+        active during this phase (state becomes ``"homing"``, not
+        ``"terminal"``).  Default 10 km.
+    """
+
+    def __init__(
+        self,
+        planet,
+        target: MovableObj,
+        cruise_altitude_m: float | None = None,
+        altitude_settling_time_s: float = 30.0,
+        terminal_range_m: float = 10_000.0,
+    ):
+        super().__init__(planet, target)
+        self._cruise_altitude_m = cruise_altitude_m
+        self.altitude_settling_time_s = altitude_settling_time_s
+        self.terminal_range_m = terminal_range_m
+
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        # Initialise cruise altitude from the missile's current altitude on the first call.
+        if self._cruise_altitude_m is None:
+            self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.planet.radius
+
+        los = self.target.position - missile.position
+        los_norm = np.linalg.norm(los)
+
+        # Homing phase: switch to direct 3-D pursuit so the missile can close on a
+        # target at a different altitude.  State is "homing", NOT "terminal", so that
+        # CruiseMissile does not cut the motor — thrust must remain active to the end.
+        if los_norm < self.terminal_range_m:
+            if self.state != "homing":
+                self.state = "homing"
+                logger["Guidance"].info(f"{missile.name} entered homing phase ({los_norm:.0f} m from target).")
+            if los_norm < 1e-8:
+                return GuidanceResults(direction=np.zeros(3), state=self.state)
+            return GuidanceResults(direction=los / los_norm, state=self.state)
+
+        # Cruise phase: altitude-hold + horizontal pursuit.
+        r_hat = missile.normalize
+
+        # Horizontal pursuit: project LOS onto the local tangential plane.
+        los_hat = los / los_norm
+        los_tan = los_hat - np.dot(los_hat, r_hat) * r_hat
+        t_norm = np.linalg.norm(los_tan)
+        t_hat = los_tan / t_norm if t_norm > 1e-8 else np.zeros(3)
+
+        # Altitude-hold: gravity compensation + critically-damped PD.
+        pos_norm = float(np.linalg.norm(missile.position))
+        current_alt = pos_norm - self.planet.radius
+        alt_error = self._cruise_altitude_m - current_alt
+        v_radial = float(np.dot(missile.velocity, r_hat))
+        g_mag = self.planet.mu / max(pos_norm**2, 1e-9)
+        omega_n = 4.0 / max(self.altitude_settling_time_s, 1.0)
+        Kp = omega_n**2
+        Kd = 2.0 * omega_n
+        available_acc = max(float(getattr(missile, "thrust_acc", 0.0)), 1e-9)
+        radial_acc = np.clip(g_mag + Kp * alt_error - Kd * v_radial, -available_acc, available_acc)
+        radial_frac = radial_acc / available_acc  # in (-1, 1]
+
+        cmd = t_hat + radial_frac * r_hat
         return GuidanceResults(direction=cmd, state=self.state)

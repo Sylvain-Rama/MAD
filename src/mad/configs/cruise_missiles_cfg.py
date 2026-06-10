@@ -23,7 +23,7 @@ aster_30 = {
     "mass": 450.0,  # kg
     "ref_radius": 0.09,  # m
     "Cd": 0.5,  # Approximate value for a streamlined missile
-    "thrust_acc": 150.0,  # m/s² — higher acceleration
+    "thrust_acc": 550.0,  # m/s² — higher acceleration
     "max_range_m": 120 * 1000,  # 120 km
 }
 

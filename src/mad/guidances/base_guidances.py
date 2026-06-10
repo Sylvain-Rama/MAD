@@ -111,24 +111,6 @@ class NoGuidance(Guidance):
         return GuidanceResults(direction=np.zeros(3), state=self.state)
 
 
-class PurePursuit(Guidance):
-    """Pure-pursuit guidance: always thrust directly toward the target's current position.
-
-    Unlike ``ProportionalNavigation``, the guidance direction is the unit vector from
-    the missile to the target — i.e. it is a *forward* direction, not a perpendicular
-    correction.  This makes it compatible with ``CruiseMissile``, which applies the
-    guidance direction as forward thrust.
-    """
-
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        los = self.target.position - missile.position
-        los_norm = np.linalg.norm(los)
-        if los_norm < 1e-8:
-            logger["Guidance"].warning("Missile is on top of the target; no guidance direction.")
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
-        return GuidanceResults(direction=los / los_norm, state=self.state)
-
-
 class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
