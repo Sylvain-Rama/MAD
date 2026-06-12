@@ -19,10 +19,6 @@ class TabulatedBallistic(Guidance):
         super().__init__(planet, target)
         self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
 
-        # Sign convention: +1 if local t_hat is prograde (toward target), -1 if retrograde.
-        # Resolved once on the first get_guidance call.
-        self._t_hat_sign: float | None = None
-
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
 
         if self.ballistic_guidance is None:
@@ -30,13 +26,7 @@ class TabulatedBallistic(Guidance):
             return GuidanceResults(direction=np.zeros(3), state=self.state)
 
         r_hat, t_hat = self.local_frame(missile)
-
-        # On first call, determine whether t_hat is prograde (+1) or retrograde (-1)
-        # by comparing it against the projection of the target direction onto the tangential plane.
-        if self._t_hat_sign is None:
-            rt_hat = self.target.normalize
-            prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
-            self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
+        sign = self._resolve_t_hat_sign(r_hat, t_hat)
 
         sigma = self.central_angle(missile, self.target)
         range_to_target = self.planet.radius * sigma
@@ -50,7 +40,7 @@ class TabulatedBallistic(Guidance):
 
         v_r = np.dot(missile.velocity, r_hat)
         v_t = np.dot(missile.velocity, t_hat)
-        missile_gamma = np.arctan2(v_r, self._t_hat_sign * v_t)
+        missile_gamma = np.arctan2(v_r, sign * v_t)
 
         query_point = np.array(
             [
@@ -82,13 +72,13 @@ class TabulatedBallistic(Guidance):
             # Compute the optimal RV release velocity: same speed as the missile but
             # aligned to the table's optimal gamma so the RV follows the correct ballistic arc.
             v_mag = np.linalg.norm(missile.velocity)
-            release_velocity = v_mag * (np.sin(gamma) * r_hat + self._t_hat_sign * np.cos(gamma) * t_hat)
+            release_velocity = v_mag * (np.sin(gamma) * r_hat + sign * np.cos(gamma) * t_hat)
 
         # Convert table gamma (prograde convention) back to the local t_hat convention
         # before passing to gravity_turn_direction.
         # 2: Aggressiveness factor to ensure the missile gets in range, was tuned empirically.
         # Should disappear the day we have coasting phase.
-        theta = self._t_hat_sign * gamma * missile.burned_fraction * 2
+        theta = sign * gamma * missile.burned_fraction * 2
 
         direction = np.cos(theta) * r_hat + np.sin(theta) * t_hat
 

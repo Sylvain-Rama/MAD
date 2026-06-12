@@ -66,8 +66,9 @@ class ReentryVehicle(Payload, GuidedObj):
             if self.guidance:
                 distance_to_target = self.guidance.planet.surface_distance(self, self.guidance.target)
                 logger["Missile"].info(f"Warhead {self.name} hit target at {distance_to_target/1000:.2f} km.")
+                self.detonate()
             else:
-                logger["Missile"].info(f"Warhead {self.name} detonated on the ground!")
+                self.detonate()
 
             self.active = False
             return np.zeros_like(self.velocity)
@@ -85,6 +86,10 @@ class ReentryVehicle(Payload, GuidedObj):
                 thrust = acc * (d / d_norm)
 
         return gravity + drag + thrust
+
+    def detonate(self):
+        logger["Missile"].info(f"Warhead {self.name} detonated with yield {self.yield_kt:.2f} kt.")
+        self.active = False
 
 
 @dataclass

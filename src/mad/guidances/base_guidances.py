@@ -29,6 +29,12 @@ class GuidableObj(Protocol):
     @property
     def has_thrust(self) -> bool: ...
 
+    @property
+    def thrust_acc(self) -> float: ...
+
+    def degrade(self):
+        print(f"{self.name} degraded: boum")
+
 
 @dataclass
 class GuidanceResults:
@@ -53,6 +59,9 @@ class Guidance(ABC):
         self.planet = planet
         self.target = target
         self.state = "powered"
+        # Sign convention: +1 if local t_hat from local_frame is prograde (toward target), -1 if retrograde.
+        # Resolved once on the first _resolve_t_hat_sign call.
+        self._t_hat_sign: float | None = None
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
@@ -80,6 +89,18 @@ class Guidance(ABC):
         theta = optimal_gamma * missile.burned_fraction
         d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
         return d / np.linalg.norm(d)
+
+    def _resolve_t_hat_sign(self, r_hat: NDArray, t_hat: NDArray) -> float:
+        """Return (and cache) the sign that makes ``t_hat`` point prograde toward ``self.target``.
+
+        Returns +1.0 if ``t_hat`` already points in the prograde direction, -1.0 otherwise.
+        The result is cached so the orientation is determined only on the first call.
+        """
+        if self._t_hat_sign is None:
+            rt_hat = self.target.normalize
+            prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
+            self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
+        return self._t_hat_sign
 
     @abstractmethod
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
@@ -127,11 +148,13 @@ class ProportionalNavigation(Guidance):
         N: float = 4.0,
         activation_altitude_km: float | None = 300.0,
         activation_range_km: float | None = None,
+        altitude_gain: float = 0.005,
     ):
         super().__init__(planet, target)
         self.N = N
         self.activation_altitude_m = activation_altitude_km * 1000.0 if activation_altitude_km is not None else None
         self.activation_range_m = activation_range_km * 1000.0 if activation_range_km is not None else None
+        self.altitude_gain = altitude_gain
         self._prev_los_hat: NDArray | None = None
         self._prev_t: float | None = None
         self._armed: bool = False
@@ -194,6 +217,15 @@ class ProportionalNavigation(Guidance):
         # PN command: a = N * v_c * los_rate_hat, in the plane perpendicular to LOS.
         # Then project onto the plane perpendicular to velocity so RCS doesn't brake.
         a_cmd = self.N * v_c * los_rate / los_rate_norm
+        a_cmd = a_cmd - np.dot(a_cmd, v_hat) * v_hat
+
+        # Altitude matching: add a radial term proportional to the altitude error between
+        # the missile and the target.  This lets the guidance correct vertical separation
+        # (e.g. interceptor at cruise altitude vs low-flying target) in addition to the
+        # standard lateral PN correction.  Re-project perpendicular to velocity afterwards.
+        r_hat = missile.position / np.linalg.norm(missile.position)
+        alt_error = np.linalg.norm(self.target.position) - np.linalg.norm(missile.position)
+        a_cmd += self.altitude_gain * alt_error * r_hat
         a_cmd = a_cmd - np.dot(a_cmd, v_hat) * v_hat
 
         cmd_norm = np.linalg.norm(a_cmd)
