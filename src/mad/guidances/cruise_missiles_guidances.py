@@ -17,6 +17,7 @@ class CruiseGuidanceConfig:
     max_speed_m_s: float = 300.0  # m/s — top cruise speed
     altitude_settling_time_s: float = 30.0  # desired altitude settling time (critical damping)
     cruise_altitude_m: float = 100.0
+    kill_radius_m: float = 30.0  # m — radius within which the target is considered destroyed
 
 
 class CruiseWaypointGuidance(Guidance):
@@ -230,11 +231,13 @@ class PurePursuit(Guidance):
         cruise_altitude_m: float | None = None,
         altitude_settling_time_s: float = 30.0,
         terminal_range_m: float = 10_000.0,
+        kill_radius_m: float = 30.0,
     ):
         super().__init__(planet, target)
         self._cruise_altitude_m = cruise_altitude_m
         self.altitude_settling_time_s = altitude_settling_time_s
         self.terminal_range_m = terminal_range_m
+        self.kill_radius_m = kill_radius_m
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Initialise cruise altitude from the missile's current altitude on the first call.
@@ -255,6 +258,14 @@ class PurePursuit(Guidance):
                 return GuidanceResults(direction=np.zeros(3), state=self.state)
             return GuidanceResults(direction=los / los_norm, state=self.state)
 
+        if los_norm < self.kill_radius_m:
+            if self.state != "detonate":
+                self.state = "detonate"
+                logger["Guidance"].info(f"{missile.name} reached kill radius ({los_norm:.0f} m from target).")
+
+                missile.degrade()
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
         # Cruise phase: altitude-hold + horizontal pursuit.
         r_hat = missile.normalize
 
@@ -273,7 +284,7 @@ class PurePursuit(Guidance):
         omega_n = 4.0 / max(self.altitude_settling_time_s, 1.0)
         Kp = omega_n**2
         Kd = 2.0 * omega_n
-        available_acc = max(float(getattr(missile, "thrust_acc", 0.0)), 1e-9)
+        available_acc = max(missile.thrust_acc, 1e-9)
         radial_acc = np.clip(g_mag + Kp * alt_error - Kd * v_radial, -available_acc, available_acc)
         radial_frac = radial_acc / available_acc  # in (-1, 1]
 

@@ -90,6 +90,10 @@ class SimulationInterface(ABC):
         a1 = self.accelerations(planet)
         self.velocity += 0.5 * (a0 + a1) * dt
 
+    def degrade(self):
+        """Degrade the object, e.g. when it reaches the kill radius. By default, just mark it as inactive."""
+        self.active = False
+
 
 class BallisticObj(MovableObj, SimulationInterface):
     """

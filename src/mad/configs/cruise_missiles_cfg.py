@@ -8,6 +8,7 @@ tomahawk = {
     "Cd": 0.5,  # Approximate value for a streamlined missile
     "thrust_acc": 100.0,  # m/s² — moderate acceleration
     "max_range_m": 1_600 * 1000,  # 1600 km
+    "yield_kt": 0.0,  # Conventional warhead
 }
 
 tomahawk_guidance = {
@@ -25,10 +26,12 @@ aster_30 = {
     "Cd": 0.5,  # Approximate value for a streamlined missile
     "thrust_acc": 550.0,  # m/s² — higher acceleration
     "max_range_m": 120 * 1000,  # 120 km
+    "yield_kt": 0.0,  # Conventional warhead
 }
 
 aster_30_guidance = {
     "max_speed_m_s": 4.5 * MACHS_TO_METERS_S,  # 1200 km/h
     "altitude_settling_time_s": 30.0,
     "cruise_altitude_m": 20_000.0,
+    "kill_radius_m": 30.0,
 }

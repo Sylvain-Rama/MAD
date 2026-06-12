@@ -21,6 +21,7 @@ class CruiseMissileConfig:
     name: str = "CruiseMissile"
     guidance: "Guidance | None" = None
     max_range_m: float = 1_000_000.0  # m
+    yield_kt: float = 0.0  # kt — default to conventional warhead
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
@@ -65,8 +66,8 @@ class CruiseMissile(BallisticObj, GuidedObj):
             self.motor_active = False
         self.t += dt
         self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
-        if self.guidance_results is not None and self.guidance_results.state == "terminal":
-            self.motor_active = False
+        if self.guidance_results is not None and self.guidance_results.state == "detonate":
+            self.detonate()
         return None
 
     def accelerations(self, planet: Planet) -> NDArray:
@@ -90,3 +91,12 @@ class CruiseMissile(BallisticObj, GuidedObj):
                     thrust += self.thrust_acc * d
 
         return gravity + drag + thrust
+
+    def detonate(self):
+        logger["Missile"].info(f"Warhead {self.name} detonated with yield {self.config.yield_kt:.2f} kt.")
+        self.active = False
+
+    def degrade(self):
+        """Degrade the missile, e.g. when being intercepted."""
+        logger["Missile"].info(f"{self.name} degraded.")
+        self.active = False
