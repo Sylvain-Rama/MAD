@@ -230,7 +230,7 @@ class PurePursuit(Guidance):
         target: MovableObj,
         cruise_altitude_m: float | None = None,
         altitude_settling_time_s: float = 30.0,
-        terminal_range_m: float = 10_000.0,
+        terminal_range_m: float = 1000.0,
         kill_radius_m: float = 30.0,
     ):
         super().__init__(planet, target)
@@ -241,30 +241,28 @@ class PurePursuit(Guidance):
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Initialise cruise altitude from the missile's current altitude on the first call.
-        if self._cruise_altitude_m is None:
-            self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.planet.radius
+        # if self._cruise_altitude_m is None:
+        self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.planet.radius
 
         los = self.target.position - missile.position
         los_norm = np.linalg.norm(los)
+
+        if los_norm < self.kill_radius_m:
+            self.state = "detonate"
+            logger["Guidance"].info(f"{missile.name} reached kill radius ({los_norm:.0f} m from target).")
+
+            self.target.degrade()
+            return GuidanceResults(direction=np.zeros(3), state=self.state)
 
         # Homing phase: switch to direct 3-D pursuit so the missile can close on a
         # target at a different altitude.  State is "homing", NOT "terminal", so that
         # CruiseMissile does not cut the motor — thrust must remain active to the end.
         if los_norm < self.terminal_range_m:
-            if self.state != "homing":
-                self.state = "homing"
-                logger["Guidance"].info(f"{missile.name} entered homing phase ({los_norm:.0f} m from target).")
+            self.state = "homing"
+            logger["Guidance"].info(f"{missile.name} entered homing phase ({los_norm:.0f} m from target).")
             if los_norm < 1e-8:
                 return GuidanceResults(direction=np.zeros(3), state=self.state)
             return GuidanceResults(direction=los / los_norm, state=self.state)
-
-        if los_norm < self.kill_radius_m:
-            if self.state != "detonate":
-                self.state = "detonate"
-                logger["Guidance"].info(f"{missile.name} reached kill radius ({los_norm:.0f} m from target).")
-
-                missile.degrade()
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
 
         # Cruise phase: altitude-hold + horizontal pursuit.
         r_hat = missile.normalize

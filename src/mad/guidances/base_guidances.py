@@ -32,6 +32,9 @@ class GuidableObj(Protocol):
     @property
     def thrust_acc(self) -> float: ...
 
+    def degrade(self):
+        print(f"{self.name} degraded: boum")
+
 
 @dataclass
 class GuidanceResults:

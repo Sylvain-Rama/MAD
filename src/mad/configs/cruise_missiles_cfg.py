@@ -6,7 +6,7 @@ tomahawk = {
     "mass": 1300.0,  # kg
     "ref_radius": 0.25,  # m
     "Cd": 0.5,  # Approximate value for a streamlined missile
-    "thrust_acc": 100.0,  # m/s² — moderate acceleration
+    "thrust_acc": 50.0,  # m/s² — moderate acceleration
     "max_range_m": 1_600 * 1000,  # 1600 km
     "yield_kt": 0.0,  # Conventional warhead
 }
