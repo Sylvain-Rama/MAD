@@ -197,6 +197,11 @@ class CruiseWaypointGuidance(Guidance):
         return GuidanceResults(direction=cmd, state=self.state)
 
 
+# TODO: This PurePursuit changes from altitude-hold pursuit to direct 3-D pursuit at a configurable terminal range.
+# allowing the missile to close on a target at any altitude.
+# This should be modified as a list of guidances with dynamic switching logic, rather than hardcoded into the guidance itself.
+
+
 class PurePursuit(Guidance):
     """Pure-pursuit guidance with altitude hold.
 
