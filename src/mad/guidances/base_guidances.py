@@ -182,7 +182,7 @@ class ProportionalNavigation(Guidance):
                 self._prev_los_hat = None
                 self._prev_t = None
                 logger["Guidance"].info(
-                    f"PN armed at altitude {altitude/1000:.1f} km, range {surface_range/1000:.1f} km."
+                    f"{t:<.2f}s - PN armed at altitude {altitude/1000:.1f} km, range {surface_range/1000:.1f} km."
                 )
             else:
                 return GuidanceResults(direction=np.zeros(3), state=self.state)

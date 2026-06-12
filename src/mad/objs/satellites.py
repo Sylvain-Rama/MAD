@@ -47,7 +47,7 @@ class Satellite(Payload):
         # Typically, we can ignore drag for stellites.
 
         if self.distance(planet) <= planet.radius:
-            logger["Satellite"].info(f"{self.name} landed on the ground!")
+            logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False
             return np.zeros_like(self.velocity)
 
@@ -66,7 +66,7 @@ class Sputnik(Satellite):
         self.t += dt
         # Sputnik beep from time to time.
         if self.t % 4000 < dt:
-            logger["Satellite"].info(f"{self.name} -- Beep Beep!")
+            logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} -- Beep Beep!")
 
         return None
 
@@ -76,5 +76,5 @@ class SputnikConfig(SatelliteConfig):
     name: str = "Sputnik"
 
     def create(self, position: NDArray, velocity: NDArray, t: float) -> "Sputnik":
-        logger["Satellite"].info("Sputnik released into orbit -- Beep Beep!")
+        logger["Satellite"].info(f"{t:<.2f}s - {self.name} released into orbit -- Beep Beep!")
         return Sputnik(config=self, position=position, velocity=velocity, t=t)

@@ -137,12 +137,13 @@ class Simulation:
         active_objs = moving_objs[:]
         t = 0.0
         start = time()
-        logger["Simulation"].info("Starting simulation.")
+        logger["Simulation"].info(f"{t:<.2f}s - Starting simulation.")
 
         self.collector.record(active_objs)
 
         while (t < self.max_time) and any(obj.active for obj in active_objs):
             new_objects: list[SimulationInterface] = []
+            t += self.dt
 
             # Update all active objects and collect any new objects they spawn (e.g. Payloads from missiles).
             for obj in active_objs:
@@ -153,7 +154,9 @@ class Simulation:
                     new_objects.extend(spawned)
 
             if new_objects:
-                logger["Simulation"].info(f"New objects spawned this step: {[obj.name for obj in new_objects]}")
+                logger["Simulation"].info(
+                    f"{t:<.2f}s - New objects spawned this step: {[obj.name for obj in new_objects]}"
+                )
                 active_objs.extend(new_objects)
 
             # Integrate all active objects' positions and velocities according to planet's gravity and drag.
@@ -164,10 +167,8 @@ class Simulation:
 
             self.collector.record(active_objs)
 
-            t += self.dt
-
         stop = time()
-        logger["Simulation"].info(f"Simulation ended at {t:.2f}s. Took {stop - start:.2f} s of real time.")
+        logger["Simulation"].info(f"{t:<.2f}s - Simulation ended. Took {stop - start:.2f} s of real time.")
         self.results = self.collector.extract_history()
 
 
@@ -181,8 +182,7 @@ def run_simple_simulation(
     """
     active_objs = moving_objs[:]
     t = 0.0
-    collector = HistoryCollector(["t", "position", "velocity", "gamma"])
-    collector.record(active_objs)
+
     while (t < max_time) and any(obj.active for obj in active_objs):
 
         for obj in active_objs[:]:

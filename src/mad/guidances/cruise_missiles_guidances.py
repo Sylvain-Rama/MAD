@@ -150,7 +150,9 @@ class CruiseWaypointGuidance(Guidance):
         if dist_to_target < 100.0:
             if self.state != "terminal":
                 self.state = "terminal"
-                logger["Guidance"].info(f"{missile.name} reached terminal range ({dist_to_target:.0f} m from target).")
+                logger["Guidance"].info(
+                    f"{t:<.2f}s - {missile.name} reached terminal range ({dist_to_target:.0f} m from target)."
+                )
             return GuidanceResults(direction=np.zeros(3), state=self.state)
 
         # Update progress along the spline.
@@ -183,7 +185,7 @@ class CruiseWaypointGuidance(Guidance):
         omega_n = 4.0 / max(self.config.altitude_settling_time_s, 1.0)
         Kp = omega_n**2
         Kd = 2.0 * omega_n
-        available_acc = max(float(getattr(missile, "thrust_acc", 0.0)), 1e-9)
+        available_acc = max(missile.thrust_acc, 1e-9)
         radial_acc = np.clip(g_mag + Kp * alt_error - Kd * v_radial, -available_acc, available_acc)
         radial_frac = radial_acc / available_acc  # in (-1, 1]
 
@@ -254,7 +256,7 @@ class PurePursuit(Guidance):
 
         if los_norm < self.kill_radius_m:
             self.state = "detonate"
-            logger["Guidance"].info(f"{missile.name} reached kill radius ({los_norm:.0f} m from target).")
+            logger["Guidance"].info(f"{t:<.2f}s - {missile.name} reached kill radius ({los_norm:.0f} m from target).")
 
             self.target.degrade()
             return GuidanceResults(direction=np.zeros(3), state=self.state)
@@ -264,7 +266,7 @@ class PurePursuit(Guidance):
         # CruiseMissile does not cut the motor — thrust must remain active to the end.
         if los_norm < self.terminal_range_m:
             self.state = "homing"
-            logger["Guidance"].info(f"{missile.name} entered homing phase ({los_norm:.0f} m from target).")
+            logger["Guidance"].info(f"{t:<.2f}s - {missile.name} entered homing phase ({los_norm:.0f} m from target).")
             if los_norm < 1e-8:
                 return GuidanceResults(direction=np.zeros(3), state=self.state)
             return GuidanceResults(direction=los / los_norm, state=self.state)

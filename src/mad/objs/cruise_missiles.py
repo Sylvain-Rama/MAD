@@ -72,7 +72,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
 
     def accelerations(self, planet: Planet) -> NDArray:
         if self.distance(planet) <= planet.radius:
-            logger["Missile"].info(f"{self.name} hit the ground.")
+            logger["Missile"].info(f"{self.t:<.2f}s - {self.name} hit the ground.")
             self.active = False
             return np.zeros_like(self.velocity)
 
@@ -93,10 +93,12 @@ class CruiseMissile(BallisticObj, GuidedObj):
         return gravity + drag + thrust
 
     def detonate(self):
-        logger["Missile"].info(f"Warhead {self.name} detonated with yield {self.config.yield_kt:.2f} kt.")
+        logger["Missile"].info(
+            f"{self.t:<.2f}s - Warhead {self.name} detonated with yield {self.config.yield_kt:.2f} kt."
+        )
         self.active = False
 
     def degrade(self):
         """Degrade the missile, e.g. when being intercepted."""
-        logger["Missile"].info(f"{self.name} degraded.")
+        logger["Missile"].info(f"{self.t:<.2f}s - {self.name} degraded.")
         self.active = False
