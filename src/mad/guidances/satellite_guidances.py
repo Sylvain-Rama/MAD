@@ -173,7 +173,7 @@ class LEOInsertionGuidance(Guidance):
             at_apogee = v_r <= 0.0 and altitude > 80_000.0
             if at_target_band or at_apogee:
                 logger["Guidance"].info(
-                    f"All propellant spent at altitude {altitude / 1e3:.1f} km, "
+                    f"{t:<.2f}s - {missile.name} All propellant spent at altitude {altitude / 1e3:.1f} km, "
                     f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s). Releasing payload."
                 )
                 self.state = LEOInsertionState.RELEASE_PAYLOAD
@@ -188,7 +188,7 @@ class LEOInsertionGuidance(Guidance):
 
             if v_horiz_mag >= 0.99 * self._v_target:
                 logger["Guidance"].info(
-                    f"Orbit insertion achieved at altitude {altitude / 1e3:.1f} km, "
+                    f"{t:<.2f}s - {missile.name} Orbit insertion achieved at altitude {altitude / 1e3:.1f} km, "
                     f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s)."
                 )
                 self.state = LEOInsertionState.RELEASE_PAYLOAD

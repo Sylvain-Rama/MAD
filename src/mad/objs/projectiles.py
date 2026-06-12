@@ -33,7 +33,7 @@ class Projectile(BallisticObj):
     def accelerations(self, planet) -> NDArray:
 
         if self.distance(planet) <= planet.radius:
-            logger["Projectile"].info(f"{self.name} landed on the ground!")
+            logger["Projectile"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False
             return np.zeros_like(self.velocity)
 

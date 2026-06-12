@@ -3,6 +3,9 @@ from numpy.typing import NDArray
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from mad.utils.base_utils import to_vec3
+from mad.utils.logger import SourceLogger
+
+logger = SourceLogger()
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
@@ -56,6 +59,11 @@ class MovableObj:
         if not isinstance(other, MovableObj):
             return False
         return self._id == other._id
+
+    def degrade(self):
+        """Degrade the object, e.g. when impacted."""
+        logger["Projectile"].info(f"{self.name} degraded.")
+        self.active = False
 
 
 class SimulationInterface(ABC):

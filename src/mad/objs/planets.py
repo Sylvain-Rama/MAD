@@ -90,7 +90,7 @@ class Planet(MovableObj):
         # Create a random object at the 2D or 3D surface (+ altitude) of the planet.
 
         if not 0 < dims < 4:
-            raise ValueError("Dimensiosn for the point definition must be between 1 and 3")
+            raise ValueError("Dimensions for the point definition must be between 1 and 3")
         v = np.random.normal(size=dims)
         v /= np.linalg.norm(v)
 
