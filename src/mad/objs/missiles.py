@@ -404,7 +404,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
     def accelerations(self, planet: Planet) -> NDArray:
         if self.distance(planet) <= planet.radius:
             logger["Missile"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
-            self.degrade()
+            self.active = False
             return np.zeros_like(self.velocity)
 
         gravity = planet.gravity(self)
