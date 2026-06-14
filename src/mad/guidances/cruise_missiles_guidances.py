@@ -1,5 +1,5 @@
 from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults
+from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GUIDANCE_STATES
 from dataclasses import dataclass
 
 import numpy as np
