@@ -1,5 +1,5 @@
 from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults
+from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
 from dataclasses import dataclass
 
 import numpy as np
@@ -148,8 +148,8 @@ class CruiseWaypointGuidance(Guidance):
         # Terminal condition: missile is within 100 m of the target.
         dist_to_target = np.linalg.norm(missile.position - self.target.position)
         if dist_to_target < 100.0:
-            if self.state != "terminal":
-                self.state = "terminal"
+            if self.state != GuidanceStates.TERMINAL:
+                self.state = GuidanceStates.TERMINAL
                 logger["Guidance"].info(
                     f"{t:<.2f}s - {missile.name} reached terminal range ({dist_to_target:.0f} m from target)."
                 )
@@ -255,7 +255,7 @@ class PurePursuit(Guidance):
         los_norm = np.linalg.norm(los)
 
         if los_norm < self.kill_radius_m:
-            self.state = "detonate"
+            self.state = GuidanceStates.DETONATE
             logger["Guidance"].info(f"{t:<.2f}s - {missile.name} reached kill radius ({los_norm:.0f} m from target).")
 
             self.target.degrade()
@@ -265,7 +265,7 @@ class PurePursuit(Guidance):
         # target at a different altitude.  State is "homing", NOT "terminal", so that
         # CruiseMissile does not cut the motor — thrust must remain active to the end.
         if los_norm < self.terminal_range_m:
-            self.state = "homing"
+            self.state = GuidanceStates.TERMINAL
             logger["Guidance"].info(f"{t:<.2f}s - {missile.name} entered homing phase ({los_norm:.0f} m from target).")
             if los_norm < 1e-8:
                 return GuidanceResults(direction=np.zeros(3), state=self.state)

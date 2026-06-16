@@ -1,7 +1,7 @@
-from mad.objs.base import MovableObj
-from mad.objs import Planet
+from mad.objs import MovableObj, Planet
 
 from dataclasses import dataclass
+from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Protocol
 import numpy as np
@@ -9,6 +9,9 @@ from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
+
+
+GuidanceStates = Enum("GuidanceStates", ["IDLE", "POWERED", "COASTING", "TERMINAL", "RELEASE_PAYLOAD", "DETONATE"])
 
 
 class GuidableObj(Protocol):
@@ -33,13 +36,13 @@ class GuidableObj(Protocol):
     def thrust_acc(self) -> float: ...
 
     def degrade(self):
-        print(f"{self.name} degraded: boum")
+        logger["Guidable"].info(f"{self.name} degraded.")
 
 
 @dataclass
 class GuidanceResults:
     direction: NDArray
-    state: str
+    state: GuidanceStates
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
     release_velocity: NDArray | None = None  # Optimal RV release velocity vector (m/s)
@@ -51,14 +54,14 @@ class Guidance(ABC):
     Provides shared geometry helpers (`central_angle`, `local_frame`,
     `optimal_gamma`, `gravity_turn_direction`) so subclasses only need to
     implement `get_guidance`.  All concrete subclasses start in the
-    ``"powered"`` state; subclasses that need a different initial state
+    ``GuidanceStates.POWERED`` state; subclasses that need a different initial state
     should override it after calling ``super().__init__``.
     """
 
     def __init__(self, planet: Planet, target: MovableObj):
         self.planet = planet
         self.target = target
-        self.state = "powered"
+        self.state = GuidanceStates.POWERED
         # Sign convention: +1 if local t_hat from local_frame is prograde (toward target), -1 if retrograde.
         # Resolved once on the first _resolve_t_hat_sign call.
         self._t_hat_sign: float | None = None
