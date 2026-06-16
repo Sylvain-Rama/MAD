@@ -1,5 +1,5 @@
 from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults
+from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
 
 
 import numpy as np
@@ -67,7 +67,7 @@ class TabulatedBallistic(Guidance):
             # TODO: Continue correction for final approach.
             # See coasting phase for last missile stage.
 
-            self.state = "release_payload"
+            self.state = GuidanceStates.RELEASE_PAYLOAD
 
             # Compute the optimal RV release velocity: same speed as the missile but
             # aligned to the table's optimal gamma so the RV follows the correct ballistic arc.

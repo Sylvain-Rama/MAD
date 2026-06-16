@@ -3,9 +3,11 @@ from mad.guidances.base_guidances import (
     Guidance,
     NoGuidance,
     ProportionalNavigation,
+    GuidanceResults,
+    GuidanceStates,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
-from mad.guidances.satellite_guidances import LEOInsertionGuidance, LEOInsertionState, RCSGuidance
+from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance
 from mad.guidances.cruise_missiles_guidances import CruiseWaypointGuidance, CruiseGuidanceConfig, PurePursuit
 
 __all__ = [
@@ -17,7 +19,8 @@ __all__ = [
     "ProportionalNavigation",
     "TabulatedBallistic",
     "LEOInsertionGuidance",
-    "LEOInsertionState",
     "CruiseWaypointGuidance",
     "CruiseGuidanceConfig",
+    "GuidanceResults",
+    "GuidanceStates",
 ]

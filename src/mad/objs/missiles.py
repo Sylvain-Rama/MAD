@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
+from mad.guidances import GuidanceStates
 from mad.utils.logger import SourceLogger
 from mad.configs.physics_cfg import G0
 
@@ -326,7 +327,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
 
         if self.guidance_results:
             if (
-                self.guidance_results.state == "release_payload"
+                self.guidance_results.state == GuidanceStates.RELEASE_PAYLOAD
                 and self.t - self.last_payload_separation_time > self.payload_separation_interval
                 and self.payloads
             ):

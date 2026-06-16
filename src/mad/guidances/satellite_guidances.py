@@ -1,20 +1,11 @@
-from enum import StrEnum
-
 import numpy as np
 from numpy.typing import NDArray
 
-from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults
+from mad.objs import MovableObj
+from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
 from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
-
-
-class LEOInsertionState(StrEnum):
-    VERTICAL_RISE = "vertical_rise"
-    PITCH_PROGRAM = "pitch_program"
-    ORBIT_INSERTION = "orbit_insertion"
-    RELEASE_PAYLOAD = "release_payload"
 
 
 class LEOInsertionGuidance(Guidance):
@@ -101,7 +92,6 @@ class LEOInsertionGuidance(Guidance):
         self.min_turn_altitude_m = min_turn_altitude_m
         self.turn_end_altitude_m = turn_end_altitude_m if turn_end_altitude_m is not None else 0.8 * perigee_altitude_m
         self.altitude_tol_m = altitude_tol_m if altitude_tol_m is not None else 0.05 * perigee_altitude_m
-        self.state = LEOInsertionState.VERTICAL_RISE
 
         # Target orbital speed at perigee.
         # Circular:    v = √(μ / r_p)
@@ -150,7 +140,6 @@ class LEOInsertionGuidance(Guidance):
         r_hat = missile.normalize
 
         if altitude < self.min_turn_altitude_m:
-            self.state = LEOInsertionState.VERTICAL_RISE
             return GuidanceResults(direction=r_hat.copy(), state=self.state)
 
         t_hat = self._resolve_t_hat(missile, r_hat)
@@ -176,7 +165,7 @@ class LEOInsertionGuidance(Guidance):
                     f"{t:<.2f}s - {missile.name} All propellant spent at altitude {altitude / 1e3:.1f} km, "
                     f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s). Releasing payload."
                 )
-                self.state = LEOInsertionState.RELEASE_PAYLOAD
+                self.state = GuidanceStates.RELEASE_PAYLOAD
                 return GuidanceResults(
                     direction=np.zeros(3),
                     state=self.state,
@@ -184,14 +173,12 @@ class LEOInsertionGuidance(Guidance):
                 )
 
         if abs(altitude - self.perigee_altitude_m) <= self.altitude_tol_m:
-            self.state = LEOInsertionState.ORBIT_INSERTION
-
             if v_horiz_mag >= 0.99 * self._v_target:
                 logger["Guidance"].info(
                     f"{t:<.2f}s - {missile.name} Orbit insertion achieved at altitude {altitude / 1e3:.1f} km, "
                     f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s)."
                 )
-                self.state = LEOInsertionState.RELEASE_PAYLOAD
+                self.state = GuidanceStates.RELEASE_PAYLOAD
                 return GuidanceResults(
                     direction=np.zeros(3),
                     state=self.state,
@@ -199,8 +186,6 @@ class LEOInsertionGuidance(Guidance):
                 )
 
             return GuidanceResults(direction=t_hat.copy(), state=self.state)
-
-        self.state = LEOInsertionState.PITCH_PROGRAM
 
         # Cosine-ease pitch schedule: smooth start and end to the turn.
         #   p = 0  → θ = 0       (vertical)
