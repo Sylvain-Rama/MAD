@@ -46,6 +46,7 @@ class GuidanceResults:
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
     release_velocity: NDArray | None = None  # Optimal RV release velocity vector (m/s)
+    next_guidance: bool = False  # Whether to switch to the next guidance in the guidance list.
 
 
 class Guidance(ABC):
@@ -65,6 +66,7 @@ class Guidance(ABC):
         # Sign convention: +1 if local t_hat from local_frame is prograde (toward target), -1 if retrograde.
         # Resolved once on the first _resolve_t_hat_sign call.
         self._t_hat_sign: float | None = None
+        self.next_guidance: bool = False  # Whether to switch to the next guidance in the guidance list.
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
@@ -109,12 +111,56 @@ class Guidance(ABC):
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         pass
 
+    def interrupt_guidance(self, planet: Planet, missile: GuidableObj, target: MovableObj, t: float = 0.0) -> None:
+        """Interrupt the current guidance law and switch to the next one in the list.
+
+        This is a convenience method that can be called by subclasses when they
+        determine that their guidance is no longer appropriate (e.g., after
+        burnout or when the target is no longer reachable).  It sets the
+        ``next_guidance`` flag to True.
+        """
+        self.next_guidance = True
+
+
+class GuidanceManager:
+    """
+    Manages a sequence of guidance laws, with their triggers and switches.
+    """
+
+    def __init__(self, guidances: list[Guidance]):
+        self.guidances = guidances
+        self.current_index = 0
+
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        if self.current_index >= len(self.guidances):
+            return GuidanceResults(
+                direction=missile.velocity / np.linalg.norm(missile.velocity), state=GuidanceStates.IDLE
+            )
+
+        current_guidance = self.guidances[self.current_index]
+        results = current_guidance.get_guidance(missile, t)
+
+        if current_guidance.next_guidance:
+            self.current_index += 1
+            if self.current_index < len(self.guidances):
+                logger["Guidance"].info(
+                    f"Switching to guidance law {self.current_index}: {self.guidances[self.current_index].__class__.__name__}"
+                )
+            else:
+                logger["Guidance"].info("No more guidance laws to switch to.")
+
+        return results
+
 
 class NoGuidance(Guidance):
     """No guidance: the missile continues on its current trajectory without any course correction."""
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        return GuidanceResults(direction=np.zeros(3), state=self.state)
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),
+            state=self.state,
+            next_guidance=self.next_guidance,
+        )
 
 
 class GravityTurn(Guidance):
@@ -125,7 +171,9 @@ class GravityTurn(Guidance):
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
 
-        return GuidanceResults(direction=self.gravity_turn_direction(missile, gamma), state=self.state)
+        return GuidanceResults(
+            direction=self.gravity_turn_direction(missile, gamma), state=self.state, next_guidance=self.next_guidance
+        )
 
 
 class ProportionalNavigation(Guidance):
@@ -166,12 +214,14 @@ class ProportionalNavigation(Guidance):
         los = self.target.position - missile.position
         los_norm = np.linalg.norm(los)
         if los_norm < 1e-8:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
+            return GuidanceResults(
+                direction=np.zeros(3), state=GuidanceStates.DETONATE, next_guidance=self.next_guidance
+            )
         los_hat = los / los_norm
 
         v_norm = np.linalg.norm(missile.velocity)
         if v_norm < 1e-8:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
         v_hat = missile.velocity / v_norm
 
         # Check arming conditions; reset LOS history on the transition.
@@ -188,19 +238,19 @@ class ProportionalNavigation(Guidance):
                     f"{t:<.2f}s - PN armed at altitude {altitude/1000:.1f} km, range {surface_range/1000:.1f} km."
                 )
             else:
-                return GuidanceResults(direction=np.zeros(3), state=self.state)
+                return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
 
         # On first call after arming, seed the LOS history.
         if self._prev_los_hat is None or self._prev_t is None:
             self._prev_los_hat = los_hat.copy()
             self._prev_t = t
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
 
         dt = t - self._prev_t
         if dt < 1e-9:
             self._prev_los_hat = los_hat.copy()
             self._prev_t = t
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
 
         # LOS rate vector (rad/s): d(los_hat)/dt projected perpendicular to los_hat
         d_los_hat = (los_hat - self._prev_los_hat) / dt
@@ -211,8 +261,12 @@ class ProportionalNavigation(Guidance):
         self._prev_t = t
 
         los_rate_norm = np.linalg.norm(los_rate)
-        if los_rate_norm < 1e-12:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
+
+        # We are on the object.
+        if los_rate_norm < 1e-6:
+            return GuidanceResults(
+                direction=np.zeros(3), state=GuidanceStates.DETONATE, next_guidance=self.next_guidance
+            )
 
         # Closing velocity (positive when approaching)
         v_c = -np.dot(missile.velocity, los_hat)
@@ -233,6 +287,8 @@ class ProportionalNavigation(Guidance):
 
         cmd_norm = np.linalg.norm(a_cmd)
         if cmd_norm < 1e-8:
-            return GuidanceResults(direction=np.zeros(3), state=self.state)
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
 
-        return GuidanceResults(direction=a_cmd / cmd_norm, state=self.state, magnitude=float(cmd_norm))
+        return GuidanceResults(
+            direction=a_cmd / cmd_norm, state=self.state, magnitude=float(cmd_norm), next_guidance=self.next_guidance
+        )
