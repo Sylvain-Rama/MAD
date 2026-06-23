@@ -45,8 +45,19 @@ class GuidanceResults:
     state: GuidanceStates
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
-    release_velocity: NDArray | None = None  # Optimal RV release velocity vector (m/s)
+    release_velocity: NDArray | None = None  # Optimal payload release velocity vector (m/s)
     next_guidance: bool = False  # Whether to switch to the next guidance in the guidance list.
+
+
+@dataclass
+class GuidanceInterrupts:
+    """Optional guidance interrupt objects that can be used to switch to the next guidance law."""
+
+    missile: GuidableObj | None = None  # Switch when action on missile
+    target: MovableObj | None = None  # Switch when action on target
+    planet: Planet | None = None  # Switch when action on planet
+    t: float = 0.0  # Switch when simulation time reaches a value (s)
+    travelled_distance_m: float = 0.0  # Switch when missile has travelled a distance (m)
 
 
 class Guidance(ABC):
@@ -67,6 +78,16 @@ class Guidance(ABC):
         # Resolved once on the first _resolve_t_hat_sign call.
         self._t_hat_sign: float | None = None
         self.next_guidance: bool = False  # Whether to switch to the next guidance in the guidance list.
+
+        self.t = 0.0
+        self.travelled_distance = 0.0
+        self.guidance_interrupts = GuidanceInterrupts(
+            missile=None,
+            target=None,
+            planet=None,
+            t=self.t,
+            travelled_distance_m=self.travelled_distance,
+        )  # Optional guidance interrupt objects that can be used to switch to the next guidance law.
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
@@ -107,11 +128,24 @@ class Guidance(ABC):
             self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
         return self._t_hat_sign
 
+    def update(self, missile: GuidableObj, t: float) -> None:
+        dt = t - self.t
+        self.travelled_distance += float(np.linalg.norm(missile.velocity) * dt)
+        self.t = t
+
+        self.guidance_interrupts = GuidanceInterrupts(
+            missile=missile,
+            target=self.target,
+            planet=self.planet,
+            t=self.t,
+            travelled_distance_m=self.travelled_distance,
+        )
+
     @abstractmethod
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        pass
+        self.update(missile, t)
 
-    def interrupt_guidance(self, planet: Planet, missile: GuidableObj, target: MovableObj, t: float = 0.0) -> None:
+    def interrupt_guidance(self, guidance_interrupts: GuidanceInterrupts, **kwargs) -> None:
         """Interrupt the current guidance law and switch to the next one in the list.
 
         This is a convenience method that can be called by subclasses when they
@@ -163,6 +197,17 @@ class NoGuidance(Guidance):
         return GuidanceResults(
             direction=missile.velocity / np.linalg.norm(missile.velocity),
             state=self.state,
+            next_guidance=self.next_guidance,
+        )
+
+
+class IdleGuidance(Guidance):
+    """Idle guidance: the missile is not guided, returning 0 will negate thrust."""
+
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        return GuidanceResults(
+            direction=np.zeros_like(missile.velocity),
+            state=GuidanceStates.IDLE,
             next_guidance=self.next_guidance,
         )
 

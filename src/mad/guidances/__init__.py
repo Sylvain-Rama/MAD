@@ -6,6 +6,7 @@ from mad.guidances.base_guidances import (
     GuidanceResults,
     GuidanceStates,
     GuidanceManager,
+    GuidanceInterrupts,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance
@@ -25,4 +26,5 @@ __all__ = [
     "GuidanceResults",
     "GuidanceStates",
     "GuidanceManager",
+    "GuidanceInterrupts",
 ]
