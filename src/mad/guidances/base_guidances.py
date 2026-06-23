@@ -130,6 +130,8 @@ class GuidanceManager:
     def __init__(self, guidances: list[Guidance]):
         self.guidances = guidances
         self.current_index = 0
+        self.planet = guidances[0].planet
+        self.target = guidances[0].target
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         if self.current_index >= len(self.guidances):
@@ -146,6 +148,8 @@ class GuidanceManager:
                 logger["Guidance"].info(
                     f"Switching to guidance law {self.current_index}: {self.guidances[self.current_index].__class__.__name__}"
                 )
+                self.planet = self.guidances[self.current_index].planet
+                self.target = self.guidances[self.current_index].target
             else:
                 logger["Guidance"].info("No more guidance laws to switch to.")
 

@@ -5,6 +5,7 @@ from mad.guidances.base_guidances import (
     ProportionalNavigation,
     GuidanceResults,
     GuidanceStates,
+    GuidanceManager,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance
@@ -23,4 +24,5 @@ __all__ = [
     "CruiseGuidanceConfig",
     "GuidanceResults",
     "GuidanceStates",
+    "GuidanceManager",
 ]

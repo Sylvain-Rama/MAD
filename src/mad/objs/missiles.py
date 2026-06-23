@@ -12,7 +12,7 @@ from mad.configs.physics_cfg import G0
 from copy import deepcopy
 
 if TYPE_CHECKING:
-    from mad.guidances import Guidance
+    from mad.guidances import Guidance, GuidanceManager
 
 logger = SourceLogger()
 
@@ -22,9 +22,9 @@ class RVConfig:
     mass: float  # kg
     ref_radius: float  # m
     Cd: float
+    guidance: Guidance | GuidanceManager
     name: str = "ReentryVehicle"
     yield_kt: float = 0.0  # kt
-    guidance: "Guidance | None" = None
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
 
     def __post_init__(self):
@@ -39,7 +39,7 @@ class ReentryVehicle(Payload, GuidedObj):
         Payload.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd, t)
         self.yield_kt = config.yield_kt
         self.guidance = config.guidance
-        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, t)
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
@@ -57,7 +57,7 @@ class ReentryVehicle(Payload, GuidedObj):
 
     def update(self, dt: float) -> None:
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, self.t)
 
         return None
 
@@ -190,7 +190,7 @@ class MissileStage:
 @dataclass
 class BallisticMissileConfig:
     stages: list[MissileStage]
-    guidance: "Guidance | None" = None
+    guidance: Guidance | GuidanceManager
     payloads: list[ReleasableConfig] = field(default_factory=list)
     payload_separation_interval: float = 2.0  # Time between payload separations, in seconds.
 
@@ -323,7 +323,7 @@ class BallisticMissile(BallisticObj, GuidedObj):
         for stage in burn_group:
             stage.update(dt)
 
-        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, self.t)
 
         if self.guidance_results:
             if (
