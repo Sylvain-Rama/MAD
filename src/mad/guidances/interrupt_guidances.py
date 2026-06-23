@@ -1,15 +1,5 @@
-from mad.objs import MovableObj, Planet
-from mad.guidances.base_guidances import GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
-
-from dataclasses import dataclass
-from enum import Enum
-from abc import ABC, abstractmethod
-from typing import Protocol
+from mad.guidances.base_guidances import GuidanceInterrupts
 import numpy as np
-from numpy.typing import NDArray
-from mad.utils.logger import SourceLogger
-
-logger = SourceLogger()
 
 
 def interrupt_at_t(interrupts: GuidanceInterrupts, t: float) -> bool:

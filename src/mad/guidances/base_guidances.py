@@ -53,7 +53,7 @@ class GuidanceResults:
 class GuidanceInterrupts:
     """Optional guidance interrupt objects that can be used to switch to the next guidance law."""
 
-    missile: GuidableObj | None = None  # Switch when action on missile
+    missile: MovableObj | None = None  # Switch when action on missile
     target: MovableObj | None = None  # Switch when action on target
     planet: Planet | None = None  # Switch when action on planet
     t: float = 0.0  # Switch when simulation time reaches a value (s)
