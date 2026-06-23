@@ -1,18 +1,14 @@
 from dataclasses import dataclass, asdict, field
 import numpy as np
 from numpy.typing import NDArray
-from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
+from mad.objs import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
-from mad.guidances import GuidanceStates
+from mad.guidances import GuidanceStates, Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 from mad.configs.physics_cfg import G0
 
 from copy import deepcopy
-
-if TYPE_CHECKING:
-    from mad.guidances import Guidance, GuidanceManager
 
 logger = SourceLogger()
 
