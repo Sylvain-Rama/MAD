@@ -35,3 +35,19 @@ aster_30_guidance = {
     "cruise_altitude_m": 20_000.0,
     "kill_radius_m": 30.0,
 }
+
+V1 = {
+    "name": "V-1",
+    "mass": 2150.0,  # kg
+    "ref_radius": 0.3,  # m
+    "Cd": 0.5,  # Approximate value for a streamlined missile
+    "thrust_acc": 30.0,  # m/s² — moderate acceleration
+    "max_range_m": 250 * 1000,  # 250 km
+    "yield_kt": 0.0,  # Conventional warhead
+}
+
+V1_guidance = {
+    "max_speed_m_s": 640 * 1000 / 3600,  # 640 km/h
+    "altitude_settling_time_s": 60.0,
+    "cruise_altitude_m": 900.0,
+}
