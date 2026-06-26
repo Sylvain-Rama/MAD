@@ -41,7 +41,7 @@ class GuidableObj(Protocol):
 
 @dataclass
 class GuidanceResults:
-    direction: NDArray
+    direction: NDArray  # Unit vector indicating the desired direction of acceleration (m/s²)
     state: GuidanceStates
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
