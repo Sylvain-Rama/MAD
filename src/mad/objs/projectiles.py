@@ -23,6 +23,9 @@ class ProjectileConfig:
     def to_dict(self):
         return asdict(self)
 
+    def create(self, t: float = 0.0) -> "Projectile":
+        return Projectile(self, t)
+
 
 class Projectile(BallisticObj):
     def __init__(self, config: ProjectileConfig, t: float = 0.0):
