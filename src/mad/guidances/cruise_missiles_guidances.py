@@ -146,7 +146,7 @@ class CruiseWaypointGuidance(Guidance):
         dists = np.linalg.norm(pts - missile.position, axis=1)
         self._progress_s = float(candidates[int(np.argmin(dists))])
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Terminal condition: missile is within 100 m of the target.
         dist_to_target = np.linalg.norm(missile.position - self.target.position)
         if dist_to_target < 100.0:
@@ -249,7 +249,7 @@ class PurePursuit(Guidance):
         self.terminal_range_m = terminal_range_m
         self.kill_radius_m = kill_radius_m
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Initialise cruise altitude from the missile's current altitude on the first call.
         # if self._cruise_altitude_m is None:
         self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.planet.radius

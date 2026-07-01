@@ -137,7 +137,7 @@ class LEOInsertionGuidance(Guidance):
 
         return self._prograde_hat  # type: ignore[return-value]
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         r = np.linalg.norm(missile.position)
         altitude = r - self.planet.radius
         r_hat = missile.normalize
@@ -209,7 +209,7 @@ class LEOInsertionGuidance(Guidance):
 class RCSGuidance(Guidance):
     """Simple guidance that uses RCS thrusters to always point directly at the target, without any powered flight phase."""
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         v_norm = np.linalg.norm(missile.velocity)
         if v_norm < 1e-8:
             return GuidanceResults(direction=np.zeros(3), state=self.state)

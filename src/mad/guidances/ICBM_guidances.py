@@ -26,7 +26,7 @@ class TabulatedBallistic(Guidance):
         super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
 
         if self.ballistic_guidance is None:
             logger["Guidance"].error("Ballistic table not loaded. Cannot compute guidance.")

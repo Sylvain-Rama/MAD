@@ -150,9 +150,13 @@ class Guidance(ABC):
         if self.interrupt_fn is not None and self.interrupt_fn(self.guidance_interrupts):
             self.next_guidance = True
 
-    @abstractmethod
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        """Template method: always calls update (which evaluates interrupt_fn), then delegates."""
         self.update(missile, t)
+        return self._compute_guidance(missile, t)
+
+    @abstractmethod
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults: ...
 
 
 class GuidanceManager:
@@ -192,7 +196,7 @@ class GuidanceManager:
 class NoGuidance(Guidance):
     """No guidance: the missile continues on its current trajectory without any course correction."""
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
             direction=missile.velocity / np.linalg.norm(missile.velocity),
             state=self.state,
@@ -203,10 +207,29 @@ class NoGuidance(Guidance):
 class IdleGuidance(Guidance):
     """Idle guidance: the missile is not guided, returning 0 will negate thrust."""
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
             direction=np.zeros_like(missile.velocity),
             state=GuidanceStates.IDLE,
+            next_guidance=self.next_guidance,
+        )
+
+
+class PurePursuitGuidance(Guidance):
+    """Pure Pursuit Guidance: the missile always points directly at the target."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        los = self.target.position - missile.position
+        los_norm = np.linalg.norm(los)
+        if los_norm < 1e-8:
+            return GuidanceResults(
+                direction=np.zeros(3), state=GuidanceStates.DETONATE, next_guidance=self.next_guidance
+            )
+        los_hat = los / los_norm
+
+        return GuidanceResults(
+            direction=los_hat,
+            state=self.state,
             next_guidance=self.next_guidance,
         )
 
@@ -215,7 +238,7 @@ class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         sigma = self.central_angle(missile, self.target)
         gamma = self.optimal_gamma(missile, sigma)
 
@@ -259,7 +282,7 @@ class ProportionalNavigation(Guidance):
         self._prev_t: float | None = None
         self._armed: bool = False
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         los = self.target.position - missile.position
         los_norm = np.linalg.norm(los)
         if los_norm < 1e-8:
