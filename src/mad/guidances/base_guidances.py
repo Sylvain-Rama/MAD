@@ -3,7 +3,7 @@ from mad.objs import MovableObj, Planet
 from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Protocol
+from typing import Callable, Protocol
 import numpy as np
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
@@ -70,9 +70,15 @@ class Guidance(ABC):
     should override it after calling ``super().__init__``.
     """
 
-    def __init__(self, planet: Planet, target: MovableObj):
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+    ):
         self.planet = planet
         self.target = target
+        self.interrupt_fn = interrupt_fn
         self.state = GuidanceStates.POWERED
         # Sign convention: +1 if local t_hat from local_frame is prograde (toward target), -1 if retrograde.
         # Resolved once on the first _resolve_t_hat_sign call.
@@ -141,19 +147,12 @@ class Guidance(ABC):
             travelled_distance_m=self.travelled_distance,
         )
 
+        if self.interrupt_fn is not None and self.interrupt_fn(self.guidance_interrupts):
+            self.next_guidance = True
+
     @abstractmethod
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         self.update(missile, t)
-
-    def interrupt_guidance(self, guidance_interrupts: GuidanceInterrupts, **kwargs) -> None:
-        """Interrupt the current guidance law and switch to the next one in the list.
-
-        This is a convenience method that can be called by subclasses when they
-        determine that their guidance is no longer appropriate (e.g., after
-        burnout or when the target is no longer reachable).  It sets the
-        ``next_guidance`` flag to True.
-        """
-        self.next_guidance = True
 
 
 class GuidanceManager:
@@ -249,8 +248,9 @@ class ProportionalNavigation(Guidance):
         activation_altitude_km: float | None = 300.0,
         activation_range_km: float | None = None,
         altitude_gain: float = 0.005,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        super().__init__(planet, target)
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self.N = N
         self.activation_altitude_m = activation_altitude_km * 1000.0 if activation_altitude_km is not None else None
         self.activation_range_m = activation_range_km * 1000.0 if activation_range_km is not None else None

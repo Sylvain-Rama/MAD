@@ -1,6 +1,7 @@
 from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
+from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -40,8 +41,9 @@ class CruiseWaypointGuidance(Guidance):
         planet,
         target: MovableObj,
         config: CruiseGuidanceConfig,
+        interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target)
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
 
         self.config = config
 
@@ -239,8 +241,9 @@ class PurePursuit(Guidance):
         altitude_settling_time_s: float = 30.0,
         terminal_range_m: float = 1000.0,
         kill_radius_m: float = 30.0,
+        interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target)
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self._cruise_altitude_m = cruise_altitude_m
         self.altitude_settling_time_s = altitude_settling_time_s
         self.terminal_range_m = terminal_range_m

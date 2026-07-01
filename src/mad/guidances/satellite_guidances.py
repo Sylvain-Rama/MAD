@@ -1,8 +1,10 @@
 import numpy as np
 from numpy.typing import NDArray
+from typing import Callable
 
 from mad.objs import MovableObj
 from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
+from mad.guidances.base_guidances import GuidanceInterrupts
 from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
@@ -85,8 +87,9 @@ class LEOInsertionGuidance(Guidance):
         min_turn_altitude_m: float = 0.0,
         turn_end_altitude_m: float | None = None,
         altitude_tol_m: float | None = None,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        super().__init__(planet, target=target)  # type: ignore[arg-type]  # target may be None
+        super().__init__(planet, target=target, interrupt_fn=interrupt_fn)  # type: ignore[arg-type]  # target may be None
         self.perigee_altitude_m = perigee_altitude_m
         self.perigee_radius_m = planet.radius + perigee_altitude_m
         self.min_turn_altitude_m = min_turn_altitude_m
