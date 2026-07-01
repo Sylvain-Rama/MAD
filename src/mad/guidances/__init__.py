@@ -2,11 +2,13 @@ from mad.guidances.base_guidances import (
     GuidableObj,
     Guidance,
     NoGuidance,
+    IdleGuidance,
     ProportionalNavigation,
     GuidanceResults,
     GuidanceStates,
     GuidanceManager,
     GuidanceInterrupts,
+    PurePursuitGuidance,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance
@@ -27,4 +29,6 @@ __all__ = [
     "GuidanceStates",
     "GuidanceManager",
     "GuidanceInterrupts",
+    "PurePursuitGuidance",
+    "IdleGuidance",
 ]
