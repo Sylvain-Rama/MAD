@@ -16,6 +16,7 @@ from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
+from mad.guidances import NoGuidance
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -54,7 +55,7 @@ def RV_cfg():
 @pytest.fixture
 def two_stage_missile(earth):
     stages = [MissileStage(MissileStageConfig(**s)) for s in titan1_stages]
-    cfg = BallisticMissileConfig(stages=stages)
+    cfg = BallisticMissileConfig(stages=stages, guidance=NoGuidance(None, None))
     r = earth.radius + 10.0
     return BallisticMissile(position=[r, 0.0], cfg=cfg, name="Titan")
 
@@ -270,7 +271,7 @@ class TestBallisticMissileUpdate:
         stages = [MissileStage(MissileStageConfig(**s)) for s in titan1_stages]
         # Deplete the first stage immediately
         stages[0].propellant_mass = 0.001
-        cfg = BallisticMissileConfig(stages=stages)
+        cfg = BallisticMissileConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
         missile = BallisticMissile(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="T")
 
@@ -290,7 +291,7 @@ class TestBallisticMissileUpdate:
             name="OnlyStage",
         )
         stages = [MissileStage(single_stage_cfg)]
-        cfg = BallisticMissileConfig(stages=stages)
+        cfg = BallisticMissileConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
         missile = BallisticMissile(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="Single")
 
@@ -321,11 +322,18 @@ class TestBallisticMissileAccelerations:
         r = earth.radius + 500_000.0
         vel = np.array([0.0, 1000.0, 0.0])
 
-        m_thrust = BallisticMissile(position=[r, 0.0], cfg=BallisticMissileConfig(stages=stages_thrust), name="A")
-        m_thrust.velocity = vel.copy()
-
-        m_coast = BallisticMissile(position=[r, 0.0], cfg=BallisticMissileConfig(stages=stages_no_thrust), name="B")
-        m_coast.velocity = vel.copy()
+        m_thrust = BallisticMissile(
+            position=[r, 0.0],
+            cfg=BallisticMissileConfig(stages=stages_thrust, guidance=NoGuidance(None, None)),
+            name="A",
+            velocity=vel.copy(),
+        )
+        m_coast = BallisticMissile(
+            position=[r, 0.0],
+            cfg=BallisticMissileConfig(stages=stages_no_thrust, guidance=NoGuidance(None, None)),
+            name="B",
+            velocity=vel.copy(),
+        )
 
         acc_thrust = np.linalg.norm(m_thrust.accelerations(earth))
         acc_coast = np.linalg.norm(m_coast.accelerations(earth))
