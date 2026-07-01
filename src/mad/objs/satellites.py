@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from mad.objs.base import Payload
 from mad.objs.projectiles import ProjectileConfig
-from mad.guidances import Guidance
+from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 import numpy as np
 from numpy.typing import NDArray
@@ -13,9 +13,9 @@ logger = SourceLogger()
 class SatelliteConfig:
     mass: float  # kg
     ref_radius: float  # m
+    guidance: Guidance | GuidanceManager
     Cd: float = 0.47  # sphere
     name: str = "Satellite"
-    guidance: Guidance | None = None
 
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2

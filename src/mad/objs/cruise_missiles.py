@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
-from typing import TYPE_CHECKING
 from mad.objs.base import BallisticObj, GuidedObj
 from mad.objs.planets import Planet
 from mad.utils.logger import SourceLogger
 
-if TYPE_CHECKING:
-    from mad.guidances import Guidance
+
+from mad.guidances import Guidance, GuidanceManager, GuidanceStates
 
 logger = SourceLogger()
 
@@ -17,9 +16,10 @@ class CruiseMissileConfig:
     mass: float  # kg
     ref_radius: float  # m
     Cd: float
+    guidance: "Guidance | GuidanceManager"
     thrust_acc: float = 50.0  # m/s² — acceleration to reach cruise speed quickly
     name: str = "CruiseMissile"
-    guidance: "Guidance | None" = None
+
     max_range_m: float = 1_000_000.0  # m
     yield_kt: float = 0.0  # kt — default to conventional warhead
 
@@ -43,7 +43,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
         )
         self.config = config
         self.guidance = config.guidance
-        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, t)
         self.t = t
         self.total_distance_traveled = 0.0
         self.motor_active = True
@@ -65,8 +65,8 @@ class CruiseMissile(BallisticObj, GuidedObj):
         if self.total_distance_traveled >= self.config.max_range_m:
             self.motor_active = False
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
-        if self.guidance_results is not None and self.guidance_results.state == "detonate":
+        self.guidance_results = self.guidance.get_guidance(self, self.t)
+        if self.guidance_results.state == GuidanceStates.DETONATE:
             self.detonate()
         return None
 
@@ -84,11 +84,11 @@ class CruiseMissile(BallisticObj, GuidedObj):
             # Apply guidance direction directly. The guidance returns a fractional vector
             # (components scaled relative to thrust_acc), so multiply directly without
             # renormalizing to preserve the absolute radial/tangential magnitudes.
-            if self.guidance_results is not None:
-                d = self.guidance_results.direction
-                d_norm = np.linalg.norm(d)
-                if d_norm > 1e-8:
-                    thrust += self.thrust_acc * d
+
+            d = self.guidance_results.direction
+            d_norm = np.linalg.norm(d)
+            if d_norm > 1e-8:
+                thrust += self.thrust_acc * d
 
         return gravity + drag + thrust
 

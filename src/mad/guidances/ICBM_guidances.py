@@ -1,5 +1,6 @@
 from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
+from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
+from typing import Callable
 
 
 import numpy as np
@@ -15,11 +16,17 @@ class TabulatedBallistic(Guidance):
     The ballistic table is a CSV file with columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     """
 
-    def __init__(self, planet, target: MovableObj, ballistic_table_path: str):
-        super().__init__(planet, target)
+    def __init__(
+        self,
+        planet,
+        target: MovableObj,
+        ballistic_table_path: str,
+        interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
 
         if self.ballistic_guidance is None:
             logger["Guidance"].error("Ballistic table not loaded. Cannot compute guidance.")

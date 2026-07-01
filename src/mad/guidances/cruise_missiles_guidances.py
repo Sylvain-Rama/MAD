@@ -1,6 +1,7 @@
 from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
+from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -40,8 +41,9 @@ class CruiseWaypointGuidance(Guidance):
         planet,
         target: MovableObj,
         config: CruiseGuidanceConfig,
+        interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target)
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
 
         self.config = config
 
@@ -144,7 +146,7 @@ class CruiseWaypointGuidance(Guidance):
         dists = np.linalg.norm(pts - missile.position, axis=1)
         self._progress_s = float(candidates[int(np.argmin(dists))])
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Terminal condition: missile is within 100 m of the target.
         dist_to_target = np.linalg.norm(missile.position - self.target.position)
         if dist_to_target < 100.0:
@@ -239,14 +241,15 @@ class PurePursuit(Guidance):
         altitude_settling_time_s: float = 30.0,
         terminal_range_m: float = 1000.0,
         kill_radius_m: float = 30.0,
+        interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target)
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self._cruise_altitude_m = cruise_altitude_m
         self.altitude_settling_time_s = altitude_settling_time_s
         self.terminal_range_m = terminal_range_m
         self.kill_radius_m = kill_radius_m
 
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Initialise cruise altitude from the missile's current altitude on the first call.
         # if self._cruise_altitude_m is None:
         self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.planet.radius

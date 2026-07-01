@@ -1,18 +1,14 @@
 from dataclasses import dataclass, asdict, field
 import numpy as np
 from numpy.typing import NDArray
-from typing import TYPE_CHECKING
-from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
+from mad.objs import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
-from mad.guidances import GuidanceStates
+from mad.guidances import GuidanceStates, Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 from mad.configs.physics_cfg import G0
 
 from copy import deepcopy
-
-if TYPE_CHECKING:
-    from mad.guidances import Guidance
 
 logger = SourceLogger()
 
@@ -22,9 +18,9 @@ class RVConfig:
     mass: float  # kg
     ref_radius: float  # m
     Cd: float
+    guidance: Guidance | GuidanceManager
     name: str = "ReentryVehicle"
     yield_kt: float = 0.0  # kt
-    guidance: "Guidance | None" = None
     RCS_thrust: float = 500.0  # N, used for terminal guidance.
 
     def __post_init__(self):
@@ -35,11 +31,17 @@ class RVConfig:
 
 
 class ReentryVehicle(Payload, GuidedObj):
+    """RVs are a special type of payload that can receive guidance commands and have a yield (kt) for detonation.
+    They have a small RCS thruster for terminal guidance, which is used to steer the RV towards its target during the final phase of flight.
+    We assume this thruster is not limited by propellant mass, and can be used for the entire flight.
+    This is a simplification, but it allows us to focus on the guidance and detonation aspects of the RV without worrying about propellant management.
+    """
+
     def __init__(self, config: RVConfig, position: NDArray, velocity=None, t=0.0):
         Payload.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd, t)
         self.yield_kt = config.yield_kt
         self.guidance = config.guidance
-        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, t)
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
@@ -57,7 +59,7 @@ class ReentryVehicle(Payload, GuidedObj):
 
     def update(self, dt: float) -> None:
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
+        self.guidance_results = self.guidance.get_guidance(self, self.t)
 
         return None
 
@@ -80,13 +82,13 @@ class ReentryVehicle(Payload, GuidedObj):
         drag = planet.drag(self)
 
         thrust = np.zeros_like(self.velocity)
-        if self.guidance_results is not None:
+        if self.guidance_results.state != GuidanceStates.IDLE:
             d = self.guidance_results.direction
             d_norm = np.linalg.norm(d)
             if d_norm > 1e-8:
                 desired_acc = self.guidance_results.magnitude
                 acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
-                thrust = acc * (d / d_norm)
+                thrust = acc * d / d_norm
 
         return gravity + drag + thrust
 
@@ -190,7 +192,7 @@ class MissileStage:
 @dataclass
 class BallisticMissileConfig:
     stages: list[MissileStage]
-    guidance: "Guidance | None" = None
+    guidance: Guidance | GuidanceManager
     payloads: list[ReleasableConfig] = field(default_factory=list)
     payload_separation_interval: float = 2.0  # Time between payload separations, in seconds.
 
@@ -320,42 +322,41 @@ class BallisticMissile(BallisticObj, GuidedObj):
         # Snapshot the active burn group before any mutations so that stage-removal
         # logic below can reliably tell which stages were already burning.
         burn_group = self._active_burn_group
-        for stage in burn_group:
-            stage.update(dt)
+        self.guidance_results = self.guidance.get_guidance(self, self.t)
+        if self.guidance_results.state != GuidanceStates.IDLE:
+            for stage in burn_group:
+                stage.update(dt)
 
-        self.guidance_results = self.guidance.get_guidance(self, self.t) if self.guidance else None
+        if (
+            self.guidance_results.state == GuidanceStates.RELEASE_PAYLOAD
+            and self.t - self.last_payload_separation_time > self.payload_separation_interval
+            and self.payloads
+        ):
+            next_cfg = self.payloads.pop(0)
+            payload_name = f"{next_cfg.name}_{self.released_payloads + 1}"
 
-        if self.guidance_results:
-            if (
-                self.guidance_results.state == GuidanceStates.RELEASE_PAYLOAD
-                and self.t - self.last_payload_separation_time > self.payload_separation_interval
-                and self.payloads
-            ):
-                next_cfg = self.payloads.pop(0)
-                payload_name = f"{next_cfg.name}_{self.released_payloads + 1}"
+            release_velocity = (
+                self.guidance_results.release_velocity
+                if self.guidance_results.release_velocity is not None
+                else self.velocity.copy()
+            )
 
-                release_velocity = (
-                    self.guidance_results.release_velocity
-                    if self.guidance_results.release_velocity is not None
-                    else self.velocity.copy()
-                )
+            payload = next_cfg.create(
+                position=self.position.copy(),
+                velocity=release_velocity,
+                t=deepcopy(self.t),
+            )
+            payload.name = payload_name
+            released_objects.append(payload)
+            logger["Missile"].info(f"{self.t:<.2f}s - {self.name} released payload {payload_name} at {self.t:.2f}.")
+            self.released_payloads += 1
+            self.last_payload_separation_time = deepcopy(self.t)
 
-                payload = next_cfg.create(
-                    position=self.position.copy(),
-                    velocity=release_velocity,
-                    t=deepcopy(self.t),
-                )
-                payload.name = payload_name
-                released_objects.append(payload)
-                logger["Missile"].info(f"{self.t:<.2f}s - {self.name} released payload {payload_name} at {self.t:.2f}.")
-                self.released_payloads += 1
-                self.last_payload_separation_time = deepcopy(self.t)
-
-                # Cut thrust immediately on first payload release without deactivating stages
-                # (stages must remain active to allow subsequent payload separations and keep the same mass).
-                for stage in self.stages:
-                    stage.thrust = 0.0
-                    stage.mass_flow_rate = 0.0
+            # Cut thrust immediately on first payload release without deactivating stages
+            # (stages must remain active to allow subsequent payload separations and keep the same mass).
+            for stage in self.stages:
+                stage.thrust = 0.0
+                stage.mass_flow_rate = 0.0
 
         if self.n_payloads > 0 and self.released_payloads >= self.n_payloads:
             for stage in self.stages:

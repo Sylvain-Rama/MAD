@@ -19,6 +19,9 @@ class PlanetConfig:
     def to_dict(self):
         return asdict(self)
 
+    def create(self) -> "Planet":
+        return Planet(self)
+
 
 class Planet(MovableObj):
     def __init__(self, config: PlanetConfig):
