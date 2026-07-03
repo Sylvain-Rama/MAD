@@ -1,3 +1,8 @@
+"""Cruise missile guidance laws.
+Cruise missiles are much simpler than rockets: they fly until they reach their max_range_m.
+The only thing to manage is the altitude, which is done with a gravity-compensating PD controller.
+"""
+
 from mad.objs.base import MovableObj
 from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
 from dataclasses import dataclass
@@ -201,12 +206,12 @@ class CruiseWaypointGuidance(Guidance):
         return GuidanceResults(direction=cmd, state=self.state)
 
 
-# TODO: This PurePursuit changes from altitude-hold pursuit to direct 3-D pursuit at a configurable terminal range.
+# TODO: This Chase guidance changes from altitude-hold pursuit to direct 3-D pursuit at a configurable terminal range.
 # allowing the missile to close on a target at any altitude.
 # This should be modified as a list of guidances with dynamic switching logic, rather than hardcoded into the guidance itself.
 
 
-class PurePursuit(Guidance):
+class Chase(Guidance):
     """Pure-pursuit guidance with altitude hold.
 
     The horizontal component points toward the target's current position

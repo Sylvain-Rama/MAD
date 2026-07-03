@@ -1,3 +1,15 @@
+"""Guidance laws for missiles and rockets.
+Guided objects are expected to implement the GuidableObj protocol, which exposes position, velocity, and other attributes needed for guidance calculations.
+Guidance classes are responsible for computing the desired acceleration direction and magnitude.
+The GuidanceManager class allows for sequencing multiple guidance laws, switching between them based on time, distance, or other conditions.
+
+Interrupts can be defined to switch guidance laws based on missile state, target state, planet state, simulation time, or travelled distance.
+See guidances/interrupt_guidances.py for examples of interrupt functions.
+
+Both Guidances and GuidanceManager classes can be used in the same way, as they both implement the same get_guidance interface.
+It is for the user to decide whether to use a single guidance law or a sequence of guidance laws for a given missile.
+"""
+
 from mad.objs import MovableObj, Planet
 
 from dataclasses import dataclass
@@ -10,7 +22,7 @@ from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
 
-
+# Guidance states for the missile, used to indicate the current phase of flight and guidance law.
 GuidanceStates = Enum("GuidanceStates", ["IDLE", "POWERED", "COASTING", "TERMINAL", "RELEASE_PAYLOAD", "DETONATE"])
 
 
@@ -41,6 +53,10 @@ class GuidableObj(Protocol):
 
 @dataclass
 class GuidanceResults:
+    """Results of a guidance law computation.
+    Contains the desired acceleration direction, magnitude, and the current guidance state.
+    """
+
     direction: NDArray  # Unit vector indicating the desired direction of acceleration (m/s²)
     state: GuidanceStates
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
@@ -116,12 +132,6 @@ class Guidance(ABC):
         gamma = np.arctan((v**2 - self.planet.mu / np.linalg.norm(missile.position)) / v**2 * np.tan(sigma / 2))
         return gamma
 
-    def gravity_turn_direction(self, missile: GuidableObj, optimal_gamma: NDArray) -> NDArray:
-        r_hat, t_hat = self.local_frame(missile)
-        theta = optimal_gamma * missile.burned_fraction
-        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
-        return d / np.linalg.norm(d)
-
     def _resolve_t_hat_sign(self, r_hat: NDArray, t_hat: NDArray) -> float:
         """Return (and cache) the sign that makes ``t_hat`` point prograde toward ``self.target``.
 
@@ -157,6 +167,8 @@ class Guidance(ABC):
 
     @abstractmethod
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults: ...
+
+    """Update to create a new guidance law, computing the desired acceleration direction and magnitude based on the missile's current state and the target's state."""
 
 
 class GuidanceManager:
@@ -205,7 +217,7 @@ class NoGuidance(Guidance):
 
 
 class IdleGuidance(Guidance):
-    """Idle guidance: the missile is not guided, returning 0 will negate thrust."""
+    """Idle guidance: the missile is not guided, returning 0 will remove thrust."""
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
@@ -237,6 +249,12 @@ class PurePursuitGuidance(Guidance):
 class GravityTurn(Guidance):
     """Gravity turn: the rocket starts vertically and gradually turns towards the target, following a smooth curve.
     The optimal curve is computed based on the current velocity and the central angle to the target."""
+
+    def gravity_turn_direction(self, missile: GuidableObj, optimal_gamma: NDArray) -> NDArray:
+        r_hat, t_hat = self.local_frame(missile)
+        theta = optimal_gamma * missile.burned_fraction
+        d = np.cos(theta) * r_hat + np.sin(theta) * t_hat
+        return d / np.linalg.norm(d)
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         sigma = self.central_angle(missile, self.target)

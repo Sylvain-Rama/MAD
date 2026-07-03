@@ -12,13 +12,13 @@ from mad.guidances.base_guidances import (
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance
-from mad.guidances.cruise_missiles_guidances import CruiseWaypointGuidance, CruiseGuidanceConfig, PurePursuit
+from mad.guidances.cruise_missiles_guidances import CruiseWaypointGuidance, CruiseGuidanceConfig, Chase
 
 __all__ = [
     "GuidableObj",
     "Guidance",
     "NoGuidance",
-    "PurePursuit",
+    "PurePursuitGuidance",
     "RCSGuidance",
     "ProportionalNavigation",
     "TabulatedBallistic",
@@ -31,4 +31,5 @@ __all__ = [
     "GuidanceInterrupts",
     "PurePursuitGuidance",
     "IdleGuidance",
+    "Chase",
 ]
