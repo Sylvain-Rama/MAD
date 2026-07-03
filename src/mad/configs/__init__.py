@@ -16,12 +16,12 @@ __all__ = [
     "rod_of_god",
     "tomahawk",
     "aster_30",
+    "aster_30_guidance",
     "G",
     "VOXEL_SIZE",
     "MILES_TO_METERS",
     "MACHS_TO_METERS_S",
     "tomahawk_guidance",
-    "aster_30_guidance",
     "V1",
     "V1_guidance",
 ]

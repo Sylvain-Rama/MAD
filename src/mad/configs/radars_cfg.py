@@ -1,3 +1,7 @@
+"""Radar configurations.
+Radars are set with a maximum range and a voxel size for broad-phase object detection.
+See objs/radars.py for the implementation of radars and their detection systems."""
+
 from mad.configs.physics_cfg import MILES_TO_METERS
 
 # See https://en.wikipedia.org/wiki/Solid_State_Phased_Array_Radar_System

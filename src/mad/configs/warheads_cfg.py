@@ -1,3 +1,7 @@
+"""Warhead configurations.
+Warheads are projectiles with a yield in kilotons (kt) of TNT equivalent.
+"""
+
 # See https://en.wikipedia.org/wiki/B53_nuclear_bomb
 B53_warhead = {
     "mass": 4000.0,  # kg
@@ -7,6 +11,7 @@ B53_warhead = {
     "yield_kt": 9.0 * 1000,  # kt
 }
 
+# See https://en.wikipedia.org/wiki/Kinetic_bombardment
 rod_of_god = {
     "mass": 8000.0,  # kg
     "ref_radius": 0.1,  # m

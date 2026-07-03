@@ -1,4 +1,7 @@
-"""Physics constants."""
+"""Physics constants.
+Used to define the default values of the simulation physics.
+These can be modified when creating a new simulation, but the default values are set here.
+"""
 
 G: float = 6.67408e-11  # m^3/(kg*s^2)
 G0: float = 9.80665  # m/s^2, value for earth
