@@ -1,3 +1,9 @@
+"""Base classes for all objects in the simulation.
+This includes MovableObj, BallisticObj, GuidedObj, Payload, and ReleasableConfig.
+See objs/projectiles.py for the implementation of projectiles and missiles.
+The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
+"""
+
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod

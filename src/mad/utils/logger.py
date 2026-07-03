@@ -8,6 +8,7 @@ _all_disabled: bool = False
 SOURCE_COLORS = {
     "Simulation": "<white>",
     "Missile": "<red>",
+    "Rocket": "<red>",
     "Interceptor": "<green>",
     "Physics": "<white>",
     "Projectile": "<blue>",

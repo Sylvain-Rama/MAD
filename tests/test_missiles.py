@@ -3,7 +3,7 @@ ReentryVehicle, BallisticMissileConfig, and BallisticMissile."""
 
 import numpy as np
 import pytest
-from mad.objs.missiles import (
+from mad.objs.rockets import (
     MissileStageConfig,
     MissileStage,
     RVConfig,
