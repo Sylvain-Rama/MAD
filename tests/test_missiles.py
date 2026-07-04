@@ -4,12 +4,12 @@ ReentryVehicle, BallisticMissileConfig, and BallisticMissile."""
 import numpy as np
 import pytest
 from mad.objs.rockets import (
-    MissileStageConfig,
-    MissileStage,
+    RocketStageConfig,
+    RocketStage,
     RVConfig,
     ReentryVehicle,
-    BallisticMissileConfig,
-    BallisticMissile,
+    RocketConfig,
+    Rocket,
 )
 from mad.objs.planets import Planet, PlanetConfig
 from mad.configs.planets_cfg import EARTH_SETTINGS
@@ -32,7 +32,7 @@ def earth():
 
 @pytest.fixture
 def stage_cfg():
-    return MissileStageConfig(
+    return RocketStageConfig(
         thrust=1_900_000.0,
         ref_radius=1.5,
         dry_mass=4_000.0,
@@ -44,7 +44,7 @@ def stage_cfg():
 
 @pytest.fixture
 def stage(stage_cfg):
-    return MissileStage(stage_cfg)
+    return RocketStage(stage_cfg)
 
 
 @pytest.fixture
@@ -54,33 +54,33 @@ def RV_cfg(earth):
 
 @pytest.fixture
 def two_stage_missile(earth):
-    stages = [MissileStage(MissileStageConfig(**s)) for s in titan1_stages]
-    cfg = BallisticMissileConfig(stages=stages, guidance=NoGuidance(None, None))
+    stages = [RocketStage(RocketStageConfig(**s)) for s in titan1_stages]
+    cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
     r = earth.radius + 10.0
-    return BallisticMissile(position=[r, 0.0], cfg=cfg, name="Titan")
+    return Rocket(position=[r, 0.0], cfg=cfg, name="Titan")
 
 
 # ---------------------------------------------------------------------------
-# MissileStageConfig
+# RocketStageConfig
 # ---------------------------------------------------------------------------
 
 
-class TestMissileStageConfig:
+class TestRocketStageConfig:
     def test_full_mass_computed_from_dry_and_propellant(self):
-        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=0.5, dry_mass=100.0, propellant_mass=900.0, Isp=300.0)
+        cfg = RocketStageConfig(thrust=1_000.0, ref_radius=0.5, dry_mass=100.0, propellant_mass=900.0, Isp=300.0)
         assert cfg.full_mass == pytest.approx(1_000.0)
 
     def test_dry_mass_computed_from_full_and_propellant(self):
-        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, propellant_mass=900.0, Isp=300.0)
+        cfg = RocketStageConfig(thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, propellant_mass=900.0, Isp=300.0)
         assert cfg.dry_mass == pytest.approx(100.0)
 
     def test_propellant_mass_computed_from_full_and_dry(self):
-        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, dry_mass=100.0, Isp=300.0)
+        cfg = RocketStageConfig(thrust=1_000.0, ref_radius=0.5, full_mass=1_000.0, dry_mass=100.0, Isp=300.0)
         assert cfg.propellant_mass == pytest.approx(900.0)
 
     def test_inconsistent_masses_raises(self):
         with pytest.raises(ValueError, match="Inconsistent"):
-            MissileStageConfig(
+            RocketStageConfig(
                 thrust=1_000.0,
                 ref_radius=0.5,
                 dry_mass=100.0,
@@ -93,7 +93,7 @@ class TestMissileStageConfig:
         thrust = 1_000.0
         burn_time = 100.0
         propellant = 50.0
-        cfg = MissileStageConfig(
+        cfg = RocketStageConfig(
             thrust=thrust,
             ref_radius=0.5,
             dry_mass=10.0,
@@ -104,13 +104,13 @@ class TestMissileStageConfig:
         assert cfg.Isp == pytest.approx(expected_isp, rel=1e-6)
 
     def test_area_computed(self):
-        cfg = MissileStageConfig(thrust=1_000.0, ref_radius=1.0, dry_mass=100.0, propellant_mass=900.0, Isp=300.0)
+        cfg = RocketStageConfig(thrust=1_000.0, ref_radius=1.0, dry_mass=100.0, propellant_mass=900.0, Isp=300.0)
         assert cfg.area == pytest.approx(np.pi * 1.0**2, rel=1e-9)
 
     def test_missing_isp_and_burn_time_raises(self):
         with pytest.raises((ValueError, TypeError)):
-            MissileStage(
-                MissileStageConfig(
+            RocketStage(
+                RocketStageConfig(
                     thrust=1_000.0,
                     ref_radius=0.5,
                     dry_mass=100.0,
@@ -121,11 +121,11 @@ class TestMissileStageConfig:
 
 
 # ---------------------------------------------------------------------------
-# MissileStage
+# RocketStage
 # ---------------------------------------------------------------------------
 
 
-class TestMissileStage:
+class TestRocketStage:
     def test_initial_mass(self, stage, stage_cfg):
         expected = stage_cfg.dry_mass + stage_cfg.propellant_mass
         assert stage.mass == pytest.approx(expected)
@@ -229,7 +229,7 @@ class TestReentryVehicle:
 
 
 # ---------------------------------------------------------------------------
-# BallisticMissile — properties
+# Rocket — properties
 # ---------------------------------------------------------------------------
 
 
@@ -268,12 +268,12 @@ class TestBallisticMissileUpdate:
 
     def test_stage_separation_returns_projectile(self, earth):
         """When the first stage runs out, update should return the spent stage as a Projectile."""
-        stages = [MissileStage(MissileStageConfig(**s)) for s in titan1_stages]
+        stages = [RocketStage(RocketStageConfig(**s)) for s in titan1_stages]
         # Deplete the first stage immediately
         stages[0].propellant_mass = 0.001
-        cfg = BallisticMissileConfig(stages=stages, guidance=NoGuidance(None, None))
+        cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
-        missile = BallisticMissile(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="T")
+        missile = Rocket(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="T")
 
         missile.update(1.0)  # burns last propellant; stage still active
         result = missile.update(0.0)  # stage now detects empty and separates
@@ -282,7 +282,7 @@ class TestBallisticMissileUpdate:
 
     def test_missile_inactive_after_all_stages_spent(self, earth):
         """A single-stage missile becomes inactive when its stage is exhausted."""
-        single_stage_cfg = MissileStageConfig(
+        single_stage_cfg = RocketStageConfig(
             thrust=500_000.0,
             ref_radius=1.0,
             dry_mass=500.0,
@@ -290,10 +290,10 @@ class TestBallisticMissileUpdate:
             Isp=300.0,
             name="OnlyStage",
         )
-        stages = [MissileStage(single_stage_cfg)]
-        cfg = BallisticMissileConfig(stages=stages, guidance=NoGuidance(None, None))
+        stages = [RocketStage(single_stage_cfg)]
+        cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
-        missile = BallisticMissile(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="Single")
+        missile = Rocket(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="Single")
 
         missile.update(1.0)  # burns propellant; stage still active
         missile.update(0.0)  # stage detects empty → separates → missile inactive
@@ -301,11 +301,11 @@ class TestBallisticMissileUpdate:
 
 
 # ---------------------------------------------------------------------------
-# BallisticMissile — accelerations
+# Rocket — accelerations
 # ---------------------------------------------------------------------------
 
 
-class TestBallisticMissileAccelerations:
+class TestRocketAccelerations:
     def test_accelerations_returns_array(self, two_stage_missile, earth):
         two_stage_missile.velocity = np.array([0.0, 100.0, 0.0])
         acc = two_stage_missile.accelerations(earth)
@@ -314,23 +314,23 @@ class TestBallisticMissileAccelerations:
 
     def test_thrust_increases_acceleration(self, earth):
         """Missile with thrust should have larger acceleration magnitude than one without."""
-        stages_thrust = [MissileStage(MissileStageConfig(**s)) for s in titan1_stages]
-        stages_no_thrust = [MissileStage(MissileStageConfig(**s)) for s in titan1_stages]
+        stages_thrust = [RocketStage(RocketStageConfig(**s)) for s in titan1_stages]
+        stages_no_thrust = [RocketStage(RocketStageConfig(**s)) for s in titan1_stages]
         for s in stages_no_thrust:
             s.propellant_mass = 0.0  # no fuel → no thrust
 
         r = earth.radius + 500_000.0
         vel = np.array([0.0, 1000.0, 0.0])
 
-        m_thrust = BallisticMissile(
+        m_thrust = Rocket(
             position=[r, 0.0],
-            cfg=BallisticMissileConfig(stages=stages_thrust, guidance=NoGuidance(None, None)),
+            cfg=RocketConfig(stages=stages_thrust, guidance=NoGuidance(None, None)),
             name="A",
             velocity=vel.copy(),
         )
-        m_coast = BallisticMissile(
+        m_coast = Rocket(
             position=[r, 0.0],
-            cfg=BallisticMissileConfig(stages=stages_no_thrust, guidance=NoGuidance(None, None)),
+            cfg=RocketConfig(stages=stages_no_thrust, guidance=NoGuidance(None, None)),
             name="B",
             velocity=vel.copy(),
         )
@@ -341,11 +341,11 @@ class TestBallisticMissileAccelerations:
 
 
 # ---------------------------------------------------------------------------
-# BallisticMissile — ballistic_range
+# Rocket — ballistic_range
 # ---------------------------------------------------------------------------
 
 
-class TestBallisticRange:
+class TestRocketRange:
     def test_ballistic_range_positive(self, two_stage_missile, earth):
         r = two_stage_missile.ballistic_range(earth)
         assert r > 0

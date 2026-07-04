@@ -1,3 +1,9 @@
+"""This module defines the Projectile class, which represents a simple ballistic object that can be launched
+and will be affected by gravity and drag forces.
+The Projectile class is a subclass of BallisticObj and is initialized with a ProjectileConfig dataclass
+that contains its properties such as mass, reference radius, drag coefficient, and initial position and velocity.
+"""
+
 from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
@@ -34,7 +40,6 @@ class Projectile(BallisticObj):
         self.t = t
 
     def accelerations(self, planet) -> NDArray:
-
         if self.distance(planet) <= planet.radius:
             logger["Projectile"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False

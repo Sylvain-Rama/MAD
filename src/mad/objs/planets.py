@@ -1,7 +1,10 @@
+"""This module defines the Planet class, which represents a celestial body with mass, radius, and other properties.
+The Planet class will calculate gravitational forces, drag forces, and distances between objects on its surface."""
+
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import MovableObj, BallisticObj
-from mad.configs.physics_cfg import G
+from mad.objs import MovableObj, BallisticObj
+from mad.configs import G
 from dataclasses import dataclass, asdict
 
 
@@ -32,6 +35,7 @@ class Planet(MovableObj):
         self.rho0 = config.rho0
         self.mu = self.mass * G
 
+    # Helpers for the user to know the planet's properties without having to calculate them manually.
     @property
     def escape_velocity(self):
         return np.sqrt(2 * self.mu / self.radius)
@@ -59,6 +63,7 @@ class Planet(MovableObj):
         )
 
     def drag(self, obj: BallisticObj) -> NDArray:
+        # Returns the drag acceleration vector (m/s^2) on the object, if it is in the atmosphere.
         drag = np.zeros_like(obj.velocity)
         alt = max(0.0, float(np.linalg.norm(obj.position - self.position)) - self.radius)
 
@@ -71,6 +76,7 @@ class Planet(MovableObj):
         return drag
 
     def gravity(self, other: MovableObj) -> NDArray:
+        # Returns the gravity acceleration vector (m/s^2) on the other object.
         r_vec = other.position - self.position
         dist = np.linalg.norm(r_vec)
         if dist < 1e-6:

@@ -1,6 +1,7 @@
+"""Satellites are payloads that can be launched into orbit and will be affected by gravity and drag forces."""
+
 from dataclasses import dataclass
-from mad.objs.base import Payload
-from mad.objs.projectiles import ProjectileConfig
+from mad.objs import Payload, ProjectileConfig
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 import numpy as np
@@ -44,8 +45,7 @@ class Satellite(Payload):
         self.config = config
 
     def accelerations(self, planet) -> NDArray:
-        # Typically, we can ignore drag for stellites.
-
+        # Typically, we can ignore drag for satellites.
         if self.distance(planet) <= planet.radius:
             logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False
@@ -64,7 +64,7 @@ class Satellite(Payload):
 class Sputnik(Satellite):
     def update(self, dt: float) -> None:
         self.t += dt
-        # Sputnik beep from time to time.
+        # Sputnik beeps from time to time.
         if self.t % 4000 < dt:
             logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} -- Beep Beep!")
 

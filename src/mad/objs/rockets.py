@@ -1,12 +1,25 @@
+"""This module defines the ReentryVehicle, RocketStage, and Rocket classes, which represent different types of ballistic objects
+that can be launched and will be affected by gravity and drag forces.
+Rockets are defined by a list of RocketStage objects, a guidance system, and a list of payloads.
+"""
+
 from dataclasses import dataclass, asdict, field
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
-from mad.objs.projectiles import ProjectileConfig, Projectile
-from mad.objs.planets import Planet
+from mad.objs import (
+    BallisticObj,
+    GuidedObj,
+    MovableObj,
+    Payload,
+    ReleasableConfig,
+    ProjectileConfig,
+    Projectile,
+    Planet,
+)
+
 from mad.guidances import GuidanceStates, Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
-from mad.configs.physics_cfg import G0
+from mad.configs import G0
 
 from copy import deepcopy
 
