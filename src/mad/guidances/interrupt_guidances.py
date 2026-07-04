@@ -1,3 +1,9 @@
+"""Guidance interrupt functions.
+A Guidance Manager can be configured with a list of guidance laws each with its own interrupt functions.
+These functions can be used to interrupt a guidance law based on missile state, target state, planet state, simulation time, or travelled distance.
+See guidances/base_guidances.py for the GuidanceInterrupts dataclass, which is passed to the interrupt functions.
+"""
+
 from mad.guidances.base_guidances import GuidanceInterrupts
 import numpy as np
 

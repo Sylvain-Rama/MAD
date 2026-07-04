@@ -1,5 +1,8 @@
 """
-Projectile configurations for MAD."""
+Projectiles are aerodynamic objects that are affected by gravity and air resistance.
+However they don't have propulsion, and are not controlled by guidance systems.
+See objs/projectiles.py for the implementation of projectiles.
+"""
 
 rock = {
     "mass": 1.0,  # kg

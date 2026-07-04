@@ -1,15 +1,18 @@
+"""Guidance laws for satellites and launch vehicles."""
+
 import numpy as np
 from numpy.typing import NDArray
 from typing import Callable
 
 from mad.objs import MovableObj
-from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates
-from mad.guidances.base_guidances import GuidanceInterrupts
+from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
 from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
 
 
+# TODO: Change this complex guidance for satellites to a list of guidances with dynamic switching logic,
+# rather than hardcoded into the guidance itself.
 class LEOInsertionGuidance(Guidance):
     """Guides a launch vehicle to a low-Earth orbit (circular or elliptical) at a desired perigee altitude.
 

@@ -1,3 +1,9 @@
+"""Configuration dicts for cruise missiles and their guidance systems.
+Cruise missiles are much simpler than rockets: they fly until they reach their max_range_m.
+
+See objs/cruise_missile.py for the implementation of cruise missiles and their guidance systems.
+"""
+
 from mad.configs.physics_cfg import MACHS_TO_METERS_S
 
 # See https://en.wikipedia.org/wiki/Tomahawk_missile
@@ -36,6 +42,7 @@ aster_30_guidance = {
     "kill_radius_m": 30.0,
 }
 
+# See https://en.wikipedia.org/wiki/V-1_flying_bomb
 V1 = {
     "name": "V-1",
     "mass": 2150.0,  # kg

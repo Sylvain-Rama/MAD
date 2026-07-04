@@ -1,9 +1,13 @@
+"""This module defines the Radar class, which represents a radar system that can detect objects within a certain range.
+The voxel_size is used to determine which voxels to check for detections, and the detection strength is calculated based
+on the distance from the radar."""
+
 import numpy as np
 import itertools
 from mad.objs import MovableObj
 from mad.objs import Planet
 from mad.utils.base_utils import to_voxel_key
-from mad.configs.physics_cfg import VOXEL_SIZE
+from mad.configs import VOXEL_SIZE
 
 from dataclasses import dataclass, asdict
 
@@ -18,6 +22,9 @@ class RadarConfig:
     @property
     def to_dict(self):
         return asdict(self)
+
+    def create(self, planet: Planet) -> "Radar":
+        return Radar(self, planet)
 
 
 class Radar(MovableObj):

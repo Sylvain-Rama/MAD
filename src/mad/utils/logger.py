@@ -1,3 +1,9 @@
+"""Logur based logger for MAD simulation.
+The user can define which sources are active or inactive, and the logger will filter messages accordingly.
+The logger is configured to output to stdout with a custom format that includes the time, level, source, and message.
+The source is color-coded based on the source name.
+"""
+
 from loguru import logger
 import sys
 
@@ -5,9 +11,13 @@ _inactive_sources: set[str] = set()
 _active_sources: set[str] = set()
 _all_disabled: bool = False
 
+# Definition of colors for the different sources.
+# If unspecified, the default color is yellow.
+# See https://loguru.readthedocs.io/en/stable/api/logger.html#color
 SOURCE_COLORS = {
     "Simulation": "<white>",
     "Missile": "<red>",
+    "Rocket": "<red>",
     "Interceptor": "<green>",
     "Physics": "<white>",
     "Projectile": "<blue>",

@@ -1,4 +1,6 @@
-"""Configs for missile stages"""
+"""Configs for Rocket objects
+Rockets are defined by a list of stages, each with its own mass, thrust, and specific impulse (Isp).
+"""
 
 # See https://en.wikipedia.org/wiki/HGM-25A_Titan_I#Specifications
 titan1_stages = [

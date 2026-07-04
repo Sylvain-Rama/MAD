@@ -1,4 +1,9 @@
-"""Planetary constants."""
+"""Planetary constants.
+These are used to define the planets in the simulation.
+See objs/planet.py for the implementation of planets.
+"""
+
+# TODO: Make sure that the simulation works for other position than the origin, and for other planets than Earth.
 
 EARTH_SETTINGS = {
     "position": [0.0, 0.0, 0.0],  # center of the sim
@@ -8,7 +13,6 @@ EARTH_SETTINGS = {
     "rho0": 1.225,  # kg / m^3
     "atmosphere_height": 8500.0,  # m
 }
-
 
 MOON_SETTINGS = {
     "position": [384400000.0, 0.0, 0.0],  # m, average distance from Earth

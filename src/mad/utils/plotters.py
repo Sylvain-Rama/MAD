@@ -1,9 +1,10 @@
+"""Helper plotters for MAD simulation."""
+
 import matplotlib.pyplot as plt
 import matplotlib.figure
 import matplotlib.patches
 import numpy as np
-from mad.objs.base import MovableObj
-from mad.objs.planets import Planet
+from mad.objs import MovableObj, Planet
 
 
 def plot_2D_planet_with_points(

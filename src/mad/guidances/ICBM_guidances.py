@@ -1,5 +1,7 @@
-from mad.objs.base import MovableObj
-from mad.guidances.base_guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
+"""Guidance laws for ICBMs & rockets."""
+
+from mad.objs import MovableObj
+from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
 from typing import Callable
 
 
