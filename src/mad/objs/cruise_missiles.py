@@ -4,7 +4,8 @@ This module defines the CruiseMissile class, which is a type of guided missile."
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs import BallisticObj, GuidedObj, Planet
+from mad.objs.base import BallisticObj, GuidedObj
+from mad.objs.planets import Planet
 from mad.utils.logger import SourceLogger
 
 from mad.guidances import Guidance, GuidanceManager, GuidanceStates
