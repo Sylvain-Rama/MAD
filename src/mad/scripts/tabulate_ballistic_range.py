@@ -75,24 +75,26 @@ def _simulate_row(args: tuple) -> dict:
     r0 = _worker_planet.radius + alt_km * 1e3
     v0 = v_kms * 1e3
     gamma_rad = np.radians(gamma_deg)
-    result = simulate(_worker_planet, _worker_config, _worker_simconfig, r0, v0, gamma_rad)
+    central_angle, range_km = simulate(_worker_planet, _worker_config, _worker_simconfig, r0, v0, gamma_rad)
+
     return dict(
         altitude_m=alt_km * 1e3,
         velocity_m_s=v0,
         gamma_rad=gamma_rad,
-        range_rad=result,
+        range_rad=central_angle,
+        range_km=range_km,
     )
 
 
 def simulate(
     planet: Planet, projconfig: ProjectileConfig, simconfig: SimParameters, r0: float, v0: float, gamma_rad: float
-) -> float | None:
+) -> tuple[float, float]:
     """
     Simulate a ballistic arc in the (x, y) plane starting from radius r0,
     speed v0, elevation angle gamma_rad above local horizontal.
 
     Returns the central angle covered (rad) until ground impact,
-    or np.nan if the object does not return within MAX_TIME.
+    and the range in kilometers, or (np.nan, np.nan) if the object does not return within MAX_TIME.
     """
     # Place the missile at (r0, 0, 0); build velocity in the x-y plane.
     pos = np.array([r0, 0.0, 0.0], dtype=float)
@@ -108,6 +110,16 @@ def simulate(
 
     simulated_object = run_simple_simulation([obj], planet, dt=simconfig.dt, max_time=simconfig.max_time)
 
+    if not simulated_object:
+        logger["I/O"].warning(f"Simulation failed for r0={r0}, v0={v0}, gamma_rad={gamma_rad}.")
+        return np.nan, np.nan
+
+    if simulated_object[0].active:
+        logger["I/O"].warning(
+            f"Simulation did not return to ground within max_time for r0={r0}, v0={v0}, gamma_rad={gamma_rad}."
+        )
+        return np.nan, np.nan
+
     final_pos = simulated_object[0].position
 
     cos_a = np.clip(
@@ -115,7 +127,10 @@ def simulate(
         -1.0,
         1.0,
     )
-    return float(np.arccos(cos_a))
+    central_angle = float(np.arccos(cos_a))
+    range_km = central_angle * planet.radius / 1000
+
+    return central_angle, range_km
 
 
 def main() -> None:
@@ -143,7 +158,6 @@ def main() -> None:
     total = len(grid)
     logger["I/O"].info(f"Using config '{args.config}' for ballistic object properties.")
     logger["I/O"].info(f"Computing {total} trajectories  (dt={simconfig.dt} s, max_time={simconfig.max_time} s) …")
-    logger["I/O"].info(f"Altitude range: {simconfig.altitudes_km} km")
 
     n_workers = cpu_count() - 1  # leave one core free for the main process
     logger["I/O"].info(f"Using {n_workers} worker processes.")

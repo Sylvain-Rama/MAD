@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+import pandas as pd
 from dataclasses import dataclass
 from scipy.spatial import KDTree
 from mad.utils.logger import SourceLogger
@@ -18,14 +19,27 @@ class BallisticTable:
     kdtree_range: KDTree  # Built from normalized (alt, vel, range_rad) for range-based gamma lookup
 
 
-BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad"]
+BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad", "range_km"]
 
 logger = SourceLogger()
 
 
+def load_ballistic_csv(table_name):
+    """Load a ballistic table from a CSV file and return a DataFrame"""
+    ballistic_values = load_ballistic_table(table_name)
+    df = pd.DataFrame({k: ballistic_values.table[:, i] for i, k in enumerate(BALLISTIC_FIELD_NAMES)})
+    df["altitude_km"] = np.round(df["altitude_m"] / 1000, 3)
+    df["gamma_deg"] = np.round(df["gamma_rad"] * 180 / np.pi, 3)
+    df["altitude_m"] = np.round(df["altitude_m"], 3)
+
+    return df
+
+
 def load_ballistic_table(table_name: str) -> BallisticTable | None:
-    """Load a ballistic table from a CSV file. The CSV file must have columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
-    The first row must be a header with exactly those column names. Returns a BallisticTable object."""
+    """Load a ballistic table from a CSV file and create the BallisticTable object.
+    The CSV file must have columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
+    The first row must be a header with exactly those column names.
+    """
 
     # TODO: Use a proper path management solution and make this more robust to different environments.
     # For now, we assume the tables are in src/mad/tables and the script is run from the root of the repo.

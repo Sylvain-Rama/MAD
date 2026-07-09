@@ -37,7 +37,7 @@ SIM_PARAMETERS = {
     "V1": {
         "altitudes_km": np.arange(0.1, 1, 0.05),
         "velocities_kms": np.arange(0.1, 0.2, 0.01),
-        "gammas_deg": np.arange(-10, 10, 1),
+        "gammas_deg": np.arange(-20, 20, 2),
         "dt": 1.0,
         "max_time": 3600.0,
     },
