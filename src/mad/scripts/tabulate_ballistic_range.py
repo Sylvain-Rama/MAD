@@ -27,7 +27,7 @@ from mad.configs import EARTH_SETTINGS
 from mad.simulation import run_simple_simulation
 from mad.utils.logger import SourceLogger, configure_logger
 from mad.utils.ballistic_tables import BALLISTIC_FIELD_NAMES
-from ranges_cfgs import SIM_PARAMETERS, AVAILABLE_OBJECTS, SimParameters
+from mad.scripts.ranges_cfgs import SIM_PARAMETERS, AVAILABLE_OBJECTS, SimParameters
 
 configure_logger(active_sources=["I/O"])
 logger = SourceLogger()

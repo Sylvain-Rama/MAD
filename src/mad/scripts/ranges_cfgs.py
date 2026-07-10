@@ -1,5 +1,7 @@
 import numpy as np
+from numpy.typing import NDArray
 from dataclasses import dataclass
+from typing import Any
 
 from mad.configs import B53_warhead, rod_of_god, V1
 
@@ -12,14 +14,14 @@ AVAILABLE_OBJECTS = {
 
 @dataclass
 class SimParameters:
-    altitudes_km: np.ndarray
-    velocities_kms: np.ndarray
-    gammas_deg: np.ndarray
+    altitudes_km: NDArray
+    velocities_kms: NDArray
+    gammas_deg: NDArray
     dt: float
     max_time: float
 
 
-SIM_PARAMETERS = {
+SIM_PARAMETERS: dict[str, dict[str, Any]] = {
     "rod_of_god": {
         "altitudes_km": np.arange(500, 1201, 10),
         "velocities_kms": np.arange(8, 10, 0.2),
