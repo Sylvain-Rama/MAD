@@ -23,36 +23,31 @@ from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.configs import EARTH_SETTINGS, B53_warhead, rod_of_god
+from mad.configs import EARTH_SETTINGS
 from mad.simulation import run_simple_simulation
 from mad.utils.logger import SourceLogger, configure_logger
 from mad.utils.ballistic_tables import BALLISTIC_FIELD_NAMES
+from mad.scripts.ranges_cfgs import SIM_PARAMETERS, AVAILABLE_OBJECTS, SimParameters
 
 configure_logger(active_sources=["I/O"])
 logger = SourceLogger()
-
-AVAILABLE_OBJECTS = {
-    "B53_warhead": B53_warhead,
-    "rod_of_god": rod_of_god,
-}
-
-
-DT = 10.0  # time step (s) — coarse is intentional
-MAX_TIME = 3600.0  # 2 h; enough for any sub-orbital ballistic arc
-
-ALTITUDES_KM = np.arange(500, 1201, 10)
-VELOCITIES_KMS = np.arange(8, 10, 0.2)
-GAMMAS_DEG = np.arange(-50, 20, 2)
 
 
 def parse_args():
     parser = ArgumentParser(description="Tabulate ballistic range for Earth.")
     parser.add_argument(
+        "--object",
+        "-o",
+        type=str,
+        default="V1",
+        help="Ballistic Object config to use (default: V1). Available: " + ", ".join(AVAILABLE_OBJECTS.keys()),
+    )
+    parser.add_argument(
         "--config",
         "-c",
         type=str,
-        default="rod_of_god",
-        help="Ballistic Object config to use (default: rod_of_god). Available: " + ", ".join(AVAILABLE_OBJECTS.keys()),
+        default="V1",
+        help="Simulation config to use (default: V1). Available: " + ", ".join(SIM_PARAMETERS.keys()),
     )
     return parser.parse_args()
 
@@ -60,39 +55,46 @@ def parse_args():
 # ── multiprocessing helpers ──────────────────────────────────────────────────
 _worker_planet: Planet | None = None
 _worker_config: ProjectileConfig | None = None
+_worker_simconfig: SimParameters | None = None
 
 
-def _pool_initializer(planet: Planet, config: ProjectileConfig) -> None:
-    """Copy planet and config into each worker process once."""
-    global _worker_planet, _worker_config
+def _pool_initializer(planet: Planet, config: ProjectileConfig, simconfig: SimParameters) -> None:
+    """Copy planet, config, and simconfig into each worker process once."""
+    global _worker_planet, _worker_config, _worker_simconfig
     _worker_planet = planet
     _worker_config = config
+    _worker_simconfig = simconfig
 
 
 def _simulate_row(args: tuple) -> dict:
     """Worker entry-point: unpack grid point, call simulate, return row dict."""
     assert _worker_planet is not None
     assert _worker_config is not None
+    assert _worker_simconfig is not None
     alt_km, v_kms, gamma_deg = args
     r0 = _worker_planet.radius + alt_km * 1e3
     v0 = v_kms * 1e3
     gamma_rad = np.radians(gamma_deg)
-    result = simulate(_worker_planet, _worker_config, r0, v0, gamma_rad)
+    central_angle, range_km = simulate(_worker_planet, _worker_config, _worker_simconfig, r0, v0, gamma_rad)
+
     return dict(
         altitude_m=alt_km * 1e3,
         velocity_m_s=v0,
         gamma_rad=gamma_rad,
-        range_rad=result,
+        range_rad=central_angle,
+        range_km=range_km,
     )
 
 
-def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gamma_rad: float) -> float | None:
+def simulate(
+    planet: Planet, projconfig: ProjectileConfig, simconfig: SimParameters, r0: float, v0: float, gamma_rad: float
+) -> tuple[float, float]:
     """
     Simulate a ballistic arc in the (x, y) plane starting from radius r0,
     speed v0, elevation angle gamma_rad above local horizontal.
 
     Returns the central angle covered (rad) until ground impact,
-    or np.nan if the object does not return within MAX_TIME.
+    and the range in kilometers, or (np.nan, np.nan) if the object does not return within MAX_TIME.
     """
     # Place the missile at (r0, 0, 0); build velocity in the x-y plane.
     pos = np.array([r0, 0.0, 0.0], dtype=float)
@@ -101,12 +103,22 @@ def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gam
 
     vel = v0 * (np.sin(gamma_rad) * r_hat + np.cos(gamma_rad) * t_hat)
 
-    config.position = pos.tolist()
-    config.velocity = vel.tolist()
-    obj = Projectile(config)
+    projconfig.position = pos.tolist()
+    projconfig.velocity = vel.tolist()
+    obj = Projectile(projconfig)
     start_pos = obj.position.copy()
 
-    simulated_object = run_simple_simulation([obj], planet, dt=DT, max_time=MAX_TIME)
+    simulated_object = run_simple_simulation([obj], planet, dt=simconfig.dt, max_time=simconfig.max_time)
+
+    if not simulated_object:
+        logger["I/O"].warning(f"Simulation failed for r0={r0}, v0={v0}, gamma_rad={gamma_rad}.")
+        return np.nan, np.nan
+
+    if simulated_object[0].active:
+        logger["I/O"].warning(
+            f"Simulation did not return to ground within max_time for r0={r0}, v0={v0}, gamma_rad={gamma_rad}."
+        )
+        return np.nan, np.nan
 
     final_pos = simulated_object[0].position
 
@@ -115,28 +127,37 @@ def simulate(planet: Planet, config: ProjectileConfig, r0: float, v0: float, gam
         -1.0,
         1.0,
     )
-    return float(np.arccos(cos_a))
+    central_angle = float(np.arccos(cos_a))
+    range_km = central_angle * planet.radius / 1000
+
+    return central_angle, range_km
 
 
 def main() -> None:
     args = parse_args()
     planet = Planet(PlanetConfig(**EARTH_SETTINGS))
-    config = AVAILABLE_OBJECTS[args.config]
+    object = AVAILABLE_OBJECTS[args.object]
+    config = SIM_PARAMETERS[args.config]
+
+    simconfig = SimParameters(**config)
 
     ballistic_config = ProjectileConfig(
         position=[0.0, 0.0, 0.0],
-        mass=float(config["mass"] if "mass" in config else config["dry_mass"]),
-        ref_radius=float(config["ref_radius"]),
-        Cd=float(config["Cd"]),
-        name=str(config["name"]),
+        mass=float(object["mass"] if "mass" in object else object["dry_mass"]),
+        ref_radius=float(object["ref_radius"]),
+        Cd=float(object["Cd"]),
+        name=str(object["name"]),
     )
 
     grid = [
-        (alt_km, v_kms, gamma_deg) for alt_km in ALTITUDES_KM for v_kms in VELOCITIES_KMS for gamma_deg in GAMMAS_DEG
+        (alt_km, v_kms, gamma_deg)
+        for alt_km in simconfig.altitudes_km
+        for v_kms in simconfig.velocities_kms
+        for gamma_deg in simconfig.gammas_deg
     ]
     total = len(grid)
     logger["I/O"].info(f"Using config '{args.config}' for ballistic object properties.")
-    logger["I/O"].info(f"Computing {total} trajectories  (dt={DT} s, max_time={MAX_TIME} s) …")
+    logger["I/O"].info(f"Computing {total} trajectories  (dt={simconfig.dt} s, max_time={simconfig.max_time} s) …")
 
     n_workers = cpu_count() - 1  # leave one core free for the main process
     logger["I/O"].info(f"Using {n_workers} worker processes.")
@@ -144,7 +165,7 @@ def main() -> None:
     with Pool(
         processes=n_workers,
         initializer=_pool_initializer,
-        initargs=(planet, ballistic_config),
+        initargs=(planet, ballistic_config, simconfig),
     ) as pool:
         rows = list(
             tqdm(

@@ -4,8 +4,8 @@ on the distance from the radar."""
 
 import numpy as np
 import itertools
-from mad.objs import MovableObj
-from mad.objs import Planet
+from mad.objs.base import MovableObj
+from mad.objs.planets import Planet
 from mad.utils.base_utils import to_voxel_key
 from mad.configs import VOXEL_SIZE
 

@@ -3,7 +3,7 @@ The Planet class will calculate gravitational forces, drag forces, and distances
 
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs import MovableObj, BallisticObj
+from mad.objs.base import MovableObj, BallisticObj
 from mad.configs import G
 from dataclasses import dataclass, asdict
 

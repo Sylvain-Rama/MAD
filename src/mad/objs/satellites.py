@@ -1,7 +1,8 @@
 """Satellites are payloads that can be launched into orbit and will be affected by gravity and drag forces."""
 
 from dataclasses import dataclass
-from mad.objs import Payload, ProjectileConfig
+from mad.objs.base import Payload
+from mad.objs.projectiles import ProjectileConfig
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 import numpy as np
