@@ -6,7 +6,7 @@ Rockets are defined by a list of RocketStage objects, a guidance system, and a l
 from dataclasses import dataclass, asdict, field
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import BallisticObj, GuidedObj, MovableObj, Payload, ReleasableConfig
+from mad.objs.base import BallisticObj, GuidedObj, MovableObj, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 
@@ -36,7 +36,7 @@ class RVConfig:
         return ReentryVehicle(config=self, position=position, velocity=velocity, t=t)
 
 
-class ReentryVehicle(Payload, GuidedObj):
+class ReentryVehicle(BallisticObj, GuidedObj):
     """RVs are a special type of payload that can receive guidance commands and have a yield (kt) for detonation.
     They have a small RCS thruster for terminal guidance, which is used to steer the RV towards its target during the final phase of flight.
     We assume this thruster is not limited by propellant mass, and can be used for the entire flight.
@@ -44,7 +44,8 @@ class ReentryVehicle(Payload, GuidedObj):
     """
 
     def __init__(self, config: RVConfig, position: NDArray, velocity=None, t=0.0):
-        Payload.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd, t)
+        BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
+        self.t = t
         self.yield_kt = config.yield_kt
         self.guidance = config.guidance
         self.guidance_results = self.guidance.get_guidance(self, t)
@@ -201,6 +202,7 @@ class RocketConfig:
     guidance: Guidance | GuidanceManager
     payloads: list[ReleasableConfig] = field(default_factory=list)
     payload_separation_interval: float = 2.0  # Time between payload separations, in seconds.
+    name: str = "Rocket"
 
     @property
     def to_dict(self):
@@ -229,8 +231,11 @@ class Rocket(BallisticObj, GuidedObj):
         # TODO: final_mass is used as the normalization bound for burned_fraction, which drives
         # the steering law.  Using only the first payload's mass preserves the original calibration
         # but is incorrect for heterogeneous or variable-count payload lists.
+        # TODO: consider ignoring the payload mass. Not realistic but easier and can do fun scenarios
+        # like rockets releasing other rockets.
         self.final_mass = deepcopy(
-            sum(stage.dry_mass for stage in self.stages) + (self.payloads[0].mass if self.payloads else 0.0)
+            sum(stage.dry_mass for stage in self.stages)
+            + (getattr(self.payloads[0], "mass", 0.0) if self.payloads else 0.0)
         )
         self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
         self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None

@@ -1,5 +1,5 @@
 """Base classes for all objects in the simulation.
-This includes MovableObj, BallisticObj, GuidedObj, Payload, and ReleasableConfig.
+This includes MovableObj, BallisticObj, GuidedObj, and ReleasableConfig.
 See objs/projectiles.py for the implementation of projectiles and missiles.
 The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
 """
@@ -166,38 +166,18 @@ class GuidedObj(ABC):
         ...
 
 
-class Payload(BallisticObj):
-    """Base class for all objects that can be released (deployed) from a missile.
-
-    Subclasses (e.g. ReentryVehicle, Satellite) inherit the common position/velocity/t
-    initialisation and are the concrete deployed objects returned by ReleasableConfig.create().
-    """
-
-    def __init__(
-        self,
-        position: list[float] | NDArray,
-        velocity: list[float] | NDArray | None,
-        name: str,
-        mass: float,
-        area: float,
-        Cd: float,
-        t: float = 0.0,
-    ):
-        super().__init__(position, velocity, name, mass, area, Cd)
-        self.t = t
-
-
 @runtime_checkable
 class ReleasableConfig(Protocol):
-    """Protocol for config objects that can produce a Payload via a factory method.
+    """Protocol for config objects that can produce a BallisticObj via a factory method.
 
-    Any dataclass with a ``name`` field, a ``mass`` field, and a ``create()``
-    method satisfies this protocol and can be used as a missile payload config.
+    Any dataclass with a ``name`` field and a ``create()`` method satisfies this
+    protocol and can be used as a missile payload config.  This includes
+    ``RVConfig``, ``RocketConfig``, ``CruiseMissileConfig``, and any other
+    config whose ``create()`` returns a ``BallisticObj``.
     """
 
     name: str
-    mass: float
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> Payload:
+    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "BallisticObj":
         """Instantiate and return the deployed object at the given state."""
         ...

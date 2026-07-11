@@ -15,7 +15,7 @@ from mad.objs import MovableObj, Planet
 from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Callable, Protocol
+from typing import Callable, Protocol, cast
 import numpy as np
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
@@ -150,7 +150,7 @@ class Guidance(ABC):
         self.t = t
 
         self.guidance_interrupts = GuidanceInterrupts(
-            missile=missile,
+            missile=cast(MovableObj, missile),
             target=self.target,
             planet=self.planet,
             t=self.t,
