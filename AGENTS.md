@@ -1,7 +1,7 @@
 # MAD — Agent Instructions
 
 MAD is a 3-D ballistic/missile simulation library written in Python 3.12+.
-The package lives under `src/mad/` and is installed in editable mode via `uv`.
+The package lives under `mad/` and is installed in editable mode via `uv`.
 
 ## Build & environment
 
@@ -16,16 +16,16 @@ docker compose up
 ## Linting & formatting
 
 ```bash
-ruff check src/          # fast lint (line-length 120)
-black --check src/       # formatting check (line-length 120)
-pyrefly check src/       # type-check (notebooks excluded)
+ruff check mad/          # fast lint (line-length 120)
+black --check mad/       # formatting check (line-length 120)
+pyrefly check mad/       # type-check (notebooks excluded)
 ```
 
 Apply fixes:
 
 ```bash
-ruff check --fix src/
-black src/
+ruff check --fix mad/
+black mad/
 ```
 
 ## Tests
@@ -36,7 +36,7 @@ pytest                   # run all tests in tests/
 
 The `tests/` directory is currently sparse; interactive validation lives in `notebooks/`.
 
-## Simulation engine — key abstractions (`src/mad/objs/base.py`)
+## Simulation engine — key abstractions (`mad/objs/base.py`)
 
 ### Class hierarchy
 
@@ -52,7 +52,7 @@ SimulationInterface (ABC)      # must implement: update(dt), accelerations(plane
 GuidedObj (ABC)                # mixin for guided objects; must implement: burned_fraction, thrust_acc
 ```
 
-### Simulation loop (`src/mad/simulation.py`)
+### Simulation loop (`mad/simulation.py`)
 
 `Simulation(max_time, dt)` orchestrates the loop:
 
@@ -61,7 +61,7 @@ GuidedObj (ABC)                # mixin for guided objects; must implement: burne
 3. `apply_collisions(objs, collisions)` marks colliding pairs inactive.
 4. A convenience function `run_simple_simulation(objs, planet, dt, max_time)` is available for quick runs without collision detection.
 
-Collision detection has been extracted to `src/mad/detection.py` (`CollisionDetector` class):
+Collision detection has been extracted to `mad/detection.py` (`CollisionDetector` class):
 
 - `build_voxel_grid(objs)` — partitions active objects into a spatial hash grid (voxel size in **km**, default 50 km).
 - `detect_collisions(objs, grid, collision_radius_m)` — broadphase via 26-neighbour voxel check, narrowphase via exact distance test.
@@ -70,7 +70,7 @@ Collision detection has been extracted to `src/mad/detection.py` (`CollisionDete
 
 - All distances in **metres**, velocities in **m/s**, time in **seconds**.
 - Positions are 3-D ECEF-like vectors (`numpy` arrays via `mad.utils.to_vec3`).
-- Gravity and drag are provided by `Planet` objects (`src/mad/objs/planets.py`).
+- Gravity and drag are provided by `Planet` objects (`mad/objs/planets.py`).
 - Integrator: **Velocity Verlet** (used in `Projectile.integrate`).
 
 ### Adding a new simulated object
@@ -84,10 +84,10 @@ Collision detection has been extracted to `src/mad/detection.py` (`CollisionDete
 
 | Path | Purpose |
 |------|---------|
-| `src/mad/objs/` | Simulation object classes |
-| `src/mad/configs/` | Physical constants & object presets |
-| `src/mad/simulation.py` | Main `Simulation` orchestrator and `run_simple_simulation` helper |
-| `src/mad/detection.py` | `CollisionDetector`: voxel grid construction and collision detection |
-| `src/mad/utils.py` | Helper utilities (`to_vec3`, `extract_history`, …) |
+| `mad/objs/` | Simulation object classes |
+| `mad/configs/` | Physical constants & object presets |
+| `mad/simulation.py` | Main `Simulation` orchestrator and `run_simple_simulation` helper |
+| `mad/detection.py` | `CollisionDetector`: voxel grid construction and collision detection |
+| `mad/utils.py` | Helper utilities (`to_vec3`, `extract_history`, …) |
 | `notebooks/` | Interactive validation / exploration notebooks |
 | `tests/` | Pytest suite (currently minimal) |

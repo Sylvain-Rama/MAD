@@ -28,7 +28,7 @@ COPY pyproject.toml uv.lock* ./
 # --- Install all dev dependencies into .venv ---
 RUN uv sync --dev --no-install-project
 
-COPY src ./src
+COPY mad ./mad
 RUN uv pip install -e .
 
 # --- Auto-activate venv for bash ---

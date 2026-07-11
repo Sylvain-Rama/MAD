@@ -28,7 +28,7 @@ def load_ballistic_csv(table_name: str) -> NDArray:
     """Load a ballistic table from a CSV file and return a DataFrame"""
     # TODO: Use a proper path management solution and make this more robust to different environments.
     # For now, we assume the tables are in src/mad/tables and the script is run from the root of the repo.
-    file_path = f"/app/src/mad/tables/{table_name}.csv"
+    file_path = f"/app/mad/tables/{table_name}.csv"
     try:
         with open(file_path, newline="") as f:
             header = f.readline().strip().split(",")
