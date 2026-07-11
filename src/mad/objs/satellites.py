@@ -1,7 +1,7 @@
 """Satellites are payloads that can be launched into orbit and will be affected by gravity and drag forces."""
 
 from dataclasses import dataclass
-from mad.objs.base import Payload
+from mad.objs.base import BallisticObj
 from mad.objs.projectiles import ProjectileConfig
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
@@ -26,7 +26,7 @@ class SatelliteConfig:
         return Satellite(config=self, position=position, velocity=velocity, t=t)
 
 
-class Satellite(Payload):
+class Satellite(BallisticObj):
     def __init__(
         self,
         config: "ProjectileConfig | SatelliteConfig",
@@ -42,7 +42,8 @@ class Satellite(Payload):
         else:
             pos = position if position is not None else np.array(config.position)
             vel = velocity if velocity is not None else config.velocity
-        Payload.__init__(self, pos, vel, config.name, config.mass, config.area, config.Cd, t)
+        BallisticObj.__init__(self, pos, vel, config.name, config.mass, config.area, config.Cd)
+        self.t = t
         self.config = config
 
     def accelerations(self, planet) -> NDArray:

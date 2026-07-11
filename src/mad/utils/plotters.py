@@ -109,7 +109,7 @@ def plot_ballistic_range_table_gamma(
 
     img = ax.imshow(
         dfs.values,
-        # extent=(dfs.columns.min(), dfs.columns.max(), dfs.index.min(), dfs.index.max()),
+        extent=(float(dfs.columns.min()), float(dfs.columns.max()), float(dfs.index.min()), float(dfs.index.max())),
         aspect="auto",
         origin="lower",
         vmin=vmin,
