@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+include = ["mad*"]
 
 [dependency-groups]
 dev = [
@@ -36,11 +36,6 @@ line-length = 120
 
 [tool.ruff]
 line-length = 120
-
-[tool.mypy]
-python_version = "3.12"
-strict = true
-mypy_path = "src"
 
 [tool.pyrefly]
 exclude = [
