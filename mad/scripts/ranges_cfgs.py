@@ -29,10 +29,10 @@ SIM_PARAMETERS: dict[str, dict[str, Any]] = {
         "dt": 10.0,
         "max_time": 3600.0,
     },
-    "B53_warhead_fine": {
-        "altitudes_km": np.arange(0, 500, 10),
-        "velocities_kms": np.arange(0.5, 8, 0.1),
-        "gammas_deg": np.arange(20, 90, 1),
+    "B53_warhead": {
+        "altitudes_km": np.arange(120, 180, 2),
+        "velocities_kms": np.arange(2, 3, 0.1),
+        "gammas_deg": np.arange(20, 90, 0.5),
         "dt": 2.0,
         "max_time": 3600.0,
     },

@@ -39,15 +39,15 @@ def parse_args():
         "--object",
         "-o",
         type=str,
-        default="V1",
+        default="B53_warhead",
         help="Ballistic Object config to use (default: V1). Available: " + ", ".join(AVAILABLE_OBJECTS.keys()),
     )
     parser.add_argument(
         "--config",
         "-c",
         type=str,
-        default="V1",
-        help="Simulation config to use (default: V1). Available: " + ", ".join(SIM_PARAMETERS.keys()),
+        default="B53_warhead",
+        help="Simulation config to use (default: B53_warhead). Available: " + ", ".join(SIM_PARAMETERS.keys()),
     )
     return parser.parse_args()
 
@@ -115,9 +115,7 @@ def simulate(
         return np.nan, np.nan
 
     if simulated_object[0].active:
-        logger["I/O"].warning(
-            f"Simulation did not return to ground within max_time for r0={r0}, v0={v0}, gamma_rad={gamma_rad}."
-        )
+        # This means the object did not return to the ground within max_time.
         return np.nan, np.nan
 
     final_pos = simulated_object[0].position
@@ -175,7 +173,7 @@ def main() -> None:
             )
         )
 
-    out_path = os.path.join("src/mad/tables", args.config + ".csv")
+    out_path = os.path.join("mad/tables", args.config + ".csv")
 
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=BALLISTIC_FIELD_NAMES)
