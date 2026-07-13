@@ -195,12 +195,12 @@ class GuidanceManager:
             self.current_index += 1
             if self.current_index < len(self.guidances):
                 logger["Guidance"].info(
-                    f"Switching to guidance law {self.current_index}: {self.guidances[self.current_index].__class__.__name__}"
+                    f"{t:<.2f}s - Switching to guidance law {self.current_index}: {self.guidances[self.current_index].__class__.__name__}"
                 )
                 self.planet = self.guidances[self.current_index].planet
                 self.target = self.guidances[self.current_index].target
             else:
-                logger["Guidance"].info("No more guidance laws to switch to.")
+                logger["Guidance"].info(f"{t:<.2f}s - No more guidance laws to switch to.")
 
         return results
 
@@ -216,13 +216,55 @@ class NoGuidance(Guidance):
         )
 
 
-class IdleGuidance(Guidance):
+class NoGuidanceNoThrust(Guidance):
     """Idle guidance: the missile is not guided, returning 0 will remove thrust."""
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
             direction=np.zeros_like(missile.velocity),
             state=GuidanceStates.IDLE,
+            next_guidance=self.next_guidance,
+        )
+
+
+# TODO: This HoldPosition guidance is fine for short waits, but presents a significant drift
+# For long waits. To be improved.
+class HoldPosition(Guidance):
+    """Hold-position guidance: counteracts gravity and damps residual velocity to keep
+    the object stationary at its current position until an interrupt is triggered.
+    """
+
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        velocity_damping: float = 1.0,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.velocity_damping = velocity_damping
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        # Acceleration required to cancel gravity at the current position.
+        gravity = self.planet.gravity(cast(MovableObj, missile))
+        a_required = -gravity
+
+        # Retro-thrust component to damp any residual velocity.
+        a_required = a_required - self.velocity_damping * missile.velocity
+
+        norm = np.linalg.norm(a_required)
+        if norm < 1e-8:
+            return GuidanceResults(
+                direction=missile.normalize,
+                state=self.state,
+                magnitude=0.0,
+                next_guidance=self.next_guidance,
+            )
+
+        return GuidanceResults(
+            direction=a_required / norm,
+            state=self.state,
+            magnitude=float(norm),
             next_guidance=self.next_guidance,
         )
 

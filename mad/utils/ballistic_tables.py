@@ -47,7 +47,7 @@ def load_ballistic_csv(table_name: str) -> NDArray:
     return table
 
 
-def load_ballistic_df(table_name: str) -> pd.DataFrame | None:
+def load_ballistic_df(table_name: str) -> pd.DataFrame:
     """Load a ballistic table from a CSV file and return a DataFrame"""
     ballistic_values = load_ballistic_csv(table_name)
     df = pd.DataFrame({k: ballistic_values[:, i] for i, k in enumerate(BALLISTIC_FIELD_NAMES)})

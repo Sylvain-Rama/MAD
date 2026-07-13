@@ -74,8 +74,11 @@ class CruiseMissile(BallisticObj, GuidedObj):
 
     def accelerations(self, planet: Planet) -> NDArray:
         if self.distance(planet) <= planet.radius:
-            logger["Missile"].info(f"{self.t:<.2f}s - {self.name} hit the ground.")
-            self.active = False
+            target_distance = planet.surface_distance(self, self.guidance.target)
+            logger["Missile"].info(
+                f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
+            )
+            self.detonate()
             return np.zeros_like(self.velocity)
 
         gravity = planet.gravity(self)
