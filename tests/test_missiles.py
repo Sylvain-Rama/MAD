@@ -16,7 +16,7 @@ from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
-from mad.guidances import NoGuidance, IdleGuidance
+from mad.guidances import NoGuidance, NoGuidanceNoThrust
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -49,7 +49,7 @@ def stage(stage_cfg):
 
 @pytest.fixture
 def RV_cfg(earth):
-    return RVConfig(**B53_warhead, guidance=IdleGuidance(earth, earth))
+    return RVConfig(**B53_warhead, guidance=NoGuidanceNoThrust(earth, earth))
 
 
 @pytest.fixture
@@ -173,7 +173,7 @@ class TestRVConfig:
         assert RV_cfg.area == pytest.approx(np.pi * B53_warhead["ref_radius"] ** 2, rel=1e-9)
 
     def test_defaults(self, RV_cfg):
-        assert isinstance(RV_cfg.guidance, IdleGuidance)
+        assert isinstance(RV_cfg.guidance, NoGuidanceNoThrust)
         assert RV_cfg.RCS_thrust == pytest.approx(500.0)
 
     def test_yield(self, RV_cfg):
