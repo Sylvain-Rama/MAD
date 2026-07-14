@@ -148,30 +148,30 @@ class RocketStageConfig:
 
 
 class RocketStage:
-    def __init__(self, cfg: RocketStageConfig):
-        self.config = cfg
-        if cfg.dry_mass is None:
-            raise ValueError(f"dry_mass could not be determined for {cfg.name}.")
-        if cfg.propellant_mass is None:
-            raise ValueError(f"propellant_mass could not be determined for {cfg.name}.")
-        if cfg.Isp is None:
-            raise ValueError(f"Isp must be provided for {cfg.name} to compute exhaust velocity.")
+    def __init__(self, config: RocketStageConfig):
+        self.config = config
+        if config.dry_mass is None:
+            raise ValueError(f"dry_mass could not be determined for {config.name}.")
+        if config.propellant_mass is None:
+            raise ValueError(f"propellant_mass could not be determined for {config.name}.")
+        if config.Isp is None:
+            raise ValueError(f"Isp must be provided for {config.name} to compute exhaust velocity.")
 
-        self.dry_mass = cfg.dry_mass
-        self.propellant_mass = cfg.propellant_mass
-        self.thrust = cfg.thrust
-        self.ref_radius = cfg.ref_radius
-        self.Cd = cfg.Cd
+        self.dry_mass = config.dry_mass
+        self.propellant_mass = config.propellant_mass
+        self.thrust = config.thrust
+        self.ref_radius = config.ref_radius
+        self.Cd = config.Cd
         self.area = np.pi * self.ref_radius**2
 
-        self.Isp = cfg.Isp
-        self.exhaust_velocity = cfg.Isp * G0
-        self.mass_flow_rate = cfg.thrust / self.exhaust_velocity
+        self.Isp = config.Isp
+        self.exhaust_velocity = config.Isp * G0
+        self.mass_flow_rate = config.thrust / self.exhaust_velocity
 
-        self.parallel: bool = cfg.parallel
-        self.separation_retrograde_dv: float = cfg.separation_retrograde_dv
+        self.parallel: bool = config.parallel
+        self.separation_retrograde_dv: float = config.separation_retrograde_dv
         self.active: bool = True
-        self.name = cfg.name
+        self.name = config.name
         self.t = 0.0
 
     @property
@@ -209,22 +209,22 @@ class RocketConfig:
         return asdict(self)
 
     def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "Rocket":
-        return Rocket(position=position, cfg=self, velocity=velocity, t=t)
+        return Rocket(position=position, config=self, velocity=velocity, t=t)
 
 
 class Rocket(BallisticObj, GuidedObj):
-    def __init__(self, position, cfg: RocketConfig, velocity=None, name="Rocket", t=0.0):
+    def __init__(self, position, config: RocketConfig, velocity=None, name="Rocket", t=0.0):
         # mass and area are computed properties on this class; bypass BallisticObj.__init__
         # to avoid storing unused _mass/_area defaults.
         MovableObj.__init__(self, position=position, velocity=velocity, name=name)
 
-        self.stages = cfg.stages
-        self.guidance = cfg.guidance
-        self.payloads: list[ReleasableConfig] = list(cfg.payloads)  # mutable copy; entries popped on release
+        self.stages = config.stages
+        self.guidance = config.guidance
+        self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
         self.t = t
         self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction
         self.released_payloads = 0
-        self.payload_separation_interval = cfg.payload_separation_interval
+        self.payload_separation_interval = config.payload_separation_interval
         self.last_payload_separation_time = 0.0
 
         self.initial_mass = deepcopy(self.mass)
