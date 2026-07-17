@@ -80,26 +80,27 @@ class Launcher(MovableObj, SimulationInterface):
         self.t += dt
         if command is None:
             return None
+        return self.receive_orders(command)
+
+    def receive_orders(self, command: ComputerCommand) -> list[BallisticObj] | None:
         # Timing logic for state transitions:
         # We cannot do anything if we are in the middle of launching, so we need to check that first.
         if self.state == LauncherStates.LAUNCHING and (self.t - self.last_release_time < self.config.launch_delay):
-            return
+            return None
         else:
             self.state = LauncherStates.IDLE
 
         # Second priority: firing.
-        result = None
-        if command is not None and command.order == ComputerOrder.LAUNCH and self.state == LauncherStates.IDLE:
+        if command.order == ComputerOrder.LAUNCH and self.state == LauncherStates.IDLE:
             projectile = self.launch(target=command.target)
             if projectile is not None:
-                result = [projectile]
-
-            return result
+                return [projectile]
+            return None
 
         # Third, if we are idle, we can move.
-        if command is not None and command.order == ComputerOrder.MOVE and self.state == LauncherStates.IDLE:
+        if command.order == ComputerOrder.MOVE and self.state == LauncherStates.IDLE:
             self.state = LauncherStates.MOVING
-            self.move(dt)
+            self.move(0.0)
 
         # Fourth priority: reloading.
         if self._can_reload() and self.state == LauncherStates.IDLE:
