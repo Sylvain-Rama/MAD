@@ -3,12 +3,12 @@ This includes MovableObj, BallisticObj, GuidedObj, and ReleasableConfig.
 See objs/projectiles.py for the implementation of projectiles and missiles.
 The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
 """
+from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
-from mad.objs.battle_computers import ComputerCommand
 from mad.utils.base_utils import to_vec3
 from mad.utils.logger import SourceLogger
 
@@ -16,6 +16,7 @@ logger = SourceLogger()
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
+    from mad.objs.battle_computers import ComputerCommand
 
 
 class MovableObj:

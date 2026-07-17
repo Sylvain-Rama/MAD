@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 from mad.utils.logger import SourceLogger
 from mad.objs import Planet, MovableObj, SimulationInterface
-from mad.objs.battle_computers import ComputerCommand
 
 logger = SourceLogger()
 

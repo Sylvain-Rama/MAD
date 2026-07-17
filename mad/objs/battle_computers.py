@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from mad.objs.base import MovableObj, SimulationInterface
+
 if TYPE_CHECKING:
     from mad.objs.base import BallisticObj
     from mad.objs.launchers import Launcher
@@ -20,31 +21,29 @@ class ComputerCommand:
     order: ComputerOrder = ComputerOrder.IDLE
     target: MovableObj | None = None
 
+
 @dataclass
 class ComputerEvent:
     time: float
     command: ComputerCommand
 
 
-
-class BattleComputer(SimulationInterface):
+class BattleComputer(MovableObj, SimulationInterface):
     def __init__(self, name: str = "BattleComputer", t: float = 0.0) -> None:
+        MovableObj.__init__(self, np.zeros(3), np.zeros(3), name)
         self.name = name
         self.active = True
-        self.position = np.zeros(3)
-        self.velocity = np.zeros(3)
         self.launchers: list[Launcher] = []
         self.radars: list[MovableObj] = []
         self.events: list[ComputerEvent] = []
         self.t = t
 
-    def issue_command(self, order: ComputerOrder, target: MovableObj | None = None) -> ComputerCommand:
-        return ComputerCommand(order=order, target=target)
-
     def send_command(self, command: ComputerCommand) -> list[BallisticObj] | None:
         """Forward *command* to all managed launchers without advancing their clock."""
         spawned: list[BallisticObj] = []
         for launcher in self.launchers:
+            # We collect the spawned objects from launchers, but we don't advance their time here.
+            # Launchers can spawn independently through their update() method.
             result = launcher.receive_orders(command)
             if result:
                 spawned.extend(result)
@@ -66,4 +65,3 @@ class BattleComputer(SimulationInterface):
 
     def integrate(self, dt: float, planet: Planet) -> None:
         pass  # BattleComputer is not a physical object
-            
