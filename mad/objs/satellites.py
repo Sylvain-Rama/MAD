@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from mad.objs.base import BallisticObj
 from mad.objs.projectiles import ProjectileConfig
+from mad.objs.battle_computers import ComputerCommand
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 import numpy as np
@@ -57,14 +58,14 @@ class Satellite(BallisticObj):
 
         return gravity_acc
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.t += dt
 
         return None
 
 
 class Sputnik(Satellite):
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.t += dt
         # Sputnik beeps from time to time.
         if self.t % 4000 < dt:

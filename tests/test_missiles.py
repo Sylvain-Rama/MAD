@@ -57,7 +57,7 @@ def two_stage_missile(earth):
     stages = [RocketStage(RocketStageConfig(**s)) for s in titan1_stages]
     cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
     r = earth.radius + 10.0
-    return Rocket(position=[r, 0.0], cfg=cfg, name="Titan")
+    return Rocket(position=[r, 0.0], config=cfg, name="Titan")
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ class TestBallisticMissileUpdate:
         stages[0].propellant_mass = 0.001
         cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
-        missile = Rocket(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="T")
+        missile = Rocket(position=[r, 0.0], config=cfg, velocity=[0.0, 100.0, 0.0], name="T")
 
         missile.update(1.0)  # burns last propellant; stage still active
         result = missile.update(0.0)  # stage now detects empty and separates
@@ -293,7 +293,7 @@ class TestBallisticMissileUpdate:
         stages = [RocketStage(single_stage_cfg)]
         cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
-        missile = Rocket(position=[r, 0.0], cfg=cfg, velocity=[0.0, 100.0, 0.0], name="Single")
+        missile = Rocket(position=[r, 0.0], config=cfg, velocity=[0.0, 100.0, 0.0], name="Single")
 
         missile.update(1.0)  # burns propellant; stage still active
         missile.update(0.0)  # stage detects empty → separates → missile inactive
@@ -324,13 +324,13 @@ class TestRocketAccelerations:
 
         m_thrust = Rocket(
             position=[r, 0.0],
-            cfg=RocketConfig(stages=stages_thrust, guidance=NoGuidance(None, None)),
+            config=RocketConfig(stages=stages_thrust, guidance=NoGuidance(None, None)),
             name="A",
             velocity=vel.copy(),
         )
         m_coast = Rocket(
             position=[r, 0.0],
-            cfg=RocketConfig(stages=stages_no_thrust, guidance=NoGuidance(None, None)),
+            config=RocketConfig(stages=stages_no_thrust, guidance=NoGuidance(None, None)),
             name="B",
             velocity=vel.copy(),
         )

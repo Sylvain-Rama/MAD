@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 from mad.objs.base import BallisticObj, GuidedObj, MovableObj, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
+from mad.objs.battle_computers import ComputerCommand
 
 from mad.guidances import GuidanceStates, Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
@@ -64,7 +65,7 @@ class ReentryVehicle(BallisticObj, GuidedObj):
         # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
         return 0.5
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.t += dt
         self.guidance_results = self.guidance.get_guidance(self, self.t)
 
@@ -326,7 +327,7 @@ class Rocket(BallisticObj, GuidedObj):
         total_thrust = sum(s.thrust_force for s in self._active_burn_group if s.active)
         return total_thrust / self.mass if total_thrust > 0 else 0.0
 
-    def update(self, dt: float) -> list[BallisticObj] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
         released_objects = []
         self.t += dt
 

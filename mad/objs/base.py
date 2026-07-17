@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from mad.objs.battle_computers import ComputerCommand
 from mad.utils.base_utils import to_vec3
 from mad.utils.logger import SourceLogger
 
@@ -87,7 +88,7 @@ class SimulationInterface(ABC):
         self.t = 0.0
 
     @abstractmethod
-    def update(self, dt: float) -> list["BallisticObj"] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list["BallisticObj"] | None:
         """Update internal state. May return a list of new BallisticObj spawned during the step
         (e.g. a separated stage or released payload)."""
         self.t += dt

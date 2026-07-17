@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import BallisticObj, GuidedObj
 from mad.objs.planets import Planet
+from mad.objs.battle_computers import ComputerCommand
 from mad.utils.logger import SourceLogger
 
 from mad.guidances import Guidance, GuidanceManager, GuidanceStates
@@ -62,7 +63,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
     def thrust_acc(self) -> float:
         return self.config.thrust_acc
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.total_distance_traveled += float(np.linalg.norm(self.velocity)) * dt
         if self.total_distance_traveled >= self.config.max_range_m:
             self.motor_active = False
