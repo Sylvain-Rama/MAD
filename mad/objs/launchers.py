@@ -78,6 +78,8 @@ class Launcher(MovableObj, SimulationInterface):
 
     def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
         self.t += dt
+        if command is None:
+            return None
         # Timing logic for state transitions:
         # We cannot do anything if we are in the middle of launching, so we need to check that first.
         if self.state == LauncherStates.LAUNCHING and (self.t - self.last_release_time < self.config.launch_delay):

@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from mad.utils.logger import SourceLogger
 from mad.objs import Planet, MovableObj, SimulationInterface
+from mad.objs.battle_computers import ComputerCommand
 
 logger = SourceLogger()
 
@@ -148,7 +149,7 @@ class Simulation:
             for obj in active_objs:
                 if not obj.active:
                     continue
-                spawned = obj.update(self.dt)
+                spawned = obj.update(self.dt, command=None)
                 if spawned:
                     new_objects.extend(spawned)
 

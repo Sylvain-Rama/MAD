@@ -12,5 +12,5 @@ ComputerOrder = Enum("ComputerOrder", ["IDLE", "RELOAD", "LAUNCH", "MOVE"])
 
 @dataclass
 class ComputerCommand:
-    order: ComputerOrder
+    order: ComputerOrder = ComputerOrder.IDLE
     target: MovableObj | None = None

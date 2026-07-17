@@ -183,7 +183,7 @@ class RocketStage:
     def thrust_force(self) -> float:
         return self.thrust if self.propellant_mass > 0 else 0.0
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
 
         self.t += dt
         if not self.active:
