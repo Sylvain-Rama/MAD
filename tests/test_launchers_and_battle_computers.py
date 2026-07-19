@@ -11,7 +11,6 @@ from mad.objs.planets import Planet, PlanetConfig
 from mad.guidances.base_guidances import NoGuidanceNoThrust
 from mad.configs.planets_cfg import EARTH_SETTINGS
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -125,15 +124,15 @@ class TestLauncherLaunch:
     def test_launch_respects_launch_delay(self, missile_config, launcher_pos):
         cfg = LauncherConfig(projectiles=missile_config, n_projectiles=5, launch_delay=30.0)
         lnch = Launcher(config=cfg, position=launcher_pos)
-        lnch.launch()               # first launch at t=0
-        lnch.t = 10.0               # only 10 s elapsed, < 30 s delay
+        lnch.launch()  # first launch at t=0
+        lnch.t = 10.0  # only 10 s elapsed, < 30 s delay
         assert lnch.launch() is None
 
     def test_launch_succeeds_after_delay_elapsed(self, missile_config, launcher_pos):
         cfg = LauncherConfig(projectiles=missile_config, n_projectiles=5, launch_delay=30.0)
         lnch = Launcher(config=cfg, position=launcher_pos)
         lnch.launch()
-        lnch.t = 30.0               # exactly at the delay boundary
+        lnch.t = 30.0  # exactly at the delay boundary
         second = lnch.launch()
         assert isinstance(second, CruiseMissile)
 
@@ -171,9 +170,9 @@ class TestLauncherReload:
     def test_reload_increments_count(self, missile_config, launcher_pos):
         cfg = LauncherConfig(projectiles=missile_config, n_projectiles=3, reload_time=5.0)
         lnch = Launcher(config=cfg, position=launcher_pos)
-        lnch.n_projectiles = 2          # one was used
+        lnch.n_projectiles = 2  # one was used
         lnch.last_reload_time = 0.0
-        lnch.t = 10.0                   # reload_time has elapsed
+        lnch.t = 10.0  # reload_time has elapsed
         lnch.reload()
         assert lnch.n_projectiles == 3
 
@@ -189,7 +188,7 @@ class TestLauncherReload:
     def test_reload_does_not_exceed_max_capacity(self, missile_config, launcher_pos):
         cfg = LauncherConfig(projectiles=missile_config, n_projectiles=3, reload_time=0.0)
         lnch = Launcher(config=cfg, position=launcher_pos)
-        lnch.reload()                   # already at max
+        lnch.reload()  # already at max
         assert lnch.n_projectiles == 3
 
     def test_reload_blocked_before_reload_time(self, missile_config, launcher_pos):
@@ -197,7 +196,7 @@ class TestLauncherReload:
         lnch = Launcher(config=cfg, position=launcher_pos)
         lnch.n_projectiles = 1
         lnch.last_reload_time = 0.0
-        lnch.t = 10.0                   # only 10 s elapsed, < 60 s
+        lnch.t = 10.0  # only 10 s elapsed, < 60 s
         lnch.reload()
         assert lnch.n_projectiles == 1
 
@@ -229,7 +228,7 @@ class TestLauncherUpdate:
         cfg = LauncherConfig(projectiles=missile_config, n_projectiles=5, launch_delay=30.0)
         lnch = Launcher(config=cfg, position=launcher_pos)
         lnch.receive_orders(ComputerCommand(order=ComputerOrder.LAUNCH))
-        lnch.t = 10.0                   # still within launch delay
+        lnch.t = 10.0  # still within launch delay
         result = lnch.receive_orders(ComputerCommand(order=ComputerOrder.LAUNCH))
         assert result is None
 
@@ -289,14 +288,14 @@ class TestBattleComputerUpdate:
         bc = BattleComputer()
         bc.launchers = [launcher]
         bc.events = [ComputerEvent(time=10.0, command=ComputerCommand(order=ComputerOrder.LAUNCH))]
-        bc.update(5.0)                  # t = 5 — event at t=10 should not fire
+        bc.update(5.0)  # t = 5 — event at t=10 should not fire
         assert launcher.n_projectiles == 3
 
     def test_event_fires_at_its_time(self, launcher):
         bc = BattleComputer()
         bc.launchers = [launcher]
         bc.events = [ComputerEvent(time=10.0, command=ComputerCommand(order=ComputerOrder.LAUNCH))]
-        bc.update(10.0)                 # t = 10 — event fires
+        bc.update(10.0)  # t = 10 — event fires
         assert launcher.n_projectiles == 2
 
     def test_event_consumed_after_firing(self, launcher):
@@ -321,9 +320,9 @@ class TestBattleComputerUpdate:
             ComputerEvent(time=5.0, command=ComputerCommand(order=ComputerOrder.LAUNCH)),
             ComputerEvent(time=15.0, command=ComputerCommand(order=ComputerOrder.LAUNCH)),
         ]
-        bc.update(6.0)                  # fires first event → n=2
+        bc.update(6.0)  # fires first event → n=2
         assert launcher.n_projectiles == 2
-        bc.update(10.0)                 # fires second event → n=1
+        bc.update(10.0)  # fires second event → n=1
         assert launcher.n_projectiles == 1
 
 

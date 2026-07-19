@@ -14,6 +14,8 @@ from mad.objs.battle_computers import ComputerCommand
 logger = SourceLogger()
 
 
+# TODO: refactor this to use a more generic ReleasableConfig dataclass, 
+# with position / velocity / name out of it.
 @dataclass
 class ProjectileConfig:
     position: list[float] | NDArray  # m
