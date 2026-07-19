@@ -389,8 +389,6 @@ class Rocket(BallisticObj, GuidedObj):
             else:
                 sep_velocity = self.velocity
             stage_cfg = ProjectileConfig(
-                position=self.position.tolist(),
-                velocity=sep_velocity.tolist(),
                 mass=dep.dry_mass,
                 name=dep.name,
                 ref_radius=dep.ref_radius,
@@ -398,7 +396,7 @@ class Rocket(BallisticObj, GuidedObj):
             )
             self.stages.remove(dep)
             logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} - {dep.name} separated at {self.t:.2f}.")
-            released_objects.append(Projectile(stage_cfg, t=deepcopy(self.t)))
+            released_objects.append(Projectile(stage_cfg, self.position.copy(), sep_velocity, t=deepcopy(self.t)))
 
         if depleted:
             if len(self.stages) == 0:
