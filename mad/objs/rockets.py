@@ -387,7 +387,7 @@ class Rocket(BallisticObj, GuidedObj):
             if dep.separation_retrograde_dv > 0 and speed > 1e-6:
                 sep_velocity = self.velocity - dep.separation_retrograde_dv * (self.velocity / speed)
             else:
-                sep_velocity = self.velocity
+                sep_velocity = self.velocity.copy()
             stage_cfg = ProjectileConfig(
                 mass=dep.dry_mass,
                 name=dep.name,
