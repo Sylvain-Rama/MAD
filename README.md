@@ -2,6 +2,10 @@
 
 MAD is a Python 3.12+ library for simulating 3-D ballistic and guided-missile trajectories in a planetary environment. It is designed around composable abstractions: physics objects, guidance laws, and a simulation orchestrator are kept strictly separate, making it easy to mix and match components.
 
+It is a simplified simulation designed to easily reproduce rocket launches, cruise missiles, satellites orbiting earth, etc...
+
+Work In Progress!
+
 ---
 
 ## Table of contents
