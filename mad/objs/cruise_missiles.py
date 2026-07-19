@@ -1,11 +1,13 @@
 """Cruise missiles are designed to fly at low altitudes and deliver a payload to a target.
 This module defines the CruiseMissile class, which is a type of guided missile."""
 
+from copy import deepcopy
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import BallisticObj, GuidedObj
 from mad.objs.planets import Planet
+from mad.objs.battle_computers import ComputerCommand
 from mad.utils.logger import SourceLogger
 
 from mad.guidances import Guidance, GuidanceManager, GuidanceStates
@@ -44,7 +46,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
             Cd=config.Cd,
         )
         self.config = config
-        self.guidance = config.guidance
+        self.guidance = deepcopy(config.guidance)
         self.guidance_results = self.guidance.get_guidance(self, t)
         self.t = t
         self.total_distance_traveled = 0.0
@@ -62,7 +64,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
     def thrust_acc(self) -> float:
         return self.config.thrust_acc
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.total_distance_traveled += float(np.linalg.norm(self.velocity)) * dt
         if self.total_distance_traveled >= self.config.max_range_m:
             self.motor_active = False

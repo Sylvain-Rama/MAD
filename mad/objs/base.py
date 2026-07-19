@@ -4,6 +4,8 @@ See objs/projectiles.py for the implementation of projectiles and missiles.
 The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
 """
 
+from __future__ import annotations
+
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
@@ -15,6 +17,7 @@ logger = SourceLogger()
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
+    from mad.objs.battle_computers import ComputerCommand
 
 
 class MovableObj:
@@ -87,7 +90,7 @@ class SimulationInterface(ABC):
         self.t = 0.0
 
     @abstractmethod
-    def update(self, dt: float) -> list["BallisticObj"] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list["BallisticObj"] | None:
         """Update internal state. May return a list of new BallisticObj spawned during the step
         (e.g. a separated stage or released payload)."""
         self.t += dt

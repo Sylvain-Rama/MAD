@@ -9,10 +9,13 @@ import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import BallisticObj
 from mad.utils.logger import SourceLogger
+from mad.objs.battle_computers import ComputerCommand
 
 logger = SourceLogger()
 
 
+# TODO: refactor this to use a more generic ReleasableConfig dataclass, 
+# with position / velocity / name out of it.
 @dataclass
 class ProjectileConfig:
     position: list[float] | NDArray  # m
@@ -50,7 +53,7 @@ class Projectile(BallisticObj):
 
         return gravity_acc + drag_acc
 
-    def update(self, dt: float):
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.t += dt
         # Nothing to update internally: it's a rock...
         return None
