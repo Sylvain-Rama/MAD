@@ -138,7 +138,6 @@ def main() -> None:
     simconfig = SimParameters(**config)
 
     ballistic_config = ProjectileConfig(
-        position=[0.0, 0.0, 0.0],
         mass=float(object["mass"] if "mass" in object else object["dry_mass"]),
         ref_radius=float(object["ref_radius"]),
         Cd=float(object["Cd"]),

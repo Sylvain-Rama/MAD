@@ -28,7 +28,9 @@ class ProjectileConfig:
     def to_dict(self):
         return asdict(self)
 
-    def create(self, position: NDArray, velocity: NDArray | None, t: float = 0.0) -> "Projectile":
+    def create(
+        self, position: list[float] | NDArray, velocity: list[float] | NDArray | None, t: float = 0.0
+    ) -> "Projectile":
         return Projectile(self, position, velocity, t)
 
 
