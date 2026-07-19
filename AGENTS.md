@@ -58,13 +58,7 @@ GuidedObj (ABC)                # mixin for guided objects; must implement: burne
 
 1. Each active object's `update(dt)` is called (internal state / staging), then `integrate(dt, planet)` advances position/velocity.
 2. `update()` may return new `BallisticObj` instances (e.g. separated stages) that are appended to the object list.
-3. `apply_collisions(objs, collisions)` marks colliding pairs inactive.
-4. A convenience function `run_simple_simulation(objs, planet, dt, max_time)` is available for quick runs without collision detection.
-
-Collision detection has been extracted to `mad/detection.py` (`CollisionDetector` class):
-
-- `build_voxel_grid(objs)` — partitions active objects into a spatial hash grid (voxel size in **km**, default 50 km).
-- `detect_collisions(objs, grid, collision_radius_m)` — broadphase via 26-neighbour voxel check, narrowphase via exact distance test.
+3. A convenience function `run_simple_simulation(objs, planet, dt, max_time)` is available for quick runs.
 
 ### Physics conventions
 
@@ -77,8 +71,7 @@ Collision detection has been extracted to `mad/detection.py` (`CollisionDetector
 
 1. Subclass `BallisticObj` (and optionally `GuidedObj`).
 2. Implement `accelerations(planet)`, `integrate(dt, planet)`, and `update(dt)`.
-3. Initialise a `History` instance and call `history.update(...)` inside `integrate`.
-4. Create a `*Config` dataclass to hold construction parameters (see `ProjectileConfig` / `PayloadConfig`).
+3. Create a `*Config` dataclass with a `create()` factory method (see `ProjectileConfig` / `PayloadConfig`).
 
 ## Key directories
 
@@ -87,7 +80,6 @@ Collision detection has been extracted to `mad/detection.py` (`CollisionDetector
 | `mad/objs/` | Simulation object classes |
 | `mad/configs/` | Physical constants & object presets |
 | `mad/simulation.py` | Main `Simulation` orchestrator and `run_simple_simulation` helper |
-| `mad/detection.py` | `CollisionDetector`: voxel grid construction and collision detection |
-| `mad/utils.py` | Helper utilities (`to_vec3`, `extract_history`, …) |
+| `mad/utils/` | Helper utilities (`to_vec3`, `extract_history`, …) |
 | `notebooks/` | Interactive validation / exploration notebooks |
 | `tests/` | Pytest suite (currently minimal) |
