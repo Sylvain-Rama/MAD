@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from mad.objs.launchers import Launcher
     from mad.objs.planets import Planet
 
-ComputerOrder = Enum("ComputerOrder", ["IDLE", "RELOAD", "LAUNCH", "MOVE"])
+ComputerOrder = Enum("ComputerOrder", ["IDLE", "RELOAD", "LAUNCH", "MOVE", "INACTIVATE"])
 
 
 @dataclass

@@ -32,7 +32,8 @@ class HistoryCollector:
         df = pd.DataFrame(collector.to_dict()["Payload_RV1_0"])
     """
 
-    def __init__(self, fields: list[str]) -> None:
+    def __init__(self, fields: list[str], ignore_objects: list[str] | None = None) -> None:
+        self.ignore_objects = ignore_objects or []
         self.fields = list(fields)
         self._data: dict[str, dict[str, list]] = {}
         self._names: dict[str, str] = {}  # _id -> name
@@ -43,7 +44,7 @@ class HistoryCollector:
     def record(self, objs: list) -> None:
         """Capture the current state of all active objects in *objs*."""
         for obj in objs:
-            if not obj.active:
+            if not obj.active or obj._id in self.ignore_objects:
                 continue
             key = obj._id
             if key not in self._data:
@@ -113,12 +114,6 @@ class Simulation:
         self.dt = dt
         self.collector = HistoryCollector(["t", "position", "velocity", "gamma"])
 
-    def apply_collisions(self, objs: list[MovableObj], collisions: list[tuple[int, int]]) -> None:
-        """Mark both objects in each colliding pair as inactive (in-place)."""
-        for i, j in collisions:
-            objs[i].active = False
-            objs[j].active = False
-
     def run(
         self,
         moving_objs: list[SimulationInterface],
@@ -171,7 +166,7 @@ class Simulation:
         self.results = self.collector.extract_history()
 
 
-# Convenience function for quick simulations without collision detection or logging.
+# Convenience function for quick simulations without logging.
 def run_simple_simulation(
     moving_objs: list[SimulationInterface], planet: Planet, dt: float = 0.1, max_time: float = 3600.0
 ) -> list[SimulationInterface]:
