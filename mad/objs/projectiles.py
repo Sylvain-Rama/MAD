@@ -14,13 +14,9 @@ from mad.objs.battle_computers import ComputerCommand
 logger = SourceLogger()
 
 
-# TODO: refactor this to use a more generic ReleasableConfig dataclass, 
-# with position / velocity / name out of it.
 @dataclass
 class ProjectileConfig:
-    position: list[float] | NDArray  # m
     mass: float  # kg
-    velocity: list[float] | NDArray | None = None  # m / s
     name: str = "Projectile"
     ref_radius: float = 0.01  # m
     Cd: float = 0.47  # sphere
@@ -32,13 +28,21 @@ class ProjectileConfig:
     def to_dict(self):
         return asdict(self)
 
-    def create(self, t: float = 0.0) -> "Projectile":
-        return Projectile(self, t)
+    def create(
+        self, position: list[float] | NDArray, velocity: list[float] | NDArray | None, t: float = 0.0
+    ) -> "Projectile":
+        return Projectile(self, position, velocity, t)
 
 
 class Projectile(BallisticObj):
-    def __init__(self, config: ProjectileConfig, t: float = 0.0):
-        super().__init__(config.position, config.velocity, config.name, config.mass, config.area, config.Cd)
+    def __init__(
+        self,
+        config: ProjectileConfig,
+        position: list[float] | NDArray,
+        velocity: list[float] | NDArray | None = None,
+        t: float = 0.0,
+    ):
+        super().__init__(position, velocity, config.name, config.mass, config.area, config.Cd)
         self.config = config
         self.t = t
 

@@ -131,26 +131,22 @@ class TestDrag:
         (exponential atmosphere: rho ≈ 0 at very high altitude)."""
         alt = earth.atmosphere_height * 100  # 100× scale height → rho ≈ rho0*e^{-100}
         cfg = ProjectileConfig(
-            position=[earth.radius + alt, 0.0],
             mass=1.0,
             ref_radius=0.5,
             Cd=1.0,
-            velocity=[1000.0, 0.0],
         )
-        obj = Projectile(cfg)
+        obj = Projectile(cfg, position=[earth.radius + alt, 0.0], velocity=[1000.0, 0.0])
         drag = earth.drag(obj)
         assert np.linalg.norm(drag) < 1e-30
 
     def test_drag_opposes_velocity(self, earth):
         """Drag must be anti-parallel to velocity."""
         cfg = ProjectileConfig(
-            position=[earth.radius + 1000.0, 0.0],
             mass=10.0,
             ref_radius=0.5,
             Cd=0.5,
-            velocity=[500.0, 0.0],
         )
-        obj = Projectile(cfg)
+        obj = Projectile(cfg, position=[earth.radius + 1000.0, 0.0], velocity=[500.0, 0.0])
         drag = earth.drag(obj)
         # drag[0] should be negative (opposing positive vx)
         assert drag[0] < 0
@@ -158,13 +154,11 @@ class TestDrag:
 
     def test_drag_zero_for_stationary_object(self, earth):
         cfg = ProjectileConfig(
-            position=[earth.radius + 1000.0, 0.0],
             mass=1.0,
             ref_radius=0.5,
             Cd=1.0,
-            velocity=[0.0, 0.0],
         )
-        obj = Projectile(cfg)
+        obj = Projectile(cfg, position=[earth.radius + 1000.0, 0.0], velocity=[0.0, 0.0])
         drag = earth.drag(obj)
         np.testing.assert_allclose(drag, 0.0, atol=1e-30)
 

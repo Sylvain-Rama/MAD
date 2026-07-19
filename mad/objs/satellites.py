@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from mad.objs.base import BallisticObj
-from mad.objs.projectiles import ProjectileConfig
 from mad.objs.battle_computers import ComputerCommand
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
@@ -31,20 +30,12 @@ class SatelliteConfig:
 class Satellite(BallisticObj):
     def __init__(
         self,
-        config: "ProjectileConfig | SatelliteConfig",
-        position: NDArray | None = None,
+        config: SatelliteConfig,
+        position: NDArray,
         velocity: NDArray | None = None,
         t: float = 0.0,
     ):
-        if isinstance(config, SatelliteConfig):
-            if position is None:
-                raise ValueError("position must be provided when using SatelliteConfig.")
-            pos = position
-            vel = velocity
-        else:
-            pos = position if position is not None else np.array(config.position)
-            vel = velocity if velocity is not None else config.velocity
-        BallisticObj.__init__(self, pos, vel, config.name, config.mass, config.area, config.Cd)  # type: ignore
+        BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
         self.t = t
         self.config = config
         if getattr(config, "guidance", None) is not None:

@@ -94,10 +94,10 @@ class TestBallisticObj:
     """BallisticObj is abstract; test its interface via Projectile."""
 
     def _make(self, **kwargs):
-        cfg = ProjectileConfig(position=[6_371_000.0 + 1_000_000.0, 0.0, 0.0], mass=kwargs.get("mass", 1.0))
+        cfg = ProjectileConfig(mass=kwargs.get("mass", 1.0))
         if "Cd" in kwargs:
             cfg.Cd = kwargs["Cd"]
-        return Projectile(cfg)
+        return Projectile(cfg, position=[6_371_000.0 + 1_000_000.0, 0.0, 0.0])
 
     def test_defaults(self):
         obj = self._make()
@@ -109,8 +109,8 @@ class TestBallisticObj:
         assert obj.mass == pytest.approx(50.0)
 
     def test_inherits_movableobj(self):
-        cfg = ProjectileConfig(position=[1.0, 2.0, 3.0], mass=1.0)
-        obj = Projectile(cfg)
+        cfg = ProjectileConfig(mass=1.0)
+        obj = Projectile(cfg, position=[1.0, 2.0, 3.0])
         np.testing.assert_array_equal(obj.position, [1.0, 2.0, 3.0])
 
     def test_mass_is_property(self):
@@ -137,13 +137,11 @@ class TestVelocityVerletIntegration:
         # Place projectile high above so it doesn't land
         r = earth.radius + 1_000_000.0
         proj_cfg = ProjectileConfig(
-            position=[r, 0.0, 0.0],
             mass=1.0,
             ref_radius=0.0,  # no drag
             Cd=0.0,
-            velocity=[0.0, 0.0, 0.0],
         )
-        proj = Projectile(proj_cfg)
+        proj = Projectile(proj_cfg, position=[r, 0.0, 0.0], velocity=[0.0, 0.0, 0.0])
 
         a0 = proj.accelerations(earth)
         dt = 1.0
@@ -163,13 +161,11 @@ class TestVelocityVerletIntegration:
         v_circ = earth.orbital_velocity * np.sqrt(earth.radius / r)
 
         proj_cfg = ProjectileConfig(
-            position=[r, 0.0],
             mass=1.0,
             ref_radius=0.0,
             Cd=0.0,
-            velocity=[0.0, v_circ],
         )
-        proj = Projectile(proj_cfg)
+        proj = Projectile(proj_cfg, position=[r, 0.0], velocity=[0.0, v_circ])
 
         def energy(p):
             r_ = np.linalg.norm(p.position)

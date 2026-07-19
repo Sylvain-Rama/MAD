@@ -16,7 +16,9 @@ from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
-from mad.guidances import NoGuidance, NoGuidanceNoThrust
+from mad.guidances import NoGuidance, NoGuidanceNoThrust, GuidanceStates
+from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
+from mad.objs.projectiles import ProjectileConfig
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -355,3 +357,85 @@ class TestRocketRange:
         r_80 = two_stage_missile.ballistic_range(earth, gamma_rad=np.radians(80))
         # 45° should give longer range than a very steep trajectory
         assert r_45 > r_80
+
+
+# ---------------------------------------------------------------------------
+# Rocket — payload release
+# ---------------------------------------------------------------------------
+
+
+class _ImmediateReleaseGuidance(Guidance):
+    """Guidance that returns RELEASE_PAYLOAD on every call, for testing only."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        v_norm = np.linalg.norm(missile.velocity)
+        direction = missile.velocity / v_norm if v_norm > 1e-8 else np.zeros(3)
+        return GuidanceResults(direction=direction, state=GuidanceStates.RELEASE_PAYLOAD)
+
+
+class TestPayloadRelease:
+    """Tests for payload separation from a Rocket."""
+
+    def _make_rocket(self, earth, altitude: float, velocity: list[float]) -> Rocket:
+        """Single-stage rocket at a known altitude/velocity with one ProjectileConfig payload."""
+        stage = RocketStage(
+            RocketStageConfig(
+                thrust=1_000_000.0,
+                ref_radius=1.0,
+                dry_mass=500.0,
+                propellant_mass=50_000.0,
+                Isp=300.0,
+                name="Stage",
+            )
+        )
+        payload_cfg = ProjectileConfig(mass=100.0, name="Payload")
+        rocket_cfg = RocketConfig(
+            stages=[stage],
+            guidance=_ImmediateReleaseGuidance(None, None),
+            payloads=[payload_cfg],
+            payload_separation_interval=0.0,  # release immediately
+        )
+        return Rocket(
+            position=np.array([earth.radius + altitude, 0.0, 0.0]),
+            config=rocket_cfg,
+            velocity=np.array(velocity, dtype=float),
+            name="TestRocket",
+        )
+
+    def test_payload_released_at_rocket_position(self, earth):
+        """Released payload must start at the rocket's position at the moment of separation."""
+        alt = 200_000.0
+        rocket = self._make_rocket(earth, alt, [0.0, 7_800.0, 0.0])
+        pos_before = rocket.position.copy()
+
+        released = rocket.update(1.0)
+
+        assert released is not None and len(released) >= 1
+        payload = next(obj for obj in released if obj.name.startswith("Payload"))
+        np.testing.assert_allclose(payload.position, pos_before, rtol=1e-9)
+
+    def test_payload_released_at_rocket_velocity(self, earth):
+        """Released payload must inherit the rocket's velocity at the moment of separation."""
+        alt = 200_000.0
+        v0 = [0.0, 7_800.0, 0.0]
+        rocket = self._make_rocket(earth, alt, v0)
+        vel_before = rocket.velocity.copy()
+
+        released = rocket.update(1.0)
+
+        assert released is not None and len(released) >= 1
+        payload = next(obj for obj in released if obj.name.startswith("Payload"))
+        np.testing.assert_allclose(payload.velocity, vel_before, rtol=1e-9)
+
+    def test_payload_velocity_independent_from_rocket(self, earth):
+        """Payload velocity must not share memory with the rocket (aliasing regression)."""
+        alt = 200_000.0
+        rocket = self._make_rocket(earth, alt, [0.0, 7_800.0, 0.0])
+
+        released = rocket.update(1.0)
+        payload = released[0]
+        payload_vel_snapshot = payload.velocity.copy()
+
+        # Mutate the rocket's velocity in-place — payload must be unaffected.
+        rocket.velocity[:] = [1.0, 2.0, 3.0]
+        np.testing.assert_array_equal(payload.velocity, payload_vel_snapshot)

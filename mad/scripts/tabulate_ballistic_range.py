@@ -22,7 +22,7 @@ from argparse import ArgumentParser
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 from mad.objs.planets import Planet, PlanetConfig
-from mad.objs.projectiles import Projectile, ProjectileConfig
+from mad.objs.projectiles import ProjectileConfig
 from mad.configs import EARTH_SETTINGS
 from mad.simulation import run_simple_simulation
 from mad.utils.logger import SourceLogger, configure_logger
@@ -103,9 +103,7 @@ def simulate(
 
     vel = v0 * (np.sin(gamma_rad) * r_hat + np.cos(gamma_rad) * t_hat)
 
-    projconfig.position = pos.tolist()
-    projconfig.velocity = vel.tolist()
-    obj = Projectile(projconfig)
+    obj = projconfig.create(pos, vel)
     start_pos = obj.position.copy()
 
     simulated_object = run_simple_simulation([obj], planet, dt=simconfig.dt, max_time=simconfig.max_time)
@@ -140,7 +138,6 @@ def main() -> None:
     simconfig = SimParameters(**config)
 
     ballistic_config = ProjectileConfig(
-        position=[0.0, 0.0, 0.0],
         mass=float(object["mass"] if "mass" in object else object["dry_mass"]),
         ref_radius=float(object["ref_radius"]),
         Cd=float(object["Cd"]),

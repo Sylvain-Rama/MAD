@@ -21,14 +21,8 @@ def earth():
 def _surface_projectile(earth, velocity=None, *, alt=500_000.0, ref_radius=0.0, Cd=0.0, mass=1.0):
     """Return a Projectile at `alt` metres above the surface."""
     r = earth.radius + alt
-    cfg = ProjectileConfig(
-        position=[r, 0.0],
-        mass=mass,
-        velocity=velocity if velocity is not None else [0.0, 0.0],
-        ref_radius=ref_radius,
-        Cd=Cd,
-    )
-    return Projectile(cfg)
+    cfg = ProjectileConfig(mass=mass, ref_radius=ref_radius, Cd=Cd)
+    return Projectile(cfg, position=[r, 0.0], velocity=velocity if velocity is not None else [0.0, 0.0])
 
 
 # ---------------------------------------------------------------------------
@@ -38,21 +32,21 @@ def _surface_projectile(earth, velocity=None, *, alt=500_000.0, ref_radius=0.0, 
 
 class TestProjectileConfig:
     def test_area_computed_from_ref_radius(self):
-        cfg = ProjectileConfig(position=[1.0, 0.0], mass=1.0, ref_radius=0.1)
+        cfg = ProjectileConfig(mass=1.0, ref_radius=0.1)
         assert cfg.area == pytest.approx(np.pi * 0.1**2, rel=1e-9)
 
     def test_zero_ref_radius_gives_zero_area(self):
-        cfg = ProjectileConfig(position=[1.0, 0.0], mass=1.0, ref_radius=0.0)
+        cfg = ProjectileConfig(mass=1.0, ref_radius=0.0)
         assert cfg.area == pytest.approx(0.0)
 
     def test_defaults(self):
-        cfg = ProjectileConfig(position=[1.0, 0.0], mass=5.0)
+        cfg = ProjectileConfig(mass=5.0)
         assert cfg.name == "Projectile"
         assert cfg.Cd == pytest.approx(0.47)
         assert cfg.ref_radius == pytest.approx(0.01)
 
     def test_to_dict(self):
-        cfg = ProjectileConfig(position=[1.0, 0.0], mass=5.0)
+        cfg = ProjectileConfig(mass=5.0)
         d = cfg.to_dict
         assert "mass" in d
         assert "Cd" in d
@@ -74,8 +68,8 @@ class TestProjectileInit:
 
     def test_custom_start_time(self, earth):
         r = earth.radius + 1000.0
-        cfg = ProjectileConfig(position=[r, 0.0], mass=1.0)
-        proj = Projectile(cfg, t=42.0)
+        cfg = ProjectileConfig(mass=1.0)
+        proj = Projectile(cfg, position=[r, 0.0], t=42.0)
         assert proj.t == pytest.approx(42.0)
 
     def test_active_on_creation(self, earth):
@@ -115,13 +109,8 @@ class TestProjectileAccelerations:
 
     def test_goes_inactive_when_below_surface(self, earth):
         """An object below the surface should become inactive and return zero acceleration."""
-        cfg = ProjectileConfig(
-            position=[earth.radius - 1.0, 0.0],  # below surface
-            mass=1.0,
-            ref_radius=0.0,
-            Cd=0.0,
-        )
-        proj = Projectile(cfg)
+        cfg = ProjectileConfig(mass=1.0, ref_radius=0.0, Cd=0.0)
+        proj = Projectile(cfg, position=[earth.radius - 1.0, 0.0])
         acc = proj.accelerations(earth)
         assert proj.active is False
         np.testing.assert_array_equal(acc, [0.0, 0.0, 0.0])
