@@ -48,7 +48,7 @@ class ReentryVehicle(BallisticObj, GuidedObj):
         BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
         self.t = t
         self.yield_kt = config.yield_kt
-        self.guidance = config.guidance
+        self.guidance = deepcopy(config.guidance)
         self.guidance_results = self.guidance.get_guidance(self, t)
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
@@ -220,7 +220,7 @@ class Rocket(BallisticObj, GuidedObj):
         MovableObj.__init__(self, position=position, velocity=velocity, name=name)
 
         self.stages = config.stages
-        self.guidance = config.guidance
+        self.guidance = deepcopy(config.guidance)
         self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
         self.t = t
         self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction

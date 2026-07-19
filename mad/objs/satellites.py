@@ -7,6 +7,7 @@ from mad.objs.battle_computers import ComputerCommand
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
 import numpy as np
+from copy import deepcopy
 from numpy.typing import NDArray
 
 logger = SourceLogger()
@@ -43,9 +44,11 @@ class Satellite(BallisticObj):
         else:
             pos = position if position is not None else np.array(config.position)
             vel = velocity if velocity is not None else config.velocity
-        BallisticObj.__init__(self, pos, vel, config.name, config.mass, config.area, config.Cd)
+        BallisticObj.__init__(self, pos, vel, config.name, config.mass, config.area, config.Cd)  # type: ignore
         self.t = t
         self.config = config
+        if getattr(config, "guidance", None) is not None:
+            self.guidance = deepcopy(config.guidance)
 
     def accelerations(self, planet) -> NDArray:
         # Typically, we can ignore drag for satellites.

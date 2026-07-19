@@ -4,7 +4,7 @@ from time import time
 import pandas as pd
 import numpy as np
 from mad.utils.logger import SourceLogger
-from mad.objs import Planet, MovableObj, SimulationInterface
+from mad.objs import Planet, SimulationInterface
 
 logger = SourceLogger()
 

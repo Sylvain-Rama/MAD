@@ -3,6 +3,7 @@ This includes MovableObj, BallisticObj, GuidedObj, and ReleasableConfig.
 See objs/projectiles.py for the implementation of projectiles and missiles.
 The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
 """
+
 from __future__ import annotations
 
 import numpy as np

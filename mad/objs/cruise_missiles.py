@@ -1,6 +1,7 @@
 """Cruise missiles are designed to fly at low altitudes and deliver a payload to a target.
 This module defines the CruiseMissile class, which is a type of guided missile."""
 
+from copy import deepcopy
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
@@ -45,7 +46,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
             Cd=config.Cd,
         )
         self.config = config
-        self.guidance = config.guidance
+        self.guidance = deepcopy(config.guidance)
         self.guidance_results = self.guidance.get_guidance(self, t)
         self.t = t
         self.total_distance_traveled = 0.0
