@@ -13,7 +13,6 @@ mercury_redstone_1A = [
         "Cd": 0.5,
         "name": "Mercury Redstone",
     },
-   
 ]
 
 mercury_capsule = {
