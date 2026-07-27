@@ -424,3 +424,32 @@ class ProportionalNavigation(Guidance):
         return GuidanceResults(
             direction=a_cmd / cmd_norm, state=self.state, magnitude=float(cmd_norm), next_guidance=self.next_guidance
         )
+
+
+class StraightUp(Guidance):
+    """Straight up guidance: the missile always points straight up, along the local vertical."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        r_hat = missile.normalize
+        return GuidanceResults(
+            direction=r_hat,
+            state=self.state,
+            next_guidance=self.next_guidance,
+        )
+
+
+class PitchRollManoeuver(Guidance):
+    """Pitch and roll maneuver guidance: the missile performs a pitch and roll maneuver to align with the target."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        r_hat, t_hat = self.local_frame(missile)
+        # Simple pitch and roll maneuver towards the target
+        desired_direction = r_hat + 0.5 * t_hat  # Adjust the factor for desired aggressiveness
+        norm = np.linalg.norm(desired_direction)
+        if norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
+        return GuidanceResults(
+            direction=desired_direction / norm,
+            state=self.state,
+            next_guidance=self.next_guidance,
+        )
