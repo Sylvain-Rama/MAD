@@ -15,7 +15,7 @@ from mad.objs import MovableObj, Planet
 from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Callable, Protocol, cast
+from typing import Callable, Protocol, cast, Any
 import numpy as np
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
@@ -59,6 +59,12 @@ class GuidanceResults:
 
     direction: NDArray  # Unit vector indicating the desired direction of acceleration (m/s²)
     state: GuidanceStates
+    modify_config: dict[str, Any] | None = (
+        None  # Optional dictionary of attributes to change the object's configuration (e.g., Cd, mass, etc.) for the next time step.
+    )
+    modify_stage: dict[str, Any] | None = (
+        None  # Optional dictionary of attributes to change the object's current stage (e.g., mass, thrust, Isp, etc.) for the next time step.
+    )
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
     release_velocity: NDArray | None = None  # Optimal payload release velocity vector (m/s)

@@ -327,6 +327,39 @@ class Rocket(BallisticObj, GuidedObj):
         total_thrust = sum(s.thrust_force for s in self._active_burn_group if s.active)
         return total_thrust / self.mass if total_thrust > 0 else 0.0
 
+    def _update_configs(self) -> None:
+        """Update the rocket's configuration based on the guidance results.
+        This is used to change any attributes of the rocket or its stages based on the guidance law's output.
+        For example, we can increase The ref_radius or Cd of the rocket to simulate deploying a drag device,
+        or change the mass of the rocket to simulate jettisoning boosters.
+        """
+        if self.guidance_results is None:
+            return
+
+        if self.guidance_results.modify_config is not None:
+            for attr, value in self.guidance_results.modify_config.items():
+                if hasattr(self, attr):
+                    setattr(self, attr, value)
+                    logger["Rocket"].info(
+                        f"{self.t:<.2f}s - {self.name} changed attribute {attr} to {value} at {self.t:.2f}."
+                    )
+                else:
+                    logger["Rocket"].warning(
+                        f"{self.t:<.2f}s - {self.name} has no attribute {attr} to change at {self.t:.2f}."
+                    )
+
+        if self.guidance_results.modify_stage is not None and self.stages:
+            for attr, value in self.guidance_results.modify_stage.items():
+                if hasattr(self._active_burn_group[0], attr):
+                    setattr(self._active_burn_group[0], attr, value)
+                    logger["Rocket"].info(
+                        f"{self.t:<.2f}s - {self.name} changed stage attribute {attr} to {value} at {self.t:.2f}."
+                    )
+                else:
+                    logger["Rocket"].warning(
+                        f"{self.t:<.2f}s - {self.name} has no stage attribute {attr} to change at {self.t:.2f}."
+                    )
+
     def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
         released_objects = []
         self.t += dt
@@ -338,6 +371,9 @@ class Rocket(BallisticObj, GuidedObj):
         if self.guidance_results.state != GuidanceStates.IDLE:
             for stage in burn_group:
                 stage.update(dt)
+
+        # Update the rocket's configuration based on the guidance results.
+        self._update_configs()
 
         if (
             self.guidance_results.state == GuidanceStates.RELEASE_PAYLOAD
