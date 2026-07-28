@@ -63,7 +63,7 @@ class GuidanceResults:
         None  # Optional dictionary of attributes to change the object's configuration (e.g., Cd, mass, etc.) for the next time step.
     )
     modify_stage: dict[str, Any] | None = (
-        None  # Optional dictionary of attributes to change the object's current stage (e.g., mass, thrust, Isp, etc.) for the next time step.
+        None  # Optional dictionary of attributes to change the rocket's current stage (e.g., mass, thrust, Isp, etc.) for the next time step.
     )
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
@@ -458,4 +458,60 @@ class PitchRollManoeuver(Guidance):
             direction=desired_direction / norm,
             state=self.state,
             next_guidance=self.next_guidance,
+        )
+
+
+class DeployChute(Guidance):
+    """Deploy parachute guidance: the missile deploys a parachute to slow down and descend."""
+
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        # Typical values for Mercury Capsule parachute deployment
+        chute_Cd: float = 1.5,
+        chute_ref_radius: float = 10.0,
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.state = GuidanceStates.POWERED  # Start in powered state to allow for chute deployment
+        self.chute_Cd = chute_Cd
+        self.chute_ref_radius = chute_ref_radius
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        # Assuming the parachute deploys and slows down the missile
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on previous direction
+            state=GuidanceStates.POWERED,
+            next_guidance=self.next_guidance,
+            modify_config={"Cd": self.chute_Cd, "ref_radius": self.chute_ref_radius},
+        )
+
+
+class DropBoosters(Guidance):
+    """Drop boosters guidance: the missile drops its boosters to reduce mass and change aerodynamics."""
+
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        # Typical values for booster drop
+        new_mass: float = 1000.0,  # New mass after dropping boosters
+        new_Cd: float = 0.5,  # New drag coefficient after dropping boosters
+        new_ref_radius: float = 0.3,  # New reference radius after dropping boosters
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.state = GuidanceStates.POWERED  # Start in powered state to allow for booster drop
+        self.new_mass = new_mass
+        self.new_Cd = new_Cd
+        self.new_ref_radius = new_ref_radius
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        # Assuming the boosters are dropped and the missile's configuration changes
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on current trajectory
+            state=GuidanceStates.POWERED,
+            next_guidance=self.next_guidance,
+            modify_config={"mass": self.new_mass, "Cd": self.new_Cd, "ref_radius": self.new_ref_radius},
         )

@@ -64,12 +64,28 @@ class CruiseMissile(BallisticObj, GuidedObj):
     def thrust_acc(self) -> float:
         return self.config.thrust_acc
 
+    def _update_config(self):
+        """Update the missile's configuration based on guidance results."""
+        if self.guidance_results.modify_config is not None:
+            for attr, value in self.guidance_results.modify_config.items():
+                if hasattr(self.config, attr):
+                    setattr(self.config, attr, value)
+                    logger["Missile"].info(
+                        f"{self.t:<.2f}s - {self.name} changed config attribute {attr} to {value} at {self.t:.2f}."
+                    )
+                else:
+                    logger["Missile"].warning(
+                        f"{self.t:<.2f}s - {self.name} has no config attribute {attr} to change at {self.t:.2f}."
+                    )
+
     def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+        self.t += dt
         self.total_distance_traveled += float(np.linalg.norm(self.velocity)) * dt
         if self.total_distance_traveled >= self.config.max_range_m:
             self.motor_active = False
-        self.t += dt
+
         self.guidance_results = self.guidance.get_guidance(self, self.t)
+        self._update_config()
         if self.guidance_results.state == GuidanceStates.DETONATE:
             self.detonate()
         return None
