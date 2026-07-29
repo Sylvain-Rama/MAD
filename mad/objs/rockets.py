@@ -104,6 +104,93 @@ class ReentryVehicle(BallisticObj, GuidedObj):
         logger["Rocket"].info(f"{self.t:<.2f}s - Warhead {self.name} detonated with yield {self.yield_kt:.2f} kt.")
         self.active = False
 
+@dataclass
+class CapsuleConfig:
+    mass: float  # kg
+    ref_radius: float  # m
+    Cd: float
+    guidance: Guidance | GuidanceManager
+    name: str = "Capsule"
+    RCS_thrust: float = 500.0  # N, used for terminal guidance.
+
+    def __post_init__(self):
+        self.area = np.pi * self.ref_radius**2
+
+    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Capsule":
+        return Capsule(config=self, position=position, velocity=velocity, t=t)
+
+
+class Capsule(BallisticObj, GuidedObj):
+    """Capsules are a special type of payload that can receive guidance commands.
+    They have a small RCS thruster for terminal guidance, which is used to steer the capsule towards its target during the final phase of flight.
+    We assume this thruster is not limited by propellant mass, and can be used for the entire flight.
+    This is a simplification, but it allows us to focus on the guidance aspects of the capsule without worrying about propellant management.
+    """
+
+    def __init__(self, config: CapsuleConfig, position: NDArray, velocity=None, t=0.0):
+        BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
+        self.t = t
+        self.guidance = deepcopy(config.guidance)
+        self.guidance_results = self.guidance.get_guidance(self, t)
+        self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
+
+    @property
+    def has_thrust(self) -> bool:
+        return self.RCS_thrust > 0
+
+    @property
+    def thrust_acc(self) -> float:
+        return self.RCS_thrust / self.mass
+
+    @property
+    def burned_fraction(self) -> float:
+        # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
+        return 0.5
+
+    def _update_configs(self) -> None:
+            if self.guidance_results is None:
+                return
+    
+            if self.guidance_results.modify_config is not None:
+                for attr, value in self.guidance_results.modify_config.items():
+                    if hasattr(self, attr):
+                        setattr(self, attr, value)
+                        logger["Rocket"].info(
+                            f"{self.t:<.2f}s - {self.name} changed attribute {attr} to {value} at {self.t:.2f}."
+                        )
+                    else:
+                        logger["Rocket"].warning(
+                            f"{self.t:<.2f}s - {self.name} has no attribute {attr} to change at {self.t:.2f}."
+                        )
+
+    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+        self.t += dt
+        self.guidance_results = self.guidance.get_guidance(self, self.t)
+        self._update_configs()
+
+        return None
+
+    def accelerations(self, planet: Planet) -> NDArray:
+
+        if self.distance(planet) <= planet.radius:
+            logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
+            self.active = False
+            return np.zeros_like(self.velocity)
+
+        gravity = planet.gravity(self)
+        drag = planet.drag(self)
+        thrust = np.zeros_like(self.velocity)
+
+        if self.guidance_results.state != GuidanceStates.IDLE:
+            d = self.guidance_results.direction
+            d_norm = np.linalg.norm(d)
+            if d_norm > 1e-8:
+                desired_acc = self.guidance_results.magnitude
+                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
+                thrust = acc * d / d_norm
+
+        return gravity + drag + thrust
+
 
 @dataclass
 class RocketStageConfig:

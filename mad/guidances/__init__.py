@@ -11,6 +11,8 @@ from mad.guidances.base_guidances import (
     GuidanceInterrupts,
     PurePursuitGuidance,
     StraightUp,
+    DeployChute,
+    PitchRollManoeuver,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance, CosinePitchProgram, OrbitalInsertion
@@ -38,4 +40,6 @@ __all__ = [
     "GuidanceInterrupts",
     "PurePursuitGuidance",
     "Chase",
+    "DeployChute",
+    "PitchRollManoeuver",
 ]

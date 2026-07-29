@@ -2,7 +2,7 @@
 # And https://en.wikipedia.org/wiki/Mercury-Redstone_1A
 # And https://en.wikipedia.org/wiki/PGM-11_Redstone
 # And https://en.wikipedia.org/wiki/Project_Mercury#Spacecraft
-mercury_redstone_1A = [
+mercury_redstone = [
     {
         "dry_mass": 3125.0,
         # "propellant_mass": 5051.0 + 11470.0 + 360.0,  # kg Alcohol, LOX, and Hydrogen Peroxide

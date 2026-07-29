@@ -80,6 +80,7 @@ class GuidanceInterrupts:
     planet: Planet | None = None  # Switch when action on planet
     t: float = 0.0  # Switch when simulation time reaches a value (s)
     travelled_distance_m: float = 0.0  # Switch when missile has travelled a distance (m)
+    reached_angle_rad: float | None = None  # Switch when missile reaches a certain angle (rad)
 
 
 class Guidance(ABC):
@@ -436,7 +437,7 @@ class StraightUp(Guidance):
     """Straight up guidance: the missile always points straight up, along the local vertical."""
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        r_hat = missile.normalize
+        r_hat = missile.position / np.linalg.norm(missile.position)
         return GuidanceResults(
             direction=r_hat,
             state=self.state,
@@ -447,17 +448,33 @@ class StraightUp(Guidance):
 class PitchRollManoeuver(Guidance):
     """Pitch and roll maneuver guidance: the missile performs a pitch and roll maneuver to align with the target."""
 
+    def __init__(
+        self, planet: Planet, target: MovableObj, interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.state = GuidanceStates.POWERED  # Start in powered state to allow for pitch and roll maneuver
+        # We want to track the original angle between r_hat and t_hat to compute the change in angle during the maneuver.
+        # This allows to interrupt the Guidance when a certain angle is reached.
+        self._original_angle = None
+
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         r_hat, t_hat = self.local_frame(missile)
+        if self._original_angle is None:
+            self._original_angle = np.arccos(np.clip(np.dot(r_hat, t_hat), -1, 1))
+
         # Simple pitch and roll maneuver towards the target
         desired_direction = r_hat + 0.5 * t_hat  # Adjust the factor for desired aggressiveness
         norm = np.linalg.norm(desired_direction)
         if norm < 1e-8:
             return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
+
+        new_angle = np.arccos(np.clip(np.dot(r_hat, t_hat), -1, 1))
+        angle_difference = new_angle - self._original_angle
         return GuidanceResults(
             direction=desired_direction / norm,
             state=self.state,
             next_guidance=self.next_guidance,
+            gamma=angle_difference,
         )
 
 
@@ -479,11 +496,10 @@ class DeployChute(Guidance):
         self.chute_ref_radius = chute_ref_radius
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        # Assuming the parachute deploys and slows down the missile
         return GuidanceResults(
             direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on previous direction
             state=GuidanceStates.POWERED,
-            next_guidance=self.next_guidance,
+            next_guidance=True,
             modify_config={"Cd": self.chute_Cd, "ref_radius": self.chute_ref_radius},
         )
 
@@ -512,6 +528,6 @@ class DropBoosters(Guidance):
         return GuidanceResults(
             direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on current trajectory
             state=GuidanceStates.POWERED,
-            next_guidance=self.next_guidance,
+            next_guidance=True,
             modify_config={"mass": self.new_mass, "Cd": self.new_Cd, "ref_radius": self.new_ref_radius},
         )
