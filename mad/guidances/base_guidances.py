@@ -80,7 +80,7 @@ class GuidanceInterrupts:
     planet: Planet | None = None  # Switch when action on planet
     t: float = 0.0  # Switch when simulation time reaches a value (s)
     travelled_distance_m: float = 0.0  # Switch when missile has travelled a distance (m)
-    reached_angle_rad: float | None = None  # Switch when missile reaches a certain angle (rad)
+    gamma: float | None = None  # Current flight-path angle from the active guidance law (rad)
 
 
 class Guidance(ABC):
@@ -164,13 +164,15 @@ class Guidance(ABC):
             travelled_distance_m=self.travelled_distance,
         )
 
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        """Update state, compute guidance, then evaluate any interrupt condition."""
+        self.update(missile, t)
+        results = self._compute_guidance(missile, t)
+        self.guidance_interrupts.gamma = results.gamma
         if self.interrupt_fn is not None and self.interrupt_fn(self.guidance_interrupts):
             self.next_guidance = True
-
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        """Template method: always calls update (which evaluates interrupt_fn), then delegates."""
-        self.update(missile, t)
-        return self._compute_guidance(missile, t)
+        results.next_guidance = self.next_guidance
+        return results
 
     @abstractmethod
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults: ...
@@ -218,7 +220,7 @@ class NoGuidance(Guidance):
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
             direction=missile.velocity / np.linalg.norm(missile.velocity),
-            state=self.state,
+            state=GuidanceStates.POWERED,
             next_guidance=self.next_guidance,
         )
 
@@ -449,32 +451,42 @@ class PitchRollManoeuver(Guidance):
     """Pitch and roll maneuver guidance: the missile performs a pitch and roll maneuver to align with the target."""
 
     def __init__(
-        self, planet: Planet, target: MovableObj, interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None
+        self, planet: Planet, 
+        target: MovableObj, 
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        agressiveness: float = 0.5,  # Factor to adjust the aggressiveness of the maneuver
     ):
         super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self.state = GuidanceStates.POWERED  # Start in powered state to allow for pitch and roll maneuver
         # We want to track the original angle between r_hat and t_hat to compute the change in angle during the maneuver.
         # This allows to interrupt the Guidance when a certain angle is reached.
-        self._original_angle = None
+        self.gamma: float | None = None
+        self.agressiveness = agressiveness
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         r_hat, t_hat = self.local_frame(missile)
-        if self._original_angle is None:
-            self._original_angle = np.arccos(np.clip(np.dot(r_hat, t_hat), -1, 1))
 
         # Simple pitch and roll maneuver towards the target
-        desired_direction = r_hat + 0.5 * t_hat  # Adjust the factor for desired aggressiveness
+        desired_direction = r_hat + self.agressiveness * t_hat  # Adjust the factor for desired aggressiveness
         norm = np.linalg.norm(desired_direction)
         if norm < 1e-8:
             return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
 
-        new_angle = np.arccos(np.clip(np.dot(r_hat, t_hat), -1, 1))
-        angle_difference = new_angle - self._original_angle
+        velocity_norm = np.linalg.norm(missile.velocity)
+        if velocity_norm < 1e-8:
+            gamma = np.pi / 2
+        else:
+            velocity_hat = missile.velocity / velocity_norm
+            radial_velocity = np.dot(velocity_hat, r_hat)
+            horizontal_velocity = velocity_hat - radial_velocity * r_hat
+            gamma = np.arctan2(radial_velocity, np.linalg.norm(horizontal_velocity))
+
+        self.gamma = float(gamma)
         return GuidanceResults(
             direction=desired_direction / norm,
             state=self.state,
             next_guidance=self.next_guidance,
-            gamma=angle_difference,
+            gamma=self.gamma,
         )
 
 
@@ -500,7 +512,7 @@ class DeployChute(Guidance):
             direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on previous direction
             state=GuidanceStates.POWERED,
             next_guidance=True,
-            modify_config={"Cd": self.chute_Cd, "ref_radius": self.chute_ref_radius},
+            modify_config={"Cd": self.chute_Cd, "area": np.pi * self.chute_ref_radius**2},
         )
 
 

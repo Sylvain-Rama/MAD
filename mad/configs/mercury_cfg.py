@@ -11,7 +11,7 @@ mercury_redstone = [
         "Isp": 215.0,
         "ref_radius": 0.9,  # m
         "Cd": 0.5,
-        "name": "Mercury Redstone",
+        "name": "Mercury Redstone Stage 1",
     },
 ]
 

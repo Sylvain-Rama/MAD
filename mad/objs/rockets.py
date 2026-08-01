@@ -104,6 +104,7 @@ class ReentryVehicle(BallisticObj, GuidedObj):
         logger["Rocket"].info(f"{self.t:<.2f}s - Warhead {self.name} detonated with yield {self.yield_kt:.2f} kt.")
         self.active = False
 
+
 @dataclass
 class CapsuleConfig:
     mass: float  # kg
@@ -148,20 +149,20 @@ class Capsule(BallisticObj, GuidedObj):
         return 0.5
 
     def _update_configs(self) -> None:
-            if self.guidance_results is None:
-                return
-    
-            if self.guidance_results.modify_config is not None:
-                for attr, value in self.guidance_results.modify_config.items():
-                    if hasattr(self, attr):
-                        setattr(self, attr, value)
-                        logger["Rocket"].info(
-                            f"{self.t:<.2f}s - {self.name} changed attribute {attr} to {value} at {self.t:.2f}."
-                        )
-                    else:
-                        logger["Rocket"].warning(
-                            f"{self.t:<.2f}s - {self.name} has no attribute {attr} to change at {self.t:.2f}."
-                        )
+        if self.guidance_results is None:
+            return
+
+        if self.guidance_results.modify_config is not None:
+            for attr, value in self.guidance_results.modify_config.items():
+                if hasattr(self, attr):
+                    setattr(self, attr, value)
+                    logger["Rocket"].info(
+                        f"{self.t:<.2f}s - {self.name} changed attribute {attr} to {value} at {self.t:.2f}."
+                    )
+                else:
+                    logger["Rocket"].warning(
+                        f"{self.t:<.2f}s - {self.name} has no attribute {attr} to change at {self.t:.2f}."
+                    )
 
     def update(self, dt: float, command: ComputerCommand | None = None) -> None:
         self.t += dt
