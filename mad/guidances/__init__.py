@@ -13,7 +13,7 @@ from mad.guidances.base_guidances import (
     StraightUp,
     DeployChute,
     PitchRollManoeuver,
-    ReleasePayload
+    ReleasePayload,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
 from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance, CosinePitchProgram, OrbitalInsertion
@@ -43,5 +43,5 @@ __all__ = [
     "Chase",
     "DeployChute",
     "PitchRollManoeuver",
-    "ReleasePayload"
+    "ReleasePayload",
 ]

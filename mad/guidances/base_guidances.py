@@ -239,6 +239,7 @@ class NoGuidanceNoThrust(Guidance):
             next_guidance=self.next_guidance,
         )
 
+
 class ReleasePayload(Guidance):
     """Release payload guidance: the missile releases its payload when it reaches the target."""
 
@@ -465,8 +466,9 @@ class PitchRollManoeuver(Guidance):
     """Pitch and roll maneuver guidance: the missile performs a pitch and roll maneuver to align with the target."""
 
     def __init__(
-        self, planet: Planet, 
-        target: MovableObj, 
+        self,
+        planet: Planet,
+        target: MovableObj,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
         agressiveness: float = 0.5,  # Factor to adjust the aggressiveness of the maneuver
     ):

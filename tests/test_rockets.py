@@ -84,7 +84,9 @@ def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
     missile = GuidanceMissile(position=[earth.radius, 0.0], velocity=[1.0, 1.0], name="Test rocket")
     target = MovableObj(position=[0.0, earth.radius], name="Target")
     threshold = np.deg2rad(41.0)
-    guidance = PitchRollManoeuver(earth, target, interrupt_fn=lambda interrupts: interrupt_at_angle(interrupts, threshold))
+    guidance = PitchRollManoeuver(
+        earth, target, interrupt_fn=lambda interrupts: interrupt_at_angle(interrupts, threshold)
+    )
     missile.guidance = GuidanceManager([guidance, NoGuidance(earth, target)])
 
     results = missile.guidance.get_guidance(missile)

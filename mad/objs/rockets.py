@@ -340,10 +340,20 @@ class Rocket(BallisticObj, GuidedObj):
     def mass(self):
         # Payload masses are excluded: they only exist once released as independent objects.
         return sum(stage.mass for stage in self.stages)
+    
+    @mass.setter
+    def mass(self, value):
+        if value <= 0:
+            raise ValueError("Rocket mass must be positive.")
+        self.mass = value
 
     @property
     def area(self):
         return self.stages[-1].area if self.stages else self._coasting_area
+
+    @area.setter
+    def area(self, value):
+        self._coasting_area = value
 
     @property
     def has_thrust(self) -> bool:
