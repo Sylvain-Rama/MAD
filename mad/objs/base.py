@@ -147,6 +147,18 @@ class BallisticObj(MovableObj, SimulationInterface):
     def area(self) -> float:
         return self._area
 
+    @mass.setter
+    def mass(self, value: float):
+        if value <= 0:
+            raise ValueError("Mass must be positive.")
+        self._mass = value
+
+    @area.setter
+    def area(self, value: float):
+        if value <= 0:
+            raise ValueError("Area must be positive.")
+        self._area = value
+
 
 class GuidedObj(ABC):
     """Abstract mixin for simulation objects that receive guidance commands.

@@ -239,6 +239,16 @@ class NoGuidanceNoThrust(Guidance):
             next_guidance=self.next_guidance,
         )
 
+class ReleasePayload(Guidance):
+    """Release payload guidance: the missile releases its payload when it reaches the target."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),
+            state=GuidanceStates.RELEASE_PAYLOAD,
+            next_guidance=self.next_guidance,
+        )
+
 
 # TODO: This HoldPosition guidance is fine for short waits, but presents a significant drift
 # For long waits. To be improved.
