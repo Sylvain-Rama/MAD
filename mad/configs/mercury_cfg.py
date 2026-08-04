@@ -6,7 +6,7 @@ mercury_redstone = [
     {
         "dry_mass": 3125.0,
         # "propellant_mass": 5051.0 + 11470.0 + 360.0,  # kg Alcohol, LOX, and Hydrogen Peroxide
-        "full_mass": 28_440.0,
+        "full_mass": 30_440.0,
         "thrust": 350 * 1000,  # N
         "Isp": 215.0,
         "ref_radius": 0.9,  # m

@@ -10,15 +10,19 @@ Both Guidances and GuidanceManager classes can be used in the same way, as they 
 It is for the user to decide whether to use a single guidance law or a sequence of guidance laws for a given missile.
 """
 
-from mad.objs import MovableObj, Planet
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Callable, Protocol, cast, Any
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 import numpy as np
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
+
+if TYPE_CHECKING:
+    from mad.objs.base import MovableObj
+    from mad.objs.planets import Planet
 
 logger = SourceLogger()
 
@@ -157,7 +161,7 @@ class Guidance(ABC):
         self.t = t
 
         self.guidance_interrupts = GuidanceInterrupts(
-            missile=cast(MovableObj, missile),
+            missile=cast(Any, missile),
             target=self.target,
             planet=self.planet,
             t=self.t,
@@ -255,7 +259,7 @@ class HoldPosition(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Acceleration required to cancel gravity at the current position.
-        gravity = self.planet.gravity(cast(MovableObj, missile))
+        gravity = self.planet.gravity(cast(Any, missile))
         a_required = -gravity
 
         # Retro-thrust component to damp any residual velocity.
