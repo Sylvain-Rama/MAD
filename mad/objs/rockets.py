@@ -343,9 +343,7 @@ class Rocket(BallisticObj, GuidedObj):
     
     @mass.setter
     def mass(self, value):
-        if value <= 0:
-            raise ValueError("Rocket mass must be positive.")
-        self.mass = value
+        raise AttributeError("Cannot set rocket mass directly; it is computed from the stages.")
 
     @property
     def area(self):
