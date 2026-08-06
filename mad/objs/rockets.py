@@ -33,7 +33,7 @@ class RVConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> "ReentryVehicle":
+    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "ReentryVehicle":
         return ReentryVehicle(config=self, position=position, velocity=velocity, t=t)
 
 
@@ -44,7 +44,7 @@ class ReentryVehicle(BallisticObj, GuidedObj):
     This is a simplification, but it allows us to focus on the guidance and detonation aspects of the RV without worrying about propellant management.
     """
 
-    def __init__(self, config: RVConfig, position: NDArray, velocity=None, t=0.0):
+    def __init__(self, config: RVConfig, position: NDArray, velocity: NDArray | None = None, t=0.0):
         BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
         self.t = t
         self.yield_kt = config.yield_kt
@@ -117,7 +117,7 @@ class CapsuleConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Capsule":
+    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "Capsule":
         return Capsule(config=self, position=position, velocity=velocity, t=t)
 
 
@@ -128,7 +128,7 @@ class Capsule(BallisticObj, GuidedObj):
     This is a simplification, but it allows us to focus on the guidance aspects of the capsule without worrying about propellant management.
     """
 
-    def __init__(self, config: CapsuleConfig, position: NDArray, velocity=None, t=0.0):
+    def __init__(self, config: CapsuleConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
         BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
         self.t = t
         self.guidance = deepcopy(config.guidance)
@@ -302,7 +302,9 @@ class RocketConfig:
 
 
 class Rocket(BallisticObj, GuidedObj):
-    def __init__(self, position, config: RocketConfig, velocity=None, name="Rocket", t=0.0):
+    def __init__(
+        self, position, config: RocketConfig, velocity: NDArray | None = None, name: str = "Rocket", t: float = 0.0
+    ):
         # mass and area are computed properties on this class; bypass BallisticObj.__init__
         # to avoid storing unused _mass/_area defaults.
         MovableObj.__init__(self, position=position, velocity=velocity, name=name)
@@ -340,7 +342,7 @@ class Rocket(BallisticObj, GuidedObj):
     def mass(self):
         # Payload masses are excluded: they only exist once released as independent objects.
         return sum(stage.mass for stage in self.stages)
-    
+
     @mass.setter
     def mass(self, value):
         raise AttributeError("Cannot set rocket mass directly; it is computed from the stages.")
@@ -477,7 +479,6 @@ class Rocket(BallisticObj, GuidedObj):
             and self.payloads
         ):
             next_cfg = self.payloads.pop(0)
-            payload_name = f"{next_cfg.name}_{self.released_payloads + 1}"
 
             release_velocity = (
                 self.guidance_results.release_velocity
@@ -490,9 +491,9 @@ class Rocket(BallisticObj, GuidedObj):
                 velocity=release_velocity,
                 t=deepcopy(self.t),
             )
-            payload.name = payload_name
+
             released_objects.append(payload)
-            logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} released payload {payload_name} at {self.t:.2f}.")
+            logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} released payload {payload.name} at {self.t:.2f}.")
             self.released_payloads += 1
             self.last_payload_separation_time = deepcopy(self.t)
 
