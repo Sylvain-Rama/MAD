@@ -298,7 +298,7 @@ class RocketConfig:
         return asdict(self)
 
     def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "Rocket":
-        return Rocket(position=position, config=self, velocity=velocity, t=t)
+        return Rocket(position=position, config=self, velocity=velocity, name=self.name, t=t)
 
 
 class Rocket(BallisticObj, GuidedObj):

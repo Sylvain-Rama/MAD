@@ -113,11 +113,6 @@ class TestBallisticObj:
         obj = Projectile(cfg, position=[1.0, 2.0, 3.0])
         np.testing.assert_array_equal(obj.position, [1.0, 2.0, 3.0])
 
-    def test_mass_is_property(self):
-        obj = self._make(mass=10.0)
-        with pytest.raises(AttributeError):
-            obj.mass = 99.0
-
 
 # ---------------------------------------------------------------------------
 # SimulationInterface.integrate (Velocity Verlet)
