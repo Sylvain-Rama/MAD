@@ -155,6 +155,7 @@ class BallisticObj(MovableObj, SimulationInterface):
         self._area = value
 
 
+
 class GuidedObj(ABC):
     """Abstract mixin for simulation objects that receive guidance commands.
 

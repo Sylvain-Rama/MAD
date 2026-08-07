@@ -94,5 +94,3 @@ class Planet(MovableObj):
         angle = np.arccos(np.clip(cos_angle, -1, 1))
 
         return self.radius * angle
-
-    
