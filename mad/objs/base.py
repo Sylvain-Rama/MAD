@@ -69,11 +69,6 @@ class MovableObj:
             return False
         return self._id == other._id
 
-    def degrade(self):
-        """Degrade the object, e.g. when impacted."""
-        logger["Projectile"].info(f"{self.name} degraded.")
-        self.active = False
-
 
 class SimulationInterface(ABC):
     """Abstract interface for any object that can be simulated inside a planet environment.
