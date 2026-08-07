@@ -3,6 +3,7 @@ from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.satellites_cfg import sputnik
 from mad.configs.warheads_cfg import B53_warhead, rod_of_god
 from mad.configs.cruise_missiles_cfg import tomahawk, aster_30, tomahawk_guidance, aster_30_guidance, V1, V1_guidance
+from mad.configs.mercury_cfg import mercury_redstone, mercury_capsule, mercury_atlas
 from mad.configs.physics_cfg import G, VOXEL_SIZE, MILES_TO_METERS, MACHS_TO_METERS_S, G0
 
 __all__ = [
@@ -25,4 +26,7 @@ __all__ = [
     "tomahawk_guidance",
     "V1",
     "V1_guidance",
+    "mercury_redstone",
+    "mercury_capsule",
+    "mercury_atlas",
 ]

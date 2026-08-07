@@ -164,6 +164,7 @@ class Simulation:
         stop = time()
         logger["Simulation"].info(f"{t:<.2f}s - Simulation ended. Took {stop - start:.2f} s of real time.")
         self.results = self.collector.extract_history()
+        self.final_objs = active_objs
 
 
 # Convenience function for quick simulations without logging.

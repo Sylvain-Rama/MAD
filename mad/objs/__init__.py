@@ -7,6 +7,8 @@ from mad.objs.rockets import (
     RocketStageConfig,
     ReentryVehicle,
     RVConfig,
+    Capsule,
+    CapsuleConfig,
 )
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.objs.radars import Radar, RadarConfig
@@ -43,4 +45,6 @@ __all__ = [
     "LauncherConfig",
     "ComputerOrder",
     "ComputerCommand",
+    "Capsule",
+    "CapsuleConfig",
 ]

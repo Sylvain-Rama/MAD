@@ -41,3 +41,10 @@ def interrupt_at_surface_distance_to_target(interrupts: GuidanceInterrupts, reac
 
     surface_distance = interrupts.planet.surface_distance(interrupts.missile, interrupts.target)
     return surface_distance < reached_distance_m
+
+
+def interrupt_at_angle(interrupts: GuidanceInterrupts, reached_angle_rad: float) -> bool:
+    """Interrupt when the flight-path angle falls to ``reached_angle_rad`` (rad)."""
+    if interrupts.gamma is None:
+        raise ValueError("The active guidance law must provide a gamma value for this GuidanceInterrupt.")
+    return float(interrupts.gamma) <= reached_angle_rad

@@ -12,12 +12,14 @@ from mad.objs.rockets import (
     Rocket,
 )
 from mad.objs.planets import Planet, PlanetConfig
+from mad.objs.base import MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
-from mad.guidances import NoGuidance, NoGuidanceNoThrust, GuidanceStates
+from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, GuidanceStates, PitchRollManoeuver
 from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
+from mad.guidances.interrupt_guidances import interrupt_at_angle
 from mad.objs.projectiles import ProjectileConfig
 
 # ---------------------------------------------------------------------------
@@ -60,6 +62,44 @@ def two_stage_missile(earth):
     cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
     r = earth.radius + 10.0
     return Rocket(position=[r, 0.0], config=cfg, name="Titan")
+
+
+class GuidanceMissile(MovableObj):
+    guidance: Guidance
+
+    @property
+    def burned_fraction(self) -> float:
+        return 0.0
+
+    @property
+    def has_thrust(self) -> bool:
+        return True
+
+    @property
+    def thrust_acc(self) -> float:
+        return 0.0
+
+
+def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
+    missile = GuidanceMissile(position=[earth.radius, 0.0], velocity=[1.0, 1.0], name="Test rocket")
+    target = MovableObj(position=[0.0, earth.radius], name="Target")
+    threshold = np.deg2rad(41.0)
+    guidance = PitchRollManoeuver(
+        earth, target, interrupt_fn=lambda interrupts: interrupt_at_angle(interrupts, threshold)
+    )
+    missile.guidance = GuidanceManager([guidance, NoGuidance(earth, target)])
+
+    results = missile.guidance.get_guidance(missile)
+
+    assert results.gamma == pytest.approx(np.deg2rad(45.0))
+    assert results.next_guidance is False
+
+    missile.velocity = np.array([np.sin(threshold), np.cos(threshold), 0.0])
+    results = missile.guidance.get_guidance(missile, t=1.0)
+
+    assert results.gamma == pytest.approx(threshold)
+    assert results.next_guidance is True
+    assert missile.guidance.current_index == 1
 
 
 # ---------------------------------------------------------------------------

@@ -10,15 +10,19 @@ Both Guidances and GuidanceManager classes can be used in the same way, as they 
 It is for the user to decide whether to use a single guidance law or a sequence of guidance laws for a given missile.
 """
 
-from mad.objs import MovableObj, Planet
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 import numpy as np
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
+
+if TYPE_CHECKING:
+    from mad.objs.base import MovableObj
+    from mad.objs.planets import Planet
 
 logger = SourceLogger()
 
@@ -59,6 +63,12 @@ class GuidanceResults:
 
     direction: NDArray  # Unit vector indicating the desired direction of acceleration (m/s²)
     state: GuidanceStates
+    modify_config: dict[str, Any] | None = (
+        None  # Optional dictionary of attributes to change the object's configuration (e.g., Cd, mass, etc.) for the next time step.
+    )
+    modify_stage: dict[str, Any] | None = (
+        None  # Optional dictionary of attributes to change the rocket's current stage (e.g., mass, thrust, Isp, etc.) for the next time step.
+    )
     gamma: float | None = None  # Optional angular velocity command for advanced guidance laws
     magnitude: float | None = None  # Optional desired acceleration magnitude (m/s²)
     release_velocity: NDArray | None = None  # Optimal payload release velocity vector (m/s)
@@ -74,6 +84,7 @@ class GuidanceInterrupts:
     planet: Planet | None = None  # Switch when action on planet
     t: float = 0.0  # Switch when simulation time reaches a value (s)
     travelled_distance_m: float = 0.0  # Switch when missile has travelled a distance (m)
+    gamma: float | None = None  # Current flight-path angle from the active guidance law (rad)
 
 
 class Guidance(ABC):
@@ -150,20 +161,22 @@ class Guidance(ABC):
         self.t = t
 
         self.guidance_interrupts = GuidanceInterrupts(
-            missile=cast(MovableObj, missile),
+            missile=cast(Any, missile),
             target=self.target,
             planet=self.planet,
             t=self.t,
             travelled_distance_m=self.travelled_distance,
         )
 
+    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        """Update state, compute guidance, then evaluate any interrupt condition."""
+        self.update(missile, t)
+        results = self._compute_guidance(missile, t)
+        self.guidance_interrupts.gamma = results.gamma
         if self.interrupt_fn is not None and self.interrupt_fn(self.guidance_interrupts):
             self.next_guidance = True
-
-    def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        """Template method: always calls update (which evaluates interrupt_fn), then delegates."""
-        self.update(missile, t)
-        return self._compute_guidance(missile, t)
+        results.next_guidance = self.next_guidance
+        return results
 
     @abstractmethod
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults: ...
@@ -211,7 +224,7 @@ class NoGuidance(Guidance):
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
             direction=missile.velocity / np.linalg.norm(missile.velocity),
-            state=self.state,
+            state=GuidanceStates.POWERED,
             next_guidance=self.next_guidance,
         )
 
@@ -223,6 +236,17 @@ class NoGuidanceNoThrust(Guidance):
         return GuidanceResults(
             direction=np.zeros_like(missile.velocity),
             state=GuidanceStates.IDLE,
+            next_guidance=self.next_guidance,
+        )
+
+
+class ReleasePayload(Guidance):
+    """Release payload guidance: the missile releases its payload when it reaches the target."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),
+            state=GuidanceStates.RELEASE_PAYLOAD,
             next_guidance=self.next_guidance,
         )
 
@@ -246,7 +270,7 @@ class HoldPosition(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Acceleration required to cancel gravity at the current position.
-        gravity = self.planet.gravity(cast(MovableObj, missile))
+        gravity = self.planet.gravity(cast(Any, missile))
         a_required = -gravity
 
         # Retro-thrust component to damp any residual velocity.
@@ -423,4 +447,115 @@ class ProportionalNavigation(Guidance):
 
         return GuidanceResults(
             direction=a_cmd / cmd_norm, state=self.state, magnitude=float(cmd_norm), next_guidance=self.next_guidance
+        )
+
+
+class StraightUp(Guidance):
+    """Straight up guidance: the missile always points straight up, along the local vertical."""
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        r_hat = missile.position / np.linalg.norm(missile.position)
+        return GuidanceResults(
+            direction=r_hat,
+            state=self.state,
+            next_guidance=self.next_guidance,
+        )
+
+
+class PitchRollManoeuver(Guidance):
+    """Pitch and roll maneuver guidance: the missile performs a pitch and roll maneuver to align with the target."""
+
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        agressiveness: float = 0.5,  # Factor to adjust the aggressiveness of the maneuver
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.state = GuidanceStates.POWERED  # Start in powered state to allow for pitch and roll maneuver
+        # We want to track the original angle between r_hat and t_hat to compute the change in angle during the maneuver.
+        # This allows to interrupt the Guidance when a certain angle is reached.
+        self.gamma: float | None = None
+        self.agressiveness = agressiveness
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        r_hat, t_hat = self.local_frame(missile)
+
+        # Simple pitch and roll maneuver towards the target
+        desired_direction = r_hat + self.agressiveness * t_hat  # Adjust the factor for desired aggressiveness
+        norm = np.linalg.norm(desired_direction)
+        if norm < 1e-8:
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
+
+        velocity_norm = np.linalg.norm(missile.velocity)
+        if velocity_norm < 1e-8:
+            gamma = np.pi / 2
+        else:
+            velocity_hat = missile.velocity / velocity_norm
+            radial_velocity = np.dot(velocity_hat, r_hat)
+            horizontal_velocity = velocity_hat - radial_velocity * r_hat
+            gamma = np.arctan2(radial_velocity, np.linalg.norm(horizontal_velocity))
+
+        self.gamma = float(gamma)
+        return GuidanceResults(
+            direction=desired_direction / norm,
+            state=self.state,
+            next_guidance=self.next_guidance,
+            gamma=self.gamma,
+        )
+
+
+class DeployChute(Guidance):
+    """Deploy parachute guidance: the missile deploys a parachute to slow down and descend."""
+
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        # Typical values for Mercury Capsule parachute deployment
+        chute_Cd: float = 1.5,
+        chute_ref_radius: float = 10.0,
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.state = GuidanceStates.POWERED  # Start in powered state to allow for chute deployment
+        self.chute_Cd = chute_Cd
+        self.chute_ref_radius = chute_ref_radius
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on previous direction
+            state=GuidanceStates.POWERED,
+            next_guidance=True,
+            modify_config={"Cd": self.chute_Cd, "area": np.pi * self.chute_ref_radius**2},
+        )
+
+
+class DropBoosters(Guidance):
+    """Drop boosters guidance: the missile drops its boosters to reduce mass and change aerodynamics."""
+
+    def __init__(
+        self,
+        planet: Planet,
+        target: MovableObj,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        # Typical values for booster drop
+        new_mass: float = 1000.0,  # New mass after dropping boosters
+        new_Cd: float = 0.5,  # New drag coefficient after dropping boosters
+        new_ref_radius: float = 0.3,  # New reference radius after dropping boosters
+    ):
+        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        self.state = GuidanceStates.POWERED  # Start in powered state to allow for booster drop
+        self.new_mass = new_mass
+        self.new_Cd = new_Cd
+        self.new_ref_radius = new_ref_radius
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        # Assuming the boosters are dropped and the missile's configuration changes
+        return GuidanceResults(
+            direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on current trajectory
+            state=GuidanceStates.POWERED,
+            next_guidance=True,
+            modify_config={"mass": self.new_mass, "Cd": self.new_Cd, "ref_radius": self.new_ref_radius},
         )
