@@ -51,7 +51,7 @@ class Planet(MovableObj):
         surf_obj = MovableObj(position=surface_pos)
 
         # We take the first element as this is where distance = planet.radius.
-        return self.gravity(surf_obj)[0]
+        return np.linalg.norm(self.gravity(surf_obj)[0])
 
     def __repr__(self):
         return (

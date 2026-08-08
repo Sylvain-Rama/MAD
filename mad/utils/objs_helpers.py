@@ -2,7 +2,7 @@ import numpy as np
 from mad.objs import MovableObj, Planet
 
 
-def random_point_at_surface(
+def random_point_at_planet_surface(
     planet: Planet, altitude: float = 10, name: str = "SurfaceObj", dims: int = 2
 ) -> MovableObj:
     # Create a random object at the 2D or 3D surface (+ altitude) of the planet.
@@ -16,7 +16,7 @@ def random_point_at_surface(
     return MovableObj(position=(planet.radius + altitude) * v + planet.position[:dims], name=name)
 
 
-def point_at_distance(
+def point_at_planet_surface_distance(
     planet: Planet, obj: MovableObj, distance_km: float, altitude: float = 10, name="RangedObj", dims: int = 2
 ) -> MovableObj:
     # Create a new random object at set distance from another point on the planet.
