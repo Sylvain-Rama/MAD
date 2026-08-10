@@ -22,11 +22,11 @@ class TabulatedBallistic(Guidance):
         self,
         planet,
         target: MovableObj,
-        ballistic_table_path: str,
+        ballistic_table_name: str,
         interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
         super().__init__(planet, target, interrupt_fn=interrupt_fn)
-        self.ballistic_guidance = load_ballistic_table(ballistic_table_path) if ballistic_table_path else None
+        self.ballistic_guidance = load_ballistic_table(ballistic_table_name) if ballistic_table_name else None
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
 

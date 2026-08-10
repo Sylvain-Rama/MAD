@@ -298,16 +298,16 @@ class RocketConfig:
         return asdict(self)
 
     def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "Rocket":
-        return Rocket(position=position, config=self, velocity=velocity, name=self.name, t=t)
+        return Rocket(position=position, config=self, velocity=velocity, t=t)
 
 
 class Rocket(BallisticObj, GuidedObj):
     def __init__(
-        self, position, config: RocketConfig, velocity: NDArray | None = None, name: str = "Rocket", t: float = 0.0
+        self, position, config: RocketConfig, velocity: NDArray | None = None, t: float = 0.0
     ):
         # mass and area are computed properties on this class; bypass BallisticObj.__init__
         # to avoid storing unused _mass/_area defaults.
-        MovableObj.__init__(self, position=position, velocity=velocity, name=name)
+        MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
 
         self.stages = config.stages
         self.guidance = deepcopy(config.guidance)
