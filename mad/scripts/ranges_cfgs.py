@@ -43,6 +43,15 @@ SIM_PARAMETERS: dict[str, dict[str, Any]] = {
         "dt": 2.0,
         "max_time": 3600.0,
     },
+    "B53_warhead_full_range": {
+        "altitudes_km": np.arange(0, 2000, 500),
+        # Burnout/coast speed grows with target range (up to ~9.6 km/s for Titan 1
+        # burning out fully), so the velocity axis must cover that whole envelope.
+        "velocities_kms": np.arange(0, 11, 0.5),
+        "gammas_deg": np.arange(20, 90, 2.0),
+        "dt": 2.0,
+        "max_time": 3600.0,
+    },
     "V1": {
         "altitudes_km": np.arange(0.1, 1, 0.05),
         "velocities_kms": np.arange(0.1, 0.2, 0.01),

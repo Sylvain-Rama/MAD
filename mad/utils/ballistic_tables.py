@@ -4,19 +4,17 @@ import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
 from dataclasses import dataclass
-from scipy.spatial import KDTree
+from scipy.interpolate import RegularGridInterpolator
 from mad.utils.logger import SourceLogger
 
 
 @dataclass
 class BallisticTable:
     table: NDArray
-    alt_scale: float
-    vel_scale: float
-    gam_scale: float
-    range_scale: float
-    kdtree: KDTree  # Built from normalized (alt, vel, gamma) inputs
-    kdtree_range: KDTree  # Built from normalized (alt, vel, range_rad) for range-based gamma lookup
+    altitudes: NDArray  # sorted unique altitude_m grid axis
+    velocities: NDArray  # sorted unique velocity_m_s grid axis
+    gammas: NDArray  # sorted unique gamma_rad grid axis
+    range_interp: RegularGridInterpolator  # linear interpolation of range_rad over (altitude, velocity, gamma)
 
 
 BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad", "range_km"]
@@ -24,8 +22,12 @@ BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad",
 logger = SourceLogger()
 
 
-def load_ballistic_csv(table_name: str) -> NDArray:
-    """Load a ballistic table from a CSV file and return a DataFrame"""
+def load_ballistic_csv(table_name: str, dropna: bool = True) -> NDArray:
+    """Load a ballistic table from a CSV file and return a DataFrame.
+
+    Set ``dropna=False`` to keep rows with missing values as NaN instead of removing
+    them — required by `load_ballistic_table` to preserve the regular grid shape.
+    """
     # TODO: Use a proper path management solution and make this more robust to different environments.
     # For now, we assume the tables are in src/mad/tables and the script is run from the root of the repo.
     file_path = f"/app/mad/tables/{table_name}.csv"
@@ -38,11 +40,12 @@ def load_ballistic_csv(table_name: str) -> NDArray:
     except Exception as e:
         raise ValueError(f"Failed to load ballistic table from {file_path}. Error: {e}")
 
-    n_before = len(table)
-    table = table[~np.isnan(table).any(axis=1)]
-    n_dropped = n_before - len(table)
-    if n_dropped:
-        logger["I/O"].warning(f"Dropped {n_dropped} row(s) with missing values from {file_path}.")
+    if dropna:
+        n_before = len(table)
+        table = table[~np.isnan(table).any(axis=1)]
+        n_dropped = n_before - len(table)
+        if n_dropped:
+            logger["I/O"].warning(f"Dropped {n_dropped} row(s) with missing values from {file_path}.")
 
     return table
 
@@ -62,41 +65,49 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
     """Load a ballistic table from a CSV file and create the BallisticTable object.
     The CSV file must have columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     The first row must be a header with exactly those column names.
+
+    Rows must form a complete regular grid over (altitude_m, velocity_m_s, gamma_rad), as
+    produced by mad/scripts/tabulate_ballistic_range.py — range_rad is linearly interpolated
+    over that grid, which is far more precise than nearest-neighbor lookup for a given table
+    size, letting tables stay compact even when covering both low- and high-altitude regimes.
     """
 
-    table = load_ballistic_csv(table_name)
+    table = load_ballistic_csv(table_name, dropna=False)
 
-    alt_scale = np.ptp(table[:, 0]) or 1.0
-    vel_scale = np.ptp(table[:, 1]) or 1.0
-    gam_scale = np.ptp(table[:, 2]) or 1.0
-    range_scale = np.ptp(table[:, 3]) or 1.0
+    altitudes = np.unique(table[:, 0])
+    velocities = np.unique(table[:, 1])
+    gammas = np.unique(table[:, 2])
 
-    norm_inputs = np.column_stack(
-        [
-            table[:, 0] / alt_scale,
-            table[:, 1] / vel_scale,
-            table[:, 2] / gam_scale,
-        ]
+    expected_rows = len(altitudes) * len(velocities) * len(gammas)
+    if expected_rows != len(table):
+        raise ValueError(
+            f"Ballistic table '{table_name}' is not a complete regular grid: expected "
+            f"{expected_rows} rows ({len(altitudes)} altitudes x {len(velocities)} velocities x "
+            f"{len(gammas)} gammas) but got {len(table)}. The table must be generated as a full "
+            "cartesian product of altitude/velocity/gamma values."
+        )
+
+    range_grid = table[:, 3].reshape(len(altitudes), len(velocities), len(gammas))
+
+    n_missing = int(np.isnan(range_grid).sum())
+    if n_missing:
+        logger["I/O"].warning(
+            f"Ballistic table '{table_name}' has {n_missing} missing entrie(s); "
+            "queries interpolated near them will return NaN."
+        )
+
+    range_interp = RegularGridInterpolator(
+        (altitudes, velocities, gammas),
+        range_grid,
+        method="linear",
+        bounds_error=False,
+        fill_value=None,  # linearly extrapolate slightly outside the grid instead of failing
     )
-    kdtree = KDTree(norm_inputs)
-
-    # TODO: Use the second KDTree for range-based lookup of gamma given alt, vel, and range.
-    # Removed the 2nd KDTree use for the moment.
-    norm_inputs_range = np.column_stack(
-        [
-            table[:, 0] / alt_scale,
-            table[:, 1] / vel_scale,
-            table[:, 3] / range_scale,
-        ]
-    )
-    kdtree_range = KDTree(norm_inputs_range)
 
     return BallisticTable(
         table=table,
-        alt_scale=alt_scale,
-        vel_scale=vel_scale,
-        gam_scale=gam_scale,
-        range_scale=range_scale,
-        kdtree=kdtree,
-        kdtree_range=kdtree_range,
+        altitudes=altitudes,
+        velocities=velocities,
+        gammas=gammas,
+        range_interp=range_interp,
     )

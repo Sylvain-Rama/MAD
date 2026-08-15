@@ -43,33 +43,27 @@ class TabulatedBallistic(Guidance):
         altitude = np.linalg.norm(missile.position) - self.planet.radius
         velocity = np.linalg.norm(missile.velocity)
 
-        # Find the closest entry in the ballistic table based on altitude, velocity and gamma.
         # Convert missile gamma to the table's prograde convention using the detected sign.
-        table = self.ballistic_guidance.table
-
         v_r = np.dot(missile.velocity, r_hat)
         v_t = np.dot(missile.velocity, t_hat)
         missile_gamma = np.arctan2(v_r, sign * v_t)
 
-        query_point = np.array(
-            [
-                altitude / self.ballistic_guidance.alt_scale,
-                velocity / self.ballistic_guidance.vel_scale,
-                missile_gamma / self.ballistic_guidance.gam_scale,
-            ]
-        )
-        k = min(5, len(table))
-        dists, idxs = self.ballistic_guidance.kdtree.query(query_point, k=k)
+        # Linearly interpolate the optimal range over the table's regular
+        # (altitude, velocity, gamma) grid. Clamp to the grid envelope since gamma is
+        # itself a grid axis, so the clamped query value doubles as the table's gamma.
+        table = self.ballistic_guidance
+        clamped_altitude = np.clip(altitude, table.altitudes[0], table.altitudes[-1])
+        clamped_velocity = np.clip(velocity, table.velocities[0], table.velocities[-1])
+        gamma = float(np.clip(missile_gamma, table.gammas[0], table.gammas[-1]))
 
-        if dists[0] < 1e-12:
-            # Exact match — no interpolation needed.
-            optimal_range = table[idxs[0], 3] * self.planet.radius
-            gamma = table[idxs[0], 2]
-        else:
-            weights = 1.0 / dists
-            weights /= weights.sum()
-            optimal_range = float(np.dot(weights, table[idxs, 3])) * self.planet.radius
-            gamma = float(np.dot(weights, table[idxs, 2]))
+        if velocity > table.velocities[-1] or velocity < table.velocities[0]:
+            logger["Guidance"].warning(
+                f"{missile.name}: velocity {velocity:.1f} m/s is outside the ballistic table's "
+                f"range [{table.velocities[0]:.1f}, {table.velocities[-1]:.1f}] m/s; clamping to "
+                f"{clamped_velocity:.1f} m/s. The table likely needs a wider velocity grid."
+            )
+
+        optimal_range = float(table.range_interp([clamped_altitude, clamped_velocity, gamma])[0]) * self.planet.radius
 
         release_velocity = None
         if range_to_target <= optimal_range:
