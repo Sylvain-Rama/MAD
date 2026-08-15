@@ -315,7 +315,7 @@ class TestBallisticMissileUpdate:
         stages[0].propellant_mass = 0.001
         cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
-        missile = Rocket(position=[r, 0.0], config=cfg, velocity=[0.0, 100.0, 0.0], name="T")
+        missile = Rocket(position=[r, 0.0], config=cfg, velocity=[0.0, 100.0, 0.0])
 
         missile.update(1.0)  # burns last propellant; stage still active
         result = missile.update(0.0)  # stage now detects empty and separates
@@ -335,7 +335,7 @@ class TestBallisticMissileUpdate:
         stages = [RocketStage(single_stage_cfg)]
         cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
         r = earth.radius + 10.0
-        missile = Rocket(position=[r, 0.0], config=cfg, velocity=[0.0, 100.0, 0.0], name="Single")
+        missile = Rocket(position=[r, 0.0], config=cfg, velocity=[0.0, 100.0, 0.0])
 
         missile.update(1.0)  # burns propellant; stage still active
         missile.update(0.0)  # stage detects empty → separates → missile inactive
@@ -367,13 +367,11 @@ class TestRocketAccelerations:
         m_thrust = Rocket(
             position=[r, 0.0],
             config=RocketConfig(stages=stages_thrust, guidance=NoGuidance(None, None)),
-            name="A",
             velocity=vel.copy(),
         )
         m_coast = Rocket(
             position=[r, 0.0],
             config=RocketConfig(stages=stages_no_thrust, guidance=NoGuidance(None, None)),
-            name="B",
             velocity=vel.copy(),
         )
 
@@ -439,7 +437,6 @@ class TestPayloadRelease:
             position=np.array([earth.radius + altitude, 0.0, 0.0]),
             config=rocket_cfg,
             velocity=np.array(velocity, dtype=float),
-            name="TestRocket",
         )
 
     def test_payload_released_at_rocket_position(self, earth):

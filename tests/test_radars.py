@@ -91,11 +91,13 @@ class TestRadarInit:
 
 class TestRadarDetect:
     def test_detects_nearby_target(self, small_earth, radar):
-        nearby = small_earth.point_at_distance(MovableObj(radar.position), distance_km=0.02, name="Near")
+        nearby = point_at_planet_surface_distance(
+            small_earth, MovableObj(radar.position), distance_km=0.02, name="Near"
+        )
         assert radar.detect(nearby) is True
 
     def test_does_not_detect_far_target(self, small_earth, radar):
-        far = small_earth.point_at_distance(MovableObj(radar.position), distance_km=0.2, name="Far")
+        far = point_at_planet_surface_distance(small_earth, MovableObj(radar.position), distance_km=0.2, name="Far")
         assert radar.detect(far) is False
 
     def test_detects_self(self, radar):
@@ -110,7 +112,9 @@ class TestRadarDetect:
 
 class TestRadarGetDetectionStrength:
     def test_strength_nearby_greater_than_far(self, small_earth, radar):
-        nearby = point_at_planet_surface_distance(small_earth, MovableObj(radar.position), distance_km=0.02, name="Near")
+        nearby = point_at_planet_surface_distance(
+            small_earth, MovableObj(radar.position), distance_km=0.02, name="Near"
+        )
         far = point_at_planet_surface_distance(small_earth, MovableObj(radar.position), distance_km=0.2, name="Far")
         s_near = radar.get_detection_strength(nearby)
         s_far = radar.get_detection_strength(far)

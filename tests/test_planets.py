@@ -182,8 +182,8 @@ class TestSurfaceDistance:
         assert earth.surface_distance(p1, p2) == pytest.approx(expected, rel=1e-6)
 
     def test_distance_symmetric(self, earth):
-        p1 = earth.random_point_at_surface()
-        p2 = earth.point_at_distance(p1, 1000.0)
+        p1 = random_point_at_planet_surface(earth, altitude=0)
+        p2 = point_at_planet_surface_distance(earth, p1, distance_km=1000.0)
         assert earth.surface_distance(p1, p2) == pytest.approx(earth.surface_distance(p2, p1), rel=1e-9)
 
 
