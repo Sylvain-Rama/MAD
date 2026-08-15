@@ -170,9 +170,9 @@ def main() -> None:
             )
         )
 
-    out_path = os.path.join("mad/tables", args.config + ".csv")
+    out_path = os.path.join("tables", args.config + ".csv")
 
-    with open(out_path, "w", newline="") as f:
+    with open(out_path, "w+", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=BALLISTIC_FIELD_NAMES)
         writer.writeheader()
         writer.writerows(rows)

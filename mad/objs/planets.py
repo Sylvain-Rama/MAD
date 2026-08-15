@@ -51,7 +51,7 @@ class Planet(MovableObj):
         surf_obj = MovableObj(position=surface_pos)
 
         # We take the first element as this is where distance = planet.radius.
-        return self.gravity(surf_obj)[0]
+        return np.linalg.norm(self.gravity(surf_obj)[0])
 
     def __repr__(self):
         return (
@@ -94,31 +94,3 @@ class Planet(MovableObj):
         angle = np.arccos(np.clip(cos_angle, -1, 1))
 
         return self.radius * angle
-
-    def random_point_at_surface(self, altitude: float = 10, name: str = "SurfaceObj", dims: int = 2) -> MovableObj:
-        # Create a random object at the 2D or 3D surface (+ altitude) of the planet.
-
-        if not 0 < dims < 4:
-            raise ValueError("Dimensions for the point definition must be between 1 and 3")
-        v = np.random.normal(size=dims)
-        v /= np.linalg.norm(v)
-
-        return MovableObj(position=(self.radius + altitude) * v, name=name)
-
-    def point_at_distance(
-        self, obj: MovableObj, distance_km: float, altitude: float = 10, name="RangedObj", dims: int = 2
-    ) -> MovableObj:
-        # Create a new random object at set distance from another point on the planet.
-        # 2D or 3D mode.
-
-        u = obj.normalize[:dims]
-        sigma = (distance_km * 1000) / self.radius
-
-        # random orthogonal direction
-        v = np.random.normal(size=dims)
-        v -= np.dot(v, u) * u
-        v /= np.linalg.norm(v)
-
-        point = np.cos(sigma) * u + np.sin(sigma) * v
-
-        return MovableObj(position=(self.radius + altitude) * point, name=name)

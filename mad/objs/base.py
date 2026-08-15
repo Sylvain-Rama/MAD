@@ -50,6 +50,7 @@ class MovableObj:
         self._id = self.__class__.__name__ + f"_{self.name}_" + str(MovableObj._id_counter)
         MovableObj._id_counter += 1
 
+    # TODO: change normalize() to pos_norm() and add a vel_norm().
     @property
     def normalize(self) -> NDArray[np.floating]:
         norm = np.linalg.norm(self.position)
@@ -68,11 +69,6 @@ class MovableObj:
         if not isinstance(other, MovableObj):
             return False
         return self._id == other._id
-
-    def degrade(self):
-        """Degrade the object, e.g. when impacted."""
-        logger["Projectile"].info(f"{self.name} degraded.")
-        self.active = False
 
 
 class SimulationInterface(ABC):
@@ -134,7 +130,7 @@ class BallisticObj(MovableObj, SimulationInterface):
         area: float = 0.01,
         Cd: float = 0.47,
     ):
-        super().__init__(position, velocity, name)
+        MovableObj.__init__(self, position, velocity, name)
         self._mass = mass
         self._area = area
         self.Cd = Cd
