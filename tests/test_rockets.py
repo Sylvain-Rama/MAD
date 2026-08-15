@@ -61,7 +61,7 @@ def two_stage_missile(earth):
     stages = [RocketStage(RocketStageConfig(**s)) for s in titan1_stages]
     cfg = RocketConfig(stages=stages, guidance=NoGuidance(None, None))
     r = earth.radius + 10.0
-    return Rocket(position=[r, 0.0], config=cfg, name="Titan")
+    return Rocket(position=[r, 0.0], config=cfg)
 
 
 class GuidanceMissile(MovableObj):

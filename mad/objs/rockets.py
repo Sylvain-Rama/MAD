@@ -302,9 +302,7 @@ class RocketConfig:
 
 
 class Rocket(BallisticObj, GuidedObj):
-    def __init__(
-        self, position, config: RocketConfig, velocity: NDArray | None = None, t: float = 0.0
-    ):
+    def __init__(self, position, config: RocketConfig, velocity: NDArray | None = None, t: float = 0.0):
         # mass and area are computed properties on this class; bypass BallisticObj.__init__
         # to avoid storing unused _mass/_area defaults.
         MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)

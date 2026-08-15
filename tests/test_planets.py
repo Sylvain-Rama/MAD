@@ -7,6 +7,7 @@ from mad.objs.base import MovableObj
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.physics_cfg import G
+from mad.utils.objs_helpers import random_point_at_planet_surface, point_at_planet_surface_distance
 
 # ---------------------------------------------------------------------------
 # Fixture
@@ -193,19 +194,19 @@ class TestSurfaceDistance:
 
 class TestPointCreation:
     def test_2d_point_at_surface(self, earth):
-        p = earth.random_point_at_surface(altitude=0)
+        p = random_point_at_planet_surface(earth, altitude=0)
         r = np.linalg.norm(p.position)
         assert r == pytest.approx(earth.radius, rel=1e-9)
 
     def test_2d_point_at_altitude(self, earth):
         alt = 500.0
-        p = earth.random_point_at_surface(altitude=alt)
+        p = random_point_at_planet_surface(earth, altitude=alt)
         r = np.linalg.norm(p.position)
         assert r == pytest.approx(earth.radius + alt, rel=1e-9)
 
     def test_2d_point_at_distance_km(self, earth):
-        p1 = earth.random_point_at_surface(altitude=0)
+        p1 = random_point_at_planet_surface(earth, altitude=0)
         distance_km = 1000.0
-        p2 = earth.point_at_distance(p1, distance_km=distance_km)
+        p2 = point_at_planet_surface_distance(earth, p1, distance_km=distance_km)
         actual_km = earth.surface_distance(p1, p2) / 1000.0
         assert actual_km == pytest.approx(distance_km, rel=1e-6)

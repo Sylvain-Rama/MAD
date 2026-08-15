@@ -6,6 +6,7 @@ from mad.objs.radars import Radar, RadarConfig
 from mad.objs.base import MovableObj
 from mad.objs.planets import Planet, PlanetConfig
 from mad.configs.planets_cfg import EARTH_SETTINGS
+from mad.utils.objs_helpers import random_point_at_planet_surface, point_at_planet_surface_distance
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -22,7 +23,7 @@ def small_earth():
 
 @pytest.fixture
 def radar(small_earth):
-    surface_pos = small_earth.random_point_at_surface(altitude=5.0)
+    surface_pos = random_point_at_planet_surface(small_earth, altitude=5.0)
     cfg = RadarConfig(
         position=surface_pos.position,
         range=45.0,
@@ -109,14 +110,14 @@ class TestRadarDetect:
 
 class TestRadarGetDetectionStrength:
     def test_strength_nearby_greater_than_far(self, small_earth, radar):
-        nearby = small_earth.point_at_distance(MovableObj(radar.position), distance_km=0.02, name="Near")
-        far = small_earth.point_at_distance(MovableObj(radar.position), distance_km=0.2, name="Far")
+        nearby = point_at_planet_surface_distance(small_earth, MovableObj(radar.position), distance_km=0.02, name="Near")
+        far = point_at_planet_surface_distance(small_earth, MovableObj(radar.position), distance_km=0.2, name="Far")
         s_near = radar.get_detection_strength(nearby)
         s_far = radar.get_detection_strength(far)
         assert s_near > s_far
 
     def test_out_of_range_returns_zero(self, small_earth, radar):
-        far = small_earth.point_at_distance(MovableObj(radar.position), distance_km=0.2, name="Far")
+        far = point_at_planet_surface_distance(small_earth, MovableObj(radar.position), distance_km=0.2, name="Far")
         assert radar.get_detection_strength(far) == pytest.approx(0.0)
 
     def test_self_strength_positive(self, radar):
