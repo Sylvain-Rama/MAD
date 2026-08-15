@@ -8,7 +8,7 @@ It is a simplified simulation designed to easily reproduce rocket launches, crui
 
 Or the reproduction of the first Sputnik launch:
 
-![Beep beep!](medias/SPutnik.png)
+![Beep beep!](medias/Sputnik.png)
 
 See a [full serie of notebooks](notebooks) showing how to use it.
 Work In Progress!
