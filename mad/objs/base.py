@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
-from mad.utils.base_utils import to_vec3
+from mad.utils.base_utils import to_vec3, normalize
 from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
@@ -50,13 +50,13 @@ class MovableObj:
         self._id = self.__class__.__name__ + f"_{self.name}_" + str(MovableObj._id_counter)
         MovableObj._id_counter += 1
 
-    # TODO: change normalize() to pos_norm() and add a vel_norm().
     @property
-    def normalize(self) -> NDArray[np.floating]:
-        norm = np.linalg.norm(self.position)
-        if norm < 1e-8:
-            return np.zeros_like(self.position)
-        return self.position / norm
+    def pos_norm(self) -> NDArray:
+        return normalize(self.position)
+
+    @property
+    def vel_norm(self) -> NDArray:
+        return normalize(self.velocity)
 
     def distance(self, other: "MovableObj") -> np.floating:
         return np.linalg.norm(self.position - other.position)

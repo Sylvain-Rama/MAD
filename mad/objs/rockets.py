@@ -559,7 +559,7 @@ class Rocket(BallisticObj, GuidedObj):
         # If there is no thrust, no need to check for direction: we cannot act on it.
         if self.thrust_acc > 0:
             # If no guidance, we continue along the same direction.
-            direction = self.guidance_results.direction if self.guidance_results else self.normalize
+            direction = self.guidance_results.direction if self.guidance_results else self.pos_norm
             direction = direction / np.linalg.norm(direction)
             thrust = self.thrust_acc * direction
         else:

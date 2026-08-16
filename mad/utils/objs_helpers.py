@@ -22,7 +22,7 @@ def point_at_planet_surface_distance(
     # Create a new random object at set distance from another point on the planet.
     # 2D or 3D mode.
 
-    u = obj.normalize[:dims]
+    u = obj.pos_norm[:dims]
     sigma = (distance_km * 1000) / planet.radius
 
     # random orthogonal direction

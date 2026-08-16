@@ -40,7 +40,10 @@ class GuidableObj(Protocol):
     name: str
 
     @property
-    def normalize(self) -> NDArray: ...
+    def pos_norm(self) -> NDArray: ...
+
+    @property
+    def vel_norm(self) -> NDArray: ...
 
     @property
     def burned_fraction(self) -> float: ...
@@ -124,11 +127,11 @@ class Guidance(ABC):
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
-        return np.arccos(np.clip(np.dot(missile.normalize, target.normalize), -1, 1))
+        return np.arccos(np.clip(np.dot(missile.pos_norm, target.pos_norm), -1, 1))
 
     def local_frame(self, missile: GuidableObj) -> tuple[NDArray, NDArray]:
-        r_hat = missile.normalize
-        rt_hat = self.target.normalize
+        r_hat = missile.pos_norm
+        rt_hat = self.target.pos_norm
 
         t_hat = np.cross(np.cross(rt_hat, r_hat), r_hat)
         t_norm = np.linalg.norm(t_hat)
@@ -150,7 +153,7 @@ class Guidance(ABC):
         The result is cached so the orientation is determined only on the first call.
         """
         if self._t_hat_sign is None:
-            rt_hat = self.target.normalize
+            rt_hat = self.target.pos_norm
             prograde = rt_hat - np.dot(rt_hat, r_hat) * r_hat
             self._t_hat_sign = 1.0 if np.dot(prograde, t_hat) >= 0 else -1.0
         return self._t_hat_sign
@@ -279,7 +282,7 @@ class HoldPosition(Guidance):
         norm = np.linalg.norm(a_required)
         if norm < 1e-8:
             return GuidanceResults(
-                direction=missile.normalize,
+                direction=missile.pos_norm,
                 state=self.state,
                 magnitude=0.0,
                 next_guidance=self.next_guidance,

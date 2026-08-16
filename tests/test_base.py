@@ -54,12 +54,12 @@ class TestMovableObj:
 
     def test_normalize_unit_vector(self):
         obj = MovableObj(position=[3.0, 4.0])
-        norm = obj.normalize
+        norm = obj.pos_norm
         assert pytest.approx(np.linalg.norm(norm), abs=1e-9) == 1.0
 
     def test_normalize_zero_returns_zeros(self):
         obj = MovableObj(position=[0.0, 0.0, 0.0])
-        np.testing.assert_array_equal(obj.normalize, [0.0, 0.0, 0.0])
+        np.testing.assert_array_equal(obj.pos_norm, [0.0, 0.0, 0.0])
 
     def test_distance_symmetric(self):
         a = MovableObj(position=[0.0, 0.0])
