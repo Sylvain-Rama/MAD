@@ -15,7 +15,7 @@ class BallisticTable:
     velocities: NDArray  # sorted unique velocity_m_s grid axis
     gammas: NDArray  # sorted unique gamma_rad grid axis
     range_interp: RegularGridInterpolator  # linear interpolation of range_rad over (altitude, velocity, gamma)
-
+    name: str = ""  # optional name for the table, e.g. the warhead or missile type
 
 BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad", "range_km"]
 
@@ -61,7 +61,7 @@ def load_ballistic_df(table_name: str) -> pd.DataFrame:
     return df
 
 
-def load_ballistic_table(table_name: str) -> BallisticTable | None:
+def load_ballistic_table(table_name: str) -> BallisticTable:
     """Load a ballistic table from a CSV file and create the BallisticTable object.
     The CSV file must have columns: altitude_m, velocity_m_s, gamma_rad, range_rad.
     The first row must be a header with exactly those column names.
@@ -110,4 +110,5 @@ def load_ballistic_table(table_name: str) -> BallisticTable | None:
         velocities=velocities,
         gammas=gammas,
         range_interp=range_interp,
+        name=table_name,
     )

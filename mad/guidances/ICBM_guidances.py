@@ -28,6 +28,17 @@ class TabulatedBallistic(Guidance):
         super().__init__(planet, target, interrupt_fn=interrupt_fn)
         self.ballistic_guidance = load_ballistic_table(ballistic_table_name) if ballistic_table_name else None
 
+    def __repr__(self):
+        max_alt, min_alt = max(self.ballistic_guidance.altitudes), min(self.ballistic_guidance.altitudes)
+        max_vel, min_vel = max(self.ballistic_guidance.velocities), min(self.ballistic_guidance.velocities)
+        max_gamma, min_gamma = max(self.ballistic_guidance.gammas), min(self.ballistic_guidance.gammas)
+        return (
+            f"TabulatedBallistic(table name={self.ballistic_guidance.name}, "
+            f"altitude range=[{min_alt:.1f}, {max_alt:.1f}] m, "
+            f"velocity range=[{min_vel:.1f}, {max_vel:.1f}] m/s, "
+            f"degrees range=[{np.degrees(min_gamma):.3f}, {np.degrees(max_gamma):.3f}] deg)"
+        )
+
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
 
         if self.ballistic_guidance is None:
