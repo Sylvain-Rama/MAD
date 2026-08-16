@@ -12,15 +12,18 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+
 from mad.utils.base_utils import to_vec3, normalize
 from mad.utils.logger import SourceLogger
+
+if TYPE_CHECKING:
+    from mad.objs.battle_computers import ComputerCommand
 
 logger = SourceLogger()
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
-    from mad.objs.battle_computers import ComputerCommand
 
 
 class MovableObj:
@@ -73,6 +76,10 @@ class MovableObj:
             return False
         return self._id == other._id
 
+    def degrade(self) -> None:
+        """Mark the object inactive when it is degraded or destroyed."""
+        self.active = False
+
 
 class BallisticObj(MovableObj):
     """Compatibility base class for physics-bearing objects.
@@ -124,9 +131,8 @@ class BallisticObj(MovableObj):
         a1 = self.accelerations(planet)
         self.velocity += 0.5 * (a0 + a1) * dt
 
-    def degrade(self):
-        """Mark the object inactive when it is degraded or destroyed."""
-        self.active = False
+    def accelerations(self, planet: "Planet") -> NDArray:
+        raise NotImplementedError("BallisticObj subclasses must implement accelerations().")
 
 
 class Body(BallisticObj):
@@ -145,15 +151,15 @@ class Body(BallisticObj):
         mass: float = 1.0,
         area: float = 0.01,
         Cd: float = 0.47,
-        guidance: object | None = None,
-        engine: object | None = None,
+        guidance: Any | None = None,
+        engine: Any | None = None,
         t: float = 0.0,
     ):
         super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
-        self.guidance = guidance
-        self.engine = engine
+        self.guidance: Any = guidance
+        self.engine: Any = engine
         self.t = t
-        self.guidance_results = None
+        self.guidance_results: Any = None
 
     @property
     def has_thrust(self) -> bool:
@@ -170,15 +176,20 @@ class Body(BallisticObj):
     def thrust_acc(self) -> float:
         if self.engine is None:
             return 0.0
-        thrust = getattr(self.engine, "thrust_acc", None)
-        if callable(thrust):
-            return float(thrust(self))
-        return float(thrust) if thrust is not None else 0.0
+        thrust_value: Any = getattr(self.engine, "thrust_acc", None)
+        if callable(thrust_value):
+            try:
+                thrust_func = cast(Any, thrust_value)
+                return float(thrust_func(self))
+            except TypeError:
+                return 0.0
+        return float(thrust_value) if thrust_value is not None else 0.0
 
-    def update(self, dt: float, command: object | None = None) -> list["BallisticObj"] | None:
+    def update(self, dt: float, command: "ComputerCommand | None" = None) -> list["Body"] | None:
         self.t += dt
-        if self.guidance is not None and hasattr(self.guidance, "get_guidance"):
-            self.guidance_results = self.guidance.get_guidance(self, self.t)
+        guidance = self.guidance
+        if guidance is not None and hasattr(guidance, "get_guidance"):
+            self.guidance_results = guidance.get_guidance(self, self.t)
         if self.engine is not None and hasattr(self.engine, "update"):
             self.engine.update(self, dt, command)
         return None

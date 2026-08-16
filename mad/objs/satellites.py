@@ -59,14 +59,14 @@ class Satellite(Body):
 
         return gravity_acc
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
 
         return None
 
 
 class Sputnik(Satellite):
-    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
         # Sputnik beeps from time to time.
         if self.t % 4000 < dt:

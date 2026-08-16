@@ -1,11 +1,11 @@
 from mad.objs.base import Body, MovableObj, ReleasableConfig
 from mad.objs.planets import Planet
-from mad.guidances import Guidance, GuidanceManager
 from mad.objs.battle_computers import ComputerOrder, ComputerCommand
 from dataclasses import dataclass, asdict
 import numpy as np
 from enum import Enum
 from copy import deepcopy
+from typing import cast
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
 
@@ -67,11 +67,11 @@ class Launcher(Body):
         # This allows to either load the launcher with projectiles having their target already set
         # Or override this target at launch.
         guidance = getattr(projectile, "guidance", None)
-        if isinstance(guidance, (Guidance, GuidanceManager)) and target is not None:
+        if guidance is not None and hasattr(guidance, "target") and target is not None:
             guidance.target = target
         self.n_projectiles -= 1
         self.last_release_time = self.t
-        return projectile
+        return cast(Body, projectile)
 
     def reload(self):
         if self._can_reload():
@@ -102,7 +102,7 @@ class Launcher(Body):
         if command.order == ComputerOrder.LAUNCH and self.state == LauncherStates.IDLE:
             projectile = self.launch(target=command.target)
             if projectile is not None:
-                return [projectile]
+                return [cast(Body, projectile)]
             return None
 
         # Third, if we are idle, we can move.

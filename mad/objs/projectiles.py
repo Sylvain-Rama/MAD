@@ -57,7 +57,7 @@ class Projectile(Body):
 
         return gravity_acc + drag_acc
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
         # Nothing to update internally: it's a rock...
         return None

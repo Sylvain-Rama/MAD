@@ -57,7 +57,7 @@ class ReentryVehicle(Body):
         )
         self.t = t
         self.yield_kt = config.yield_kt
-        self.guidance_results = self.guidance.get_guidance(self, t)
+        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
@@ -73,9 +73,10 @@ class ReentryVehicle(Body):
         # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
         return 0.5
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self, self.t)
+        if self.guidance is not None and hasattr(self.guidance, "get_guidance"):
+            self.guidance_results = self.guidance.get_guidance(self, self.t)
 
         return None
 
@@ -98,7 +99,7 @@ class ReentryVehicle(Body):
         drag = planet.drag(self)
 
         thrust = np.zeros_like(self.velocity)
-        if self.guidance_results.state != GuidanceStates.IDLE:
+        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
             d = self.guidance_results.direction
             d_norm = np.linalg.norm(d)
             if d_norm > 1e-8:
@@ -148,7 +149,7 @@ class Capsule(Body):
             t=t,
         )
         self.t = t
-        self.guidance_results = self.guidance.get_guidance(self, t)
+        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
@@ -180,9 +181,10 @@ class Capsule(Body):
                         f"{self.t:<.2f}s - {self.name} has no attribute {attr} to change at {self.t:.2f}."
                     )
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
-        self.guidance_results = self.guidance.get_guidance(self, self.t)
+        if self.guidance is not None and hasattr(self.guidance, "get_guidance"):
+            self.guidance_results = self.guidance.get_guidance(self, self.t)
         self._update_configs()
 
         return None
@@ -198,7 +200,7 @@ class Capsule(Body):
         drag = planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
-        if self.guidance_results.state != GuidanceStates.IDLE:
+        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
             d = self.guidance_results.direction
             d_norm = np.linalg.norm(d)
             if d_norm > 1e-8:
@@ -324,7 +326,7 @@ class Rocket(Body):
         MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
 
         self.stages = config.stages
-        self.guidance = deepcopy(config.guidance)
+        self.guidance = deepcopy(config.guidance) if config.guidance is not None else None
         self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
         self.t = t
         self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction

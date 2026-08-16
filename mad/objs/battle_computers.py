@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
-from mad.objs.base import Body, MovableObj
+from mad.objs.base import BallisticObj, MovableObj
 
 if TYPE_CHECKING:
     from mad.objs.launchers import Launcher
@@ -37,9 +37,9 @@ class BattleComputer(MovableObj):
         self.events: list[ComputerEvent] = []
         self.t = t
 
-    def send_command(self, command: ComputerCommand) -> list[Body] | None:
+    def send_command(self, command: ComputerCommand) -> list[BallisticObj] | None:
         """Forward *command* to all managed launchers without advancing their clock."""
-        spawned: list[Body] = []
+        spawned: list[BallisticObj] = []
         for launcher in self.launchers:
             # We collect the spawned objects from launchers, but we don't advance their time here.
             # Launchers can spawn independently through their update() method.
@@ -48,7 +48,7 @@ class BattleComputer(MovableObj):
                 spawned.extend(result)
         return spawned if spawned else None
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
         self.t += dt
         fired = [e for e in self.events if e.time <= self.t]
         for event in fired:
