@@ -1,4 +1,4 @@
-from mad.objs.base import MovableObj, ReleasableConfig, BallisticObj, SimulationInterface
+from mad.objs.base import Body, MovableObj, ReleasableConfig
 from mad.objs.planets import Planet
 from mad.guidances import Guidance, GuidanceManager
 from mad.objs.battle_computers import ComputerOrder, ComputerCommand
@@ -32,9 +32,17 @@ class LauncherConfig:
         return launcher
 
 
-class Launcher(MovableObj, SimulationInterface):
+class Launcher(Body):
     def __init__(self, config: LauncherConfig, position: NDArray, velocity=None, t=0.0):
-        MovableObj.__init__(self, position, velocity, config.name)
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=1.0,
+            area=1.0,
+            Cd=0.0,
+            t=t,
+        )
         self.config = config
         self.projectiles: ReleasableConfig = config.projectiles
         self.n_projectiles = config.n_projectiles
@@ -45,7 +53,7 @@ class Launcher(MovableObj, SimulationInterface):
         self.state: LauncherStates = LauncherStates.IDLE
         self.launch_delay = config.launch_delay
 
-    def launch(self, target: MovableObj | None = None) -> BallisticObj | None:
+    def launch(self, target: MovableObj | None = None) -> Body | None:
         if self.n_projectiles <= 0:
             logger["Launcher"].warning(f"{self.t:<.2f}s - {self.name} has no projectiles to launch!")
             return None
@@ -76,13 +84,13 @@ class Launcher(MovableObj, SimulationInterface):
             self.t - self.last_reload_time >= self.config.reload_time
         )
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
         if command is None:
             return None
         return self.receive_orders(command)
 
-    def receive_orders(self, command: ComputerCommand) -> list[BallisticObj] | None:
+    def receive_orders(self, command: ComputerCommand) -> list[Body] | None:
         # Timing logic for state transitions:
         # We cannot do anything if we are in the middle of launching, so we need to check that first.
         if self.state == LauncherStates.LAUNCHING and (self.t - self.last_release_time < self.config.launch_delay):
