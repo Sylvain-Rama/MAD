@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import BallisticObj, GuidedObj
+from mad.objs.base import Body
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 from mad.utils.logger import SourceLogger
@@ -34,21 +34,33 @@ class CruiseMissileConfig:
         return CruiseMissile(config=self, position=position, velocity=velocity, t=t)
 
 
-class CruiseMissile(BallisticObj, GuidedObj):
+class _CruiseEngine:
+    def __init__(self, thrust_acc: float):
+        self._thrust_acc = float(thrust_acc)
+
+    @property
+    def thrust_acc(self) -> float:
+        return self._thrust_acc
+
+    def update(self, body, dt: float, command: ComputerCommand | None = None) -> None:
+        return None
+
+
+class CruiseMissile(Body):
     def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
-        BallisticObj.__init__(
-            self,
+        super().__init__(
             position=position,
             velocity=velocity,
             name=config.name,
             mass=config.mass,
             area=config.area,
             Cd=config.Cd,
+            guidance=deepcopy(config.guidance),
+            engine=_CruiseEngine(config.thrust_acc),
+            t=t,
         )
         self.config = config
-        self.guidance = deepcopy(config.guidance)
         self.guidance_results = self.guidance.get_guidance(self, t)
-        self.t = t
         self.total_distance_traveled = 0.0
         self.motor_active = True
 
@@ -62,7 +74,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
 
     @property
     def thrust_acc(self) -> float:
-        return self.config.thrust_acc
+        return self.engine.thrust_acc if self.engine is not None else 0.0
 
     def _update_config(self):
         """Update the missile's configuration based on guidance results."""
