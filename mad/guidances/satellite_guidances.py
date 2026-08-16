@@ -75,7 +75,7 @@ class CosinePitchProgram(_ProgradeTrackingGuidance):
         self.turn_end_altitude_m = turn_end_altitude_m
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        r_hat = missile.normalize
+        r_hat = missile.pos_norm
         altitude = np.linalg.norm(missile.position) - self.planet.radius
         t_hat = self._resolve_t_hat(missile, r_hat)
 
@@ -122,7 +122,7 @@ class OrbitalInsertion(_ProgradeTrackingGuidance):
             self._v_target = float(np.sqrt(planet.mu / self.perigee_radius_m))
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
-        r_hat = missile.normalize
+        r_hat = missile.pos_norm
         altitude = np.linalg.norm(missile.position) - self.planet.radius
         t_hat = self._resolve_t_hat(missile, r_hat)
         v_horiz_mag = abs(np.dot(missile.velocity, t_hat))

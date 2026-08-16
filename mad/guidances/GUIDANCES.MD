@@ -10,7 +10,7 @@ Both `Guidance` and `GuidanceManager` expose the same `get_guidance(missile, t)`
 
 ### `GuidableObj` (Protocol)
 
-Guidance classes are decoupled from concrete missile types via a structural protocol. Any object that exposes `position`, `velocity`, `normalize`, `burned_fraction`, `has_thrust`, and `thrust_acc` can be steered by any guidance law — no inheritance required.
+Guidance classes are decoupled from concrete missile types via a structural protocol. Any object that exposes `position`, `velocity`, `pos_norm`, `burned_fraction`, `has_thrust`, and `thrust_acc` can be steered by any guidance law — no inheritance required.
 
 ### `GuidanceResults`
 

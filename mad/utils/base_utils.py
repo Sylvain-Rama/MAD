@@ -29,3 +29,10 @@ def to_voxel_key(position: list | NDArray, voxel_size: float = VOXEL_SIZE) -> tu
         raise ValueError(f"Position must have at least 3 components, got shape {pos_arr.shape} instead.")
     key = tuple(np.floor(pos_arr / voxel_size).astype(int))
     return key
+
+
+def normalize(value: NDArray[np.floating]) -> NDArray:
+    norm = np.linalg.norm(value)
+    if norm < 1e-8:
+        return np.zeros_like(value)
+    return value / norm

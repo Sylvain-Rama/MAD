@@ -78,7 +78,7 @@ class CruiseWaypointGuidance(Guidance):
         """
 
         r = self.planet.radius + self.config.cruise_altitude_m
-        normals = [wp.normalize for wp in self.waypoints]
+        normals = [wp.pos_norm for wp in self.waypoints]
 
         # Densify each segment with SLERP-interpolated points at cruise altitude.
         dense_pts: list[NDArray] = []
@@ -280,7 +280,7 @@ class Chase(Guidance):
             return GuidanceResults(direction=los / los_norm, state=self.state)
 
         # Cruise phase: altitude-hold + horizontal pursuit.
-        r_hat = missile.normalize
+        r_hat = missile.pos_norm
 
         # Horizontal pursuit: project LOS onto the local tangential plane.
         los_hat = los / los_norm

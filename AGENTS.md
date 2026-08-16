@@ -41,7 +41,7 @@ The `tests/` directory is currently sparse; interactive validation lives in `not
 ### Class hierarchy
 
 ```
-MovableObj                     # geometric point: position, velocity, distance(), normalize
+MovableObj                     # geometric point: position, velocity, distance(), pos_norm, vel_norm
 └── BallisticObj(MovableObj, SimulationInterface)
     │   Adds: mass, area, Cd (drag coefficient)
     ├── Projectile             # pure ballistic (gravity + drag), Velocity Verlet integrator
