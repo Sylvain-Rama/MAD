@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
-from mad.objs.base import MovableObj, SimulationInterface
+from mad.objs.base import Body, MovableObj
 
 if TYPE_CHECKING:
-    from mad.objs.base import BallisticObj
     from mad.objs.launchers import Launcher
     from mad.objs.planets import Planet
 
@@ -28,7 +27,7 @@ class ComputerEvent:
     command: ComputerCommand
 
 
-class BattleComputer(MovableObj, SimulationInterface):
+class BattleComputer(MovableObj):
     def __init__(self, name: str = "BattleComputer", t: float = 0.0) -> None:
         MovableObj.__init__(self, np.zeros(3), np.zeros(3), name)
         self.name = name
@@ -38,9 +37,9 @@ class BattleComputer(MovableObj, SimulationInterface):
         self.events: list[ComputerEvent] = []
         self.t = t
 
-    def send_command(self, command: ComputerCommand) -> list[BallisticObj] | None:
+    def send_command(self, command: ComputerCommand) -> list[Body] | None:
         """Forward *command* to all managed launchers without advancing their clock."""
-        spawned: list[BallisticObj] = []
+        spawned: list[Body] = []
         for launcher in self.launchers:
             # We collect the spawned objects from launchers, but we don't advance their time here.
             # Launchers can spawn independently through their update() method.
@@ -49,7 +48,7 @@ class BattleComputer(MovableObj, SimulationInterface):
                 spawned.extend(result)
         return spawned if spawned else None
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
         fired = [e for e in self.events if e.time <= self.t]
         for event in fired:

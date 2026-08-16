@@ -7,7 +7,7 @@ that contains its properties such as mass, reference radius, drag coefficient, a
 from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import BallisticObj
+from mad.objs.base import Body
 from mad.utils.logger import SourceLogger
 from mad.objs.battle_computers import ComputerCommand
 
@@ -34,7 +34,7 @@ class ProjectileConfig:
         return Projectile(self, position, velocity, t)
 
 
-class Projectile(BallisticObj):
+class Projectile(Body):
     def __init__(
         self,
         config: ProjectileConfig,

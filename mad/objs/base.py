@@ -1,14 +1,17 @@
 """Base classes for all objects in the simulation.
-This includes MovableObj, BallisticObj, GuidedObj, and ReleasableConfig.
-See objs/projectiles.py for the implementation of projectiles and missiles.
-The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
+
+The canonical runtime object for the physics loop is ``Body``: a single shared
+simulated body with position, velocity, mass, drag, and optional guidance/engine
+behaviour attached via composition.
+
+Compatibility aliases such as ``BallisticObj`` remain available for older code
+paths and external consumers during the migration to the simpler model.
 """
 
 from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from mad.utils.base_utils import to_vec3, normalize
 from mad.utils.logger import SourceLogger
@@ -71,54 +74,13 @@ class MovableObj:
         return self._id == other._id
 
 
-class SimulationInterface(ABC):
-    """Abstract interface for any object that can be simulated inside a planet environment.
-    Subclasses must implement `update` and `accelerations`; `integrate` has a no-op default
-    that subclasses are expected to override."""
+class BallisticObj(MovableObj):
+    """Compatibility base class for physics-bearing objects.
 
-    # Declared here so type checkers know concrete subclasses (via MovableObj) provide these.
-    position: NDArray
-    velocity: NDArray
-    name: str
-
-    def __init__(self):
-        self.active: bool = True
-        self.t = 0.0
-
-    @abstractmethod
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list["BallisticObj"] | None:
-        """Update internal state. May return a list of new BallisticObj spawned during the step
-        (e.g. a separated stage or released payload)."""
-        self.t += dt
-
-    @abstractmethod
-    def accelerations(self, planet: "Planet") -> NDArray:
-        """Return the total acceleration vector (gravity + thrust + drag + …) in m/s²."""
-        pass
-
-    def integrate(self, dt: float, planet: "Planet") -> None:
-        """Advance position and velocity by one time step using Velocity Verlet integration."""
-        a0 = self.accelerations(planet)
-        self.position += self.velocity * dt + 0.5 * a0 * dt**2
-        a1 = self.accelerations(planet)
-        self.velocity += 0.5 * (a0 + a1) * dt
-
-    def degrade(self):
-        """Degrade the object, e.g. when it reaches the kill radius. By default, just mark it as inactive."""
-        self.active = False
-
-
-class BallisticObj(MovableObj, SimulationInterface):
-    """
-    BallisticObj is a MovableObj with mass, area and drag coefficient, which can be used for projectiles and missiles.
-    It does not have any guidance or propulsion, and is only affected by gravity and drag.
-    Parameters:
-    - position: initial position of the object in meters (m)
-    - velocity: initial velocity of the object in meters per second (m/s)
-    - name: name of the object (string)
-    - mass: mass of the object in kg
-    - area: cross-sectional area of the object in m^2
-    - Cd: drag coefficient of the object (dimensionless)
+    ``Body`` is the preferred canonical implementation for new or refactored
+    objects. ``BallisticObj`` is retained so existing object factories and tests
+    continue to work while the project migrates to the simplified composition-based
+    model.
     """
 
     def __init__(
@@ -154,6 +116,17 @@ class BallisticObj(MovableObj, SimulationInterface):
         if value <= 0:
             raise ValueError("Area must be positive.")
         self._area = value
+
+    def integrate(self, dt: float, planet: "Planet") -> None:
+        """Advance position and velocity by one time step using Velocity Verlet integration."""
+        a0 = self.accelerations(planet)
+        self.position += self.velocity * dt + 0.5 * a0 * dt**2
+        a1 = self.accelerations(planet)
+        self.velocity += 0.5 * (a0 + a1) * dt
+
+    def degrade(self):
+        """Mark the object inactive when it is degraded or destroyed."""
+        self.active = False
 
 
 class Body(BallisticObj):
@@ -234,27 +207,6 @@ class Body(BallisticObj):
                         thrust = engine_thrust * direction / direction_norm
 
         return gravity + drag + thrust
-
-
-class GuidedObj(ABC):
-    """Abstract mixin for simulation objects that receive guidance commands.
-
-    Pair with MovableObj (or BallisticObj) in the class MRO.  Concrete
-    subclasses must implement `burned_fraction` and `thrust_acc`, which are
-    the two properties that guidance laws and thrust computations depend on.
-    """
-
-    @property
-    @abstractmethod
-    def burned_fraction(self) -> float:
-        """Fraction of propellant consumed, in [0, 1]."""
-        ...
-
-    @property
-    @abstractmethod
-    def thrust_acc(self) -> float:
-        """Maximum available propulsion acceleration (m/s²)."""
-        ...
 
 
 @runtime_checkable

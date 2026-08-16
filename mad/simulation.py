@@ -4,7 +4,8 @@ from time import time
 import pandas as pd
 import numpy as np
 from mad.utils.logger import SourceLogger
-from mad.objs import Planet, SimulationInterface
+from mad.objs.base import Body
+from mad.objs.planets import Planet
 
 logger = SourceLogger()
 
@@ -116,7 +117,7 @@ class Simulation:
 
     def run(
         self,
-        moving_objs: list[SimulationInterface],
+        moving_objs: list[Body],
         planet: Planet,
     ) -> None:
         """Run a simple simulation of the given objects moving under the influence of the planet's gravity and atmospheric drag.
@@ -136,7 +137,7 @@ class Simulation:
         self.collector.record(active_objs)
 
         while (t < self.max_time) and any(obj.active for obj in active_objs):
-            new_objects: list[SimulationInterface] = []
+            new_objects: list[Body] = []
             t += self.dt
 
             # Update all active objects and collect any new objects they spawn (e.g. Payloads from missiles).
@@ -169,8 +170,8 @@ class Simulation:
 
 # Convenience function for quick simulations without logging.
 def run_simple_simulation(
-    moving_objs: list[SimulationInterface], planet: Planet, dt: float = 0.1, max_time: float = 3600.0
-) -> list[SimulationInterface]:
+    moving_objs: list[Body], planet: Planet, dt: float = 0.1, max_time: float = 3600.0
+) -> list[Body]:
     """Run a simple simulation of the given objects moving under the influence of the planet's gravity and atmospheric drag.
     The objects must have their initial position and velocity set. The simulation runs until max_time
     or until all objects are inactive (e.g. impacted or ran out of propellant). Returns the collected history as a dictionary.

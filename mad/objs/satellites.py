@@ -1,7 +1,7 @@
 """Satellites are payloads that can be launched into orbit and will be affected by gravity and drag forces."""
 
 from dataclasses import dataclass
-from mad.objs.base import BallisticObj
+from mad.objs.base import Body
 from mad.objs.battle_computers import ComputerCommand
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
@@ -27,7 +27,7 @@ class SatelliteConfig:
         return Satellite(config=self, position=position, velocity=velocity, t=t)
 
 
-class Satellite(BallisticObj):
+class Satellite(Body):
     def __init__(
         self,
         config: SatelliteConfig,
@@ -35,11 +35,18 @@ class Satellite(BallisticObj):
         velocity: NDArray | None = None,
         t: float = 0.0,
     ):
-        BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=config.mass,
+            area=config.area,
+            Cd=config.Cd,
+            guidance=deepcopy(config.guidance) if getattr(config, "guidance", None) is not None else None,
+            t=t,
+        )
         self.t = t
         self.config = config
-        if getattr(config, "guidance", None) is not None:
-            self.guidance = deepcopy(config.guidance)
 
     def accelerations(self, planet) -> NDArray:
         # Typically, we can ignore drag for satellites.
