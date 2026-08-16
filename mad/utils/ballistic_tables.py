@@ -17,6 +17,7 @@ class BallisticTable:
     range_interp: RegularGridInterpolator  # linear interpolation of range_rad over (altitude, velocity, gamma)
     name: str = ""  # optional name for the table, e.g. the warhead or missile type
 
+
 BALLISTIC_FIELD_NAMES = ["altitude_m", "velocity_m_s", "gamma_rad", "range_rad", "range_km"]
 
 logger = SourceLogger()
@@ -56,7 +57,7 @@ def load_ballistic_df(table_name: str) -> pd.DataFrame:
     df = pd.DataFrame({k: ballistic_values[:, i] for i, k in enumerate(BALLISTIC_FIELD_NAMES)})
     df["altitude_km"] = np.round(df["altitude_m"] / 1000, 3)
     df["gamma_deg"] = np.round(df["gamma_rad"] * 180 / np.pi, 3)
-    df["altitude_m"] = np.round(df["altitude_m"], 3)
+    df["altitude_m_rounded"] = np.round(df["altitude_m"], 3)
 
     return df
 

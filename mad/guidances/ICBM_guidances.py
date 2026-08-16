@@ -26,7 +26,7 @@ class TabulatedBallistic(Guidance):
         interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
         super().__init__(planet, target, interrupt_fn=interrupt_fn)
-        self.ballistic_guidance = load_ballistic_table(ballistic_table_name) if ballistic_table_name else None
+        self.ballistic_guidance = load_ballistic_table(ballistic_table_name)
 
     def __repr__(self):
         max_alt, min_alt = max(self.ballistic_guidance.altitudes), min(self.ballistic_guidance.altitudes)
