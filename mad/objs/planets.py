@@ -86,10 +86,10 @@ class Planet(MovableObj):
 
     def surface_distance(self, obj1: MovableObj, obj2: MovableObj) -> float:
         # Will give the linear distance (m) between 2 objects placed at the surface.
+        norm1 = np.linalg.norm(obj1.position)
+        norm2 = np.linalg.norm(obj2.position)
 
-        cos_angle = np.dot(obj1.position, obj2.position) / (
-            np.linalg.norm(obj1.position) * np.linalg.norm(obj2.position)
-        )
+        cos_angle = np.dot(obj1.position, obj2.position) / (norm1 * norm2)
 
         angle = np.arccos(np.clip(cos_angle, -1, 1))
 

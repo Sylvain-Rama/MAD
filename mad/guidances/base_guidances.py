@@ -201,7 +201,8 @@ class GuidanceManager:
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         if self.current_index >= len(self.guidances):
             return GuidanceResults(
-                direction=missile.velocity / np.linalg.norm(missile.velocity), state=GuidanceStates.IDLE
+                direction=missile.vel_norm,
+                state=GuidanceStates.IDLE,
             )
 
         current_guidance = self.guidances[self.current_index]
@@ -226,7 +227,7 @@ class NoGuidance(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
-            direction=missile.velocity / np.linalg.norm(missile.velocity),
+            direction=missile.vel_norm,
             state=GuidanceStates.POWERED,
             next_guidance=self.next_guidance,
         )
@@ -248,7 +249,7 @@ class ReleasePayload(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
-            direction=missile.velocity / np.linalg.norm(missile.velocity),
+            direction=missile.vel_norm,
             state=GuidanceStates.RELEASE_PAYLOAD,
             next_guidance=self.next_guidance,
         )
@@ -528,7 +529,7 @@ class DeployChute(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
-            direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on previous direction
+            direction=missile.vel_norm,
             state=GuidanceStates.POWERED,
             next_guidance=True,
             modify_config={"Cd": self.chute_Cd, "area": np.pi * self.chute_ref_radius**2},
@@ -557,7 +558,7 @@ class DropBoosters(Guidance):
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Assuming the boosters are dropped and the missile's configuration changes
         return GuidanceResults(
-            direction=missile.velocity / np.linalg.norm(missile.velocity),  # Continue on current trajectory
+            direction=missile.vel_norm,
             state=GuidanceStates.POWERED,
             next_guidance=True,
             modify_config={"mass": self.new_mass, "Cd": self.new_Cd, "ref_radius": self.new_ref_radius},

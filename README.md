@@ -29,25 +29,25 @@ Work In Progress!
 
 ### Simulation objects
 
-Every entity that moves in the simulation is a subclass of `BallisticObj`, which itself combines `MovableObj` (position, velocity) with `SimulationInterface` (the contract the simulation loop depends on). Guided objects additionally mix in `GuidedObj` to expose propulsion state.
+The runtime model is centered on a single `Body` abstraction. `MovableObj` handles geometric state (position, velocity, active flag), `BallisticObj` adds physics-like mass/drag properties, and `Body` is the canonical simulation object used by the loop. Guidance and propulsion are attached as runtime components rather than encoded in a deep inheritance tree.
 
-The simulation loop calls `update(dt)` — advancing internal state and optionally spawning child objects — then `integrate(dt, planet)` to step position and velocity forward using **Velocity Verlet** integration.
+The simulation loop calls `update(dt, command)` to advance internal state and optionally spawn child bodies, then `integrate(dt, planet)` to step position and velocity forward using **Velocity Verlet** integration.
 
-→ See [mad/objs/OBJECTS.MD](mad/objs/OBJECTS.MD) for the full class hierarchy, lifecycle, and a guide to implementing new objects.
+→ See [mad/objs/OBJECTS.MD](mad/objs/OBJECTS.MD) for the current runtime model, lifecycle, and object-authoring guide.
 
 ### Guidance
 
-Guidance classes compute a desired **acceleration direction** (and optionally magnitude) at each simulation step. They are decoupled from concrete missile types through the `GuidableObj` structural protocol.
+Guidance logic is kept separate from the body itself. A `Body` may receive a `guidance` object or strategy, whose output is stored in `guidance_results` and used to shape thrust direction or manoeuvre behaviour during the step.
 
-Multi-phase missions are built by composing single-phase `Guidance` instances inside a `GuidanceManager`. Each guidance law can carry an optional `interrupt_fn` that triggers advancement to the next phase.
+Mission logic is built by composing guidance modules or managers; the body remains the state carrier while guidance handles intent and steering. This keeps the architecture simple while still supporting multi-phase or interrupt-driven behaviours.
 
-→ See [mad/guidances/GUIDANCES.MD](mad/guidances/GUIDANCES.MD) for the full API, interrupt system, and implementation guide.
+→ See [mad/guidances/GUIDANCES.MD](mad/guidances/GUIDANCES.MD) for the guidance API and implementation guide.
 
 ### Configuration presets
 
-Physical parameters for all object categories (planets, rockets, warheads, cruise missiles, radars …) live in `mad/configs/` as plain Python dicts. These are intentionally kept separate from the typed `*Config` dataclasses in `mad/objs/`, providing a human-readable layer that is easy to serialise and extend.
+Physical parameters for planets, projectiles, rockets, missiles, radars, and other entities live in `mad/configs/` as Python configuration data and dataclass-backed factories. These are kept separate from the runtime object logic so the flight model remains composable and the preset values stay easy to inspect, serialize, and extend.
 
-→ See [mad/configs/CONFIGS.MD](mad/configs/CONFIGS.MD) for the layout of every config file and the unit-conversion helpers.
+→ See [mad/configs/CONFIGS.MD](mad/configs/CONFIGS.MD) for the layout of each config module and the defaults used by the simulation.
 
 ### Physics conventions
 
@@ -117,7 +117,7 @@ mad/
 ├── simulation.py          # Simulation orchestrator and run_simple_simulation helper
 ├── objs/                  # Simulation object classes
 │   ├── OBJECTS.MD         # ← architecture docs
-│   ├── base.py            # MovableObj, BallisticObj, SimulationInterface, GuidedObj
+│   ├── base.py            # MovableObj, BallisticObj, Body and composition model
 │   ├── projectiles.py
 │   ├── rockets.py
 │   ├── satellites.py
@@ -126,14 +126,14 @@ mad/
 │   ├── radars.py
 │   ├── launchers.py
 │   └── battle_computers.py
-├── guidances/             # Guidance laws
+├── guidances/             # Guidance laws and strategy objects
 │   ├── GUIDANCES.MD       # ← architecture docs
 │   ├── base_guidances.py
 │   ├── ICBM_guidances.py
 │   ├── cruise_missiles_guidances.py
 │   ├── satellite_guidances.py
 │   └── interrupt_guidances.py
-├── configs/               # Physical parameter presets
+├── configs/               # Physical parameter presets and config factories
 │   ├── CONFIGS.MD         # ← architecture docs
 │   ├── physics_cfg.py     # constants & unit conversions
 │   ├── planets_cfg.py

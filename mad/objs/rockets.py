@@ -578,7 +578,11 @@ class Rocket(Body):
         if self.thrust_acc > 0:
             # If no guidance, we continue along the same direction.
             direction = self.guidance_results.direction if self.guidance_results else self.pos_norm
-            direction = direction / np.linalg.norm(direction)
+            direction_norm = np.linalg.norm(direction)
+            if direction_norm > 0.0:
+                direction = direction / direction_norm
+            else:
+                direction = self.pos_norm
             thrust = self.thrust_acc * direction
         else:
             thrust = np.zeros_like(self.velocity)

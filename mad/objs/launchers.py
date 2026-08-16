@@ -102,7 +102,7 @@ class Launcher(Body):
         if command.order == ComputerOrder.LAUNCH and self.state == LauncherStates.IDLE:
             projectile = self.launch(target=command.target)
             if projectile is not None:
-                return [cast(Body, projectile)]
+                return [projectile]
             return None
 
         # Third, if we are idle, we can move.
