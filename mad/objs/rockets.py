@@ -6,7 +6,7 @@ Rockets are defined by a list of RocketStage objects, a guidance system, and a l
 from dataclasses import dataclass, asdict, field
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import BallisticObj, GuidedObj, MovableObj, ReleasableConfig
+from mad.objs.base import Body, MovableObj, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
@@ -37,7 +37,7 @@ class RVConfig:
         return ReentryVehicle(config=self, position=position, velocity=velocity, t=t)
 
 
-class ReentryVehicle(BallisticObj, GuidedObj):
+class ReentryVehicle(Body):
     """RVs are a special type of payload that can receive guidance commands and have a yield (kt) for detonation.
     They have a small RCS thruster for terminal guidance, which is used to steer the RV towards its target during the final phase of flight.
     We assume this thruster is not limited by propellant mass, and can be used for the entire flight.
@@ -45,10 +45,18 @@ class ReentryVehicle(BallisticObj, GuidedObj):
     """
 
     def __init__(self, config: RVConfig, position: NDArray, velocity: NDArray | None = None, t=0.0):
-        BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=config.mass,
+            area=config.area,
+            Cd=config.Cd,
+            guidance=deepcopy(config.guidance),
+            t=t,
+        )
         self.t = t
         self.yield_kt = config.yield_kt
-        self.guidance = deepcopy(config.guidance)
         self.guidance_results = self.guidance.get_guidance(self, t)
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
@@ -121,7 +129,7 @@ class CapsuleConfig:
         return Capsule(config=self, position=position, velocity=velocity, t=t)
 
 
-class Capsule(BallisticObj, GuidedObj):
+class Capsule(Body):
     """Capsules are a special type of payload that can receive guidance commands.
     They have a small RCS thruster for terminal guidance, which is used to steer the capsule towards its target during the final phase of flight.
     We assume this thruster is not limited by propellant mass, and can be used for the entire flight.
@@ -129,9 +137,17 @@ class Capsule(BallisticObj, GuidedObj):
     """
 
     def __init__(self, config: CapsuleConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
-        BallisticObj.__init__(self, position, velocity, config.name, config.mass, config.area, config.Cd)
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=config.mass,
+            area=config.area,
+            Cd=config.Cd,
+            guidance=deepcopy(config.guidance),
+            t=t,
+        )
         self.t = t
-        self.guidance = deepcopy(config.guidance)
         self.guidance_results = self.guidance.get_guidance(self, t)
         self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
@@ -301,10 +317,10 @@ class RocketConfig:
         return Rocket(position=position, config=self, velocity=velocity, t=t)
 
 
-class Rocket(BallisticObj, GuidedObj):
+class Rocket(Body):
     def __init__(self, position, config: RocketConfig, velocity: NDArray | None = None, t: float = 0.0):
-        # mass and area are computed properties on this class; bypass BallisticObj.__init__
-        # to avoid storing unused _mass/_area defaults.
+        # mass and area are computed properties on this class; bypass the default Body initializer
+        # to avoid storing unused _mass/_area defaults and to keep stage-derived mass semantics.
         MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
 
         self.stages = config.stages
@@ -456,7 +472,7 @@ class Rocket(BallisticObj, GuidedObj):
                         f"{self.t:<.2f}s - {self.name} has no stage attribute {attr} to change at {self.t:.2f}."
                     )
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         released_objects = []
         self.t += dt
 
