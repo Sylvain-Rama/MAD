@@ -22,6 +22,7 @@ __all__ = [
     "PlanetConfig",
     "MovableObj",
     "BallisticObj",
+    "Body",
     "ReleasableConfig",
     "Rocket",
     "RocketConfig",

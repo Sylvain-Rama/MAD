@@ -156,6 +156,86 @@ class BallisticObj(MovableObj, SimulationInterface):
         self._area = value
 
 
+class Body(BallisticObj):
+    """Simplified shared implementation for all dynamic bodies in the simulation.
+
+    This keeps the existing physics-heavy API of BallisticObj while allowing
+    optional guidance/engine strategies to be attached without requiring a deep
+    inheritance hierarchy for every concrete object type.
+    """
+
+    def __init__(
+        self,
+        position: list[float] | NDArray,
+        velocity: list[float] | NDArray | None = None,
+        name: str = "Body",
+        mass: float = 1.0,
+        area: float = 0.01,
+        Cd: float = 0.47,
+        guidance: object | None = None,
+        engine: object | None = None,
+        t: float = 0.0,
+    ):
+        super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
+        self.guidance = guidance
+        self.engine = engine
+        self.t = t
+        self.guidance_results = None
+
+    @property
+    def has_thrust(self) -> bool:
+        return self.engine is not None and getattr(self.engine, "thrust_acc", None) is not None
+
+    @property
+    def burned_fraction(self) -> float:
+        if self.engine is None:
+            return 0.0
+        burned = getattr(self.engine, "burned_fraction", None)
+        return float(burned) if burned is not None else 0.0
+
+    @property
+    def thrust_acc(self) -> float:
+        if self.engine is None:
+            return 0.0
+        thrust = getattr(self.engine, "thrust_acc", None)
+        if callable(thrust):
+            return float(thrust(self))
+        return float(thrust) if thrust is not None else 0.0
+
+    def update(self, dt: float, command: object | None = None) -> list["BallisticObj"] | None:
+        self.t += dt
+        if self.guidance is not None and hasattr(self.guidance, "get_guidance"):
+            self.guidance_results = self.guidance.get_guidance(self, self.t)
+        if self.engine is not None and hasattr(self.engine, "update"):
+            self.engine.update(self, dt, command)
+        return None
+
+    def accelerations(self, planet: "Planet") -> NDArray:
+        if self.distance(planet) <= planet.radius:
+            self.active = False
+            return np.zeros_like(self.velocity)
+
+        gravity = planet.gravity(self)
+        drag = planet.drag(self)
+        thrust = np.zeros_like(self.velocity)
+
+        if self.engine is not None:
+            engine_thrust = self.thrust_acc
+            if engine_thrust > 0.0 and self.guidance is not None and hasattr(self.guidance, "get_guidance"):
+                try:
+                    guidance_result = self.guidance.get_guidance(self, self.t)
+                except TypeError:
+                    guidance_result = None
+
+                if guidance_result is not None and getattr(guidance_result, "direction", None) is not None:
+                    direction = guidance_result.direction
+                    direction_norm = np.linalg.norm(direction)
+                    if direction_norm > 1e-8:
+                        thrust = engine_thrust * direction / direction_norm
+
+        return gravity + drag + thrust
+
+
 class GuidedObj(ABC):
     """Abstract mixin for simulation objects that receive guidance commands.
 
