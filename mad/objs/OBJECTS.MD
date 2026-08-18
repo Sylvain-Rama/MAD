@@ -1,23 +1,25 @@
 # Objects
 
-Simulation objects are responsible for their own motion: they compute forces, integrate their state, and can spawn new objects (e.g. separated stages or released payloads). The *direction* of thrust is delegated to Guidance classes; objects only know their current thrust magnitude.
+Simulation objects are responsible for their own motion: they compute forces, integrate state, and can spawn new bodies such as separated stages or released payloads. The current design keeps a single runtime body model, with propulsion and guidance attached as optional runtime components rather than encoded in a deep inheritance tree.
 
 ---
 
-## Class hierarchy
+## Canonical runtime model
+
+The project now centers on `Body`, which is the simulation's canonical runtime object.
 
 ```
 MovableObj                          # geometric point: position, velocity, id, active flag
-└── BallisticObj(MovableObj, SimulationInterface)
-    │   Adds: mass, area, Cd (drag coefficient)
-    ├── Projectile                  # unguided ballistic (gravity + drag)
-    ├── Payload(BallisticObj, GuidedObj)   # separating warhead / upper stage
-    └── … (Missile subclasses, Rockets, Satellites, …)
+└── BallisticObj(MovableObj)         # compatibility physics base with mass, area, Cd
+    └── Body(BallisticObj)          # canonical dynamic body for the simulation loop
 
-SimulationInterface (ABC)           # contract for the simulation loop
-GuidedObj (ABC)                     # mixin for propulsion / guidance
-ReleasableConfig (Protocol)         # factory contract for deployable payloads
+Body owns optional components via composition:
+- guidance: guidance strategy or manager
+- engine: propulsion model / thrust source
+- guidance_results: last guidance outputs
 ```
+
+`Body` is the baseline for the simulation loop, while `BallisticObj` remains available as a compatibility layer for older factories and external callers.
 
 ---
 
@@ -29,43 +31,35 @@ The root of every simulated entity. Tracks a 3-D `position` and `velocity` (NumP
 
 Key helpers:
 - `distance(other)` — Euclidean separation in metres.
-- `normalize` — unit vector along `position` (radial direction).
-- `degrade()` — marks the object inactive; overridden by subclasses for extra teardown.
+- `pos_norm` / `vel_norm` — normalized direction vectors.
+- `degrade()` — marks the object inactive.
 
 `MovableObj` has no mass and is not connected to the simulation loop. It is only a geometric carrier.
 
-### `SimulationInterface` (ABC, `base.py`)
+### `BallisticObj` (`base.py`)
 
-The contract the `Simulation` loop depends on. Any object that participates in the loop must satisfy it.
+A compatibility base for physical objects subject to gravity and aerodynamic drag. Adds `mass` (kg), `area` (m²), and `Cd` (dimensionless drag coefficient), as well as the standard physics API used by the integrator.
 
-| Method | Responsibility |
-|---|---|
-| `update(dt, command)` | Advance internal state (staging timers, fuel consumption, guidance computation). **May return a list of new `BallisticObj`s** that are immediately injected into the simulation. |
-| `accelerations(planet)` | Return the net acceleration vector (m·s⁻²) at the current state: gravity + drag + thrust + … |
-| `integrate(dt, planet)` | Advance `position` and `velocity` by one time step. The default implementation uses **Velocity Verlet** and calls `accelerations` twice per step. |
+It includes the default Velocity Verlet `integrate(dt, planet)` and expects concrete subclasses to implement `accelerations(planet)`.
 
-`update` is always called before `integrate` within the same time step. This ordering means internal state (e.g. staging, fuel burn) is always consistent before the integrator asks for forces.
+### `Body` (`base.py`)
 
-### `BallisticObj(MovableObj, SimulationInterface)` (`base.py`)
+The canonical dynamic body used by the active simulation. `Body` extends `BallisticObj` and adds optional runtime behaviour through composition:
 
-The standard base for any physical object subject to gravity and aerodynamic drag. Adds `mass` (kg), `area` (m²), and `Cd` (dimensionless drag coefficient), all read-only properties. It does not add guidance or propulsion; those are contributed by `GuidedObj`.
+- `guidance` — object with a `get_guidance()`-style interface
+- `engine` — propulsion model with `thrust_acc`, `burned_fraction`, or update hooks
+- `guidance_results` — last computed guidance result
+- `t` — current simulation time for the object
 
-### `GuidedObj` (ABC, `base.py`)
-
-A mixin for objects that carry propellant. Requires two abstract properties:
-
-- `burned_fraction` — fraction of propellant consumed, in [0, 1]. Used by guidance laws to determine available manoeuvre authority.
-- `thrust_acc` — current maximum propulsive acceleration (m·s⁻²).
-
-Concrete subclasses combine `BallisticObj + GuidedObj` in the MRO and implement these properties based on their staging / fuel model.
+The key idea is that an object is an instance of `Body` with the behaviour it needs attached, rather than a new class deep in an inheritance tree.
 
 ---
 
 ## Config / factory pattern
 
-Every concrete object is constructed via a paired `*Config` dataclass (e.g. `ProjectileConfig`, `PayloadConfig`). Configs hold all physical parameters and expose a `create(position, velocity, t)` factory method that instantiates the object. This keeps construction logic out of the simulation loop and makes configs serialisable and reusable.
+Every concrete object is constructed via a paired `*Config` dataclass (for example, `ProjectileConfig`, `RocketConfig`, `CruiseMissileConfig`). Configs hold all physical parameters and expose a `create(position, velocity, t)` factory method that instantiates the object.
 
-Configs that represent deployable payloads satisfy the `ReleasableConfig` protocol (a `name` field plus `create()`). The simulation never needs to know the concrete type; it calls `config.create(...)` and receives a `BallisticObj`.
+A config that represents a deployable payload satisfies the `ReleasableConfig` protocol: it has a `name` field and a `create()` method. The simulation never needs to know the concrete type; it receives a `Body`-compatible object and runs it through the common loop.
 
 ---
 
@@ -73,12 +67,12 @@ Configs that represent deployable payloads satisfy the `ReleasableConfig` protoc
 
 1. **Created** — position and velocity set at construction; `active = True`.
 2. **Active** — participates in every simulation step: `update` → `integrate`.
-3. **Spawning** — `update` returns a list of child objects (e.g. a separated stage). The loop appends them to the active list immediately.
-4. **Inactive** — `active = False`. The object is skipped by the loop but retained in the history. Inactivation is triggered by:
-   - Ground impact (detected inside `accelerations` or `update`).
-   - Collision (set externally by `apply_collisions`).
+3. **Spawning** — `update` returns a list of new child bodies (for example, a separated stage). The loop appends them to the active list immediately.
+4. **Inactive** — `active = False`. The object is skipped by the loop but retained in history. Inactivation is triggered by:
+   - Ground impact or planetary surface contact.
+   - Explicit `degrade()` calls.
    - Propellant exhaustion or mission completion.
-   - Explicit call to `degrade()`.
+   - External game-state rules.
 
 ---
 
@@ -87,32 +81,33 @@ Configs that represent deployable payloads satisfy the `ReleasableConfig` protoc
 ```
 for each time step:
     for each active object:
-        new_objs = obj.update(dt, command)   # internal state, may spawn children
+        new_objs = obj.update(dt, command)
         active_list.extend(new_objs)
     for each active object:
-        obj.integrate(dt, planet)            # physics step
-    collision_detection_and_marking()
-    history_collector.record(active_list)
+        obj.integrate(dt, planet)
+    record_history(active_list)
 ```
 
-`Simulation` is the full orchestrator. `run_simple_simulation` is a lightweight alternative with no history collection.
+`Simulation` is the orchestrator. `run_simple_simulation` is a lightweight alternative with no logging or history capture.
 
 ---
 
 ## Physics conventions
 
-- Coordinates: 3-D ECEF-like vectors (`numpy` arrays). Use `mad.utils.to_vec3` to normalise inputs.
-- Units: metres, m·s⁻¹, seconds throughout.
-- Gravity and atmospheric drag are provided by `Planet` objects and queried via `planet.gravity(obj)` / `planet.drag(obj)`.
-- Integrator: **Velocity Verlet** — second-order accurate, time-reversible, good energy conservation for orbital trajectories.
+- Coordinates: 3-D ECEF-like vectors (`numpy` arrays). Use `mad.utils.to_vec3` to normalize inputs.
+- Units: metres, m·s⁻¹, and seconds throughout.
+- Gravity and atmospheric drag are provided by `Planet` objects and are queried via `planet.gravity(obj)` and `planet.drag(obj)`.
+- Integrator: **Velocity Verlet** — second-order accurate and well suited to orbital and ballistic motion.
 
 ---
 
 ## Adding a new simulated object
 
-1. Subclass `BallisticObj` (and `GuidedObj` if propelled).
-2. Implement `accelerations(planet)` — sum all relevant force terms divided by mass.
-3. Implement `update(dt, command)` — advance timers/fuel; return spawned objects or `None`.
-4. Override `integrate(dt, planet)` only if the default Velocity Verlet is insufficient.
+1. Instantiate or subclass a `Body`/`BallisticObj` as appropriate.
+2. Attach optional `guidance` and `engine` components via composition.
+3. Implement `accelerations(planet)` and `update(dt, command)`.
+4. Override `integrate(dt, planet)` only if the default Velocity Verlet logic is insufficient.
 5. Create a `*Config` dataclass with a `create()` factory method.
-6. If the object can be deployed as a payload from another object, ensure the config satisfies `ReleasableConfig`.
+6. If the object can be deployed from another object, ensure the config satisfies `ReleasableConfig`.
+
+The intended model is not “one class per mission phase” but “one dynamic body with the required runtime behaviour attached.”

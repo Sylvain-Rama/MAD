@@ -1,23 +1,30 @@
 """Base classes for all objects in the simulation.
-This includes MovableObj, BallisticObj, GuidedObj, and ReleasableConfig.
-See objs/projectiles.py for the implementation of projectiles and missiles.
-The base classes provide basic functionalities such as position, velocity, mass, area, drag coefficient, and guidance interfaces.
+
+The canonical runtime object for the physics loop is ``Body``: a single shared
+simulated body with position, velocity, mass, drag, and optional guidance/engine
+behaviour attached via composition.
+
+Compatibility aliases such as ``BallisticObj`` remain available for older code
+paths and external consumers during the migration to the simpler model.
 """
 
 from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+
 from mad.utils.base_utils import to_vec3, normalize
 from mad.utils.logger import SourceLogger
+
+if TYPE_CHECKING:
+    from mad.objs.battle_computers import ComputerCommand
+    from mad.guidances.base_guidances import Guidance, GuidanceManager, GuidanceResults
 
 logger = SourceLogger()
 
 if TYPE_CHECKING:
     from mad.objs.planets import Planet
-    from mad.objs.battle_computers import ComputerCommand
 
 
 class MovableObj:
@@ -61,6 +68,9 @@ class MovableObj:
     def distance(self, other: "MovableObj") -> np.floating:
         return np.linalg.norm(self.position - other.position)
 
+    def los(self, other: "MovableObj") -> NDArray:
+        return other.position - self.position
+
     def __repr__(self):
         a = "active" if self.active else "inactive"
         return f"{self.name} at {self.position}, velocity {self.velocity}, {a}."
@@ -70,55 +80,18 @@ class MovableObj:
             return False
         return self._id == other._id
 
-
-class SimulationInterface(ABC):
-    """Abstract interface for any object that can be simulated inside a planet environment.
-    Subclasses must implement `update` and `accelerations`; `integrate` has a no-op default
-    that subclasses are expected to override."""
-
-    # Declared here so type checkers know concrete subclasses (via MovableObj) provide these.
-    position: NDArray
-    velocity: NDArray
-    name: str
-
-    def __init__(self):
-        self.active: bool = True
-        self.t = 0.0
-
-    @abstractmethod
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list["BallisticObj"] | None:
-        """Update internal state. May return a list of new BallisticObj spawned during the step
-        (e.g. a separated stage or released payload)."""
-        self.t += dt
-
-    @abstractmethod
-    def accelerations(self, planet: "Planet") -> NDArray:
-        """Return the total acceleration vector (gravity + thrust + drag + …) in m/s²."""
-        pass
-
-    def integrate(self, dt: float, planet: "Planet") -> None:
-        """Advance position and velocity by one time step using Velocity Verlet integration."""
-        a0 = self.accelerations(planet)
-        self.position += self.velocity * dt + 0.5 * a0 * dt**2
-        a1 = self.accelerations(planet)
-        self.velocity += 0.5 * (a0 + a1) * dt
-
-    def degrade(self):
-        """Degrade the object, e.g. when it reaches the kill radius. By default, just mark it as inactive."""
+    def degrade(self) -> None:
+        """Mark the object inactive when it is degraded or destroyed."""
         self.active = False
 
 
-class BallisticObj(MovableObj, SimulationInterface):
-    """
-    BallisticObj is a MovableObj with mass, area and drag coefficient, which can be used for projectiles and missiles.
-    It does not have any guidance or propulsion, and is only affected by gravity and drag.
-    Parameters:
-    - position: initial position of the object in meters (m)
-    - velocity: initial velocity of the object in meters per second (m/s)
-    - name: name of the object (string)
-    - mass: mass of the object in kg
-    - area: cross-sectional area of the object in m^2
-    - Cd: drag coefficient of the object (dimensionless)
+class BallisticObj(MovableObj):
+    """Compatibility base class for physics-bearing objects.
+
+    ``Body`` is the preferred canonical implementation for new or refactored
+    objects. ``BallisticObj`` is retained so existing object factories and tests
+    continue to work while the project migrates to the simplified composition-based
+    model.
     """
 
     def __init__(
@@ -155,26 +128,95 @@ class BallisticObj(MovableObj, SimulationInterface):
             raise ValueError("Area must be positive.")
         self._area = value
 
+    def integrate(self, dt: float, planet: "Planet") -> None:
+        """Advance position and velocity by one time step using Velocity Verlet integration."""
+        a0 = self.accelerations(planet)
+        self.position += self.velocity * dt + 0.5 * a0 * dt**2
+        a1 = self.accelerations(planet)
+        self.velocity += 0.5 * (a0 + a1) * dt
 
-class GuidedObj(ABC):
-    """Abstract mixin for simulation objects that receive guidance commands.
+    def accelerations(self, planet: "Planet") -> NDArray:
+        raise NotImplementedError("BallisticObj subclasses must implement accelerations().")
 
-    Pair with MovableObj (or BallisticObj) in the class MRO.  Concrete
-    subclasses must implement `burned_fraction` and `thrust_acc`, which are
-    the two properties that guidance laws and thrust computations depend on.
-    """
+
+class Body(BallisticObj):
+    """Simplified shared implementation for all dynamic bodies in the simulation."""
+
+    def __init__(
+        self,
+        position: list[float] | NDArray,
+        velocity: list[float] | NDArray | None = None,
+        name: str = "Body",
+        mass: float = 1.0,
+        area: float = 0.01,
+        Cd: float = 0.47,
+        guidance: Guidance | GuidanceManager | None = None,
+        engine: Any | None = None,
+        t: float = 0.0,
+    ):
+        super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
+        self.guidance = guidance
+        self.engine: Any = engine
+        self.t = t
+        self.guidance_results: GuidanceResults | None = None
 
     @property
-    @abstractmethod
+    def has_thrust(self) -> bool:
+        return self.engine is not None and getattr(self.engine, "thrust_acc", None) is not None
+
+    @property
     def burned_fraction(self) -> float:
-        """Fraction of propellant consumed, in [0, 1]."""
-        ...
+        if self.engine is None:
+            return 0.0
+        burned = getattr(self.engine, "burned_fraction", None)
+        return float(burned) if burned is not None else 0.0
 
     @property
-    @abstractmethod
     def thrust_acc(self) -> float:
-        """Maximum available propulsion acceleration (m/s²)."""
-        ...
+        if self.engine is None:
+            return 0.0
+        thrust_value: Any = getattr(self.engine, "thrust_acc", None)
+        if callable(thrust_value):
+            try:
+                thrust_func = cast(Any, thrust_value)
+                return float(thrust_func(self))
+            except TypeError:
+                return 0.0
+        return float(thrust_value) if thrust_value is not None else 0.0
+
+    def update(self, dt: float, command: "ComputerCommand | None" = None) -> list["Body"] | None:
+        self.t += dt
+        guidance = self.guidance
+        if guidance is not None and hasattr(guidance, "get_guidance"):
+            self.guidance_results = guidance.get_guidance(self, self.t)
+        if self.engine is not None and hasattr(self.engine, "update"):
+            self.engine.update(self, dt, command)
+        return None
+
+    def accelerations(self, planet: "Planet") -> NDArray:
+        if self.distance(planet) <= planet.radius:
+            self.active = False
+            return np.zeros_like(self.velocity)
+
+        gravity = planet.gravity(self)
+        drag = planet.drag(self)
+        thrust = np.zeros_like(self.velocity)
+
+        if self.engine is not None:
+            engine_thrust = self.thrust_acc
+            if engine_thrust > 0.0 and self.guidance is not None and hasattr(self.guidance, "get_guidance"):
+                try:
+                    guidance_result = self.guidance.get_guidance(self, self.t)
+                except TypeError:
+                    guidance_result = None
+
+                if guidance_result is not None and getattr(guidance_result, "direction", None) is not None:
+                    direction = guidance_result.direction
+                    direction_norm = np.linalg.norm(direction)
+                    if direction_norm > 1e-8:
+                        thrust = engine_thrust * direction / direction_norm
+
+        return gravity + drag + thrust
 
 
 @runtime_checkable

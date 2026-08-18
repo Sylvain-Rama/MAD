@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from mad.objs.base import MovableObj
+from mad.objs.base import MovableObj, Body, BallisticObj
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
 from mad.configs.planets_cfg import EARTH_SETTINGS
@@ -112,6 +112,17 @@ class TestBallisticObj:
         cfg = ProjectileConfig(mass=1.0)
         obj = Projectile(cfg, position=[1.0, 2.0, 3.0])
         np.testing.assert_array_equal(obj.position, [1.0, 2.0, 3.0])
+
+
+class TestBody:
+    def test_body_is_a_ballistic_object_with_optional_behaviour(self):
+        body = Body(position=[1.0, 2.0, 3.0], velocity=[0.0, 1.0, 0.0], mass=2.0, area=0.5, Cd=0.9, name="Body")
+        assert isinstance(body, BallisticObj)
+        assert body.mass == pytest.approx(2.0)
+        assert body.area == pytest.approx(0.5)
+        assert body.Cd == pytest.approx(0.9)
+        assert body.guidance is None
+        assert body.engine is None
 
 
 # ---------------------------------------------------------------------------

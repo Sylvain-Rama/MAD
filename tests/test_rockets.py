@@ -10,9 +10,10 @@ from mad.objs.rockets import (
     ReentryVehicle,
     RocketConfig,
     Rocket,
+    RocketEngine,
 )
 from mad.objs.planets import Planet, PlanetConfig
-from mad.objs.base import MovableObj
+from mad.objs.base import Body, MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
 from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
@@ -78,6 +79,108 @@ class GuidanceMissile(MovableObj):
     @property
     def thrust_acc(self) -> float:
         return 0.0
+
+
+class _BodyGuidance(Guidance):
+    def __init__(self, planet=None, target=None, interrupt_fn=None):
+        super().__init__(planet or earth, target or MovableObj(position=[0.0, 0.0, 0.0], name="Target"), interrupt_fn)
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        direction = missile.vel_norm if np.linalg.norm(missile.velocity) > 1e-12 else np.array([1.0, 0.0, 0.0])
+        return GuidanceResults(direction=direction, state=GuidanceStates.POWERED, magnitude=5.0)
+
+
+class _BodyEngine:
+    def __init__(self):
+        self.thrust_acc = 9.81
+        self.calls = 0
+
+    def update(self, body, dt, command=None):
+        self.calls += 1
+        body.t += dt
+
+
+class TestBodyGuidanceAndEngineComposition:
+    def test_body_updates_guidance_and_engine_separately(self, earth):
+        guidance = _BodyGuidance(
+            planet=earth, target=MovableObj(position=[earth.radius + 100_000.0, 0.0, 0.0], name="Target")
+        )
+        engine = _BodyEngine()
+        body = Body(
+            position=[earth.radius + 1000.0, 0.0, 0.0],
+            velocity=[1.0, 0.0, 0.0],
+            name="Composed",
+            mass=100.0,
+            area=1.0,
+            guidance=guidance,
+            engine=engine,
+        )
+
+        assert body.guidance is guidance
+        assert body.engine is engine
+        assert body.thrust_acc == pytest.approx(9.81)
+
+        body.update(0.5)
+
+        assert body.guidance_results is not None
+        assert body.guidance_results.state == GuidanceStates.POWERED
+        assert body.guidance_results.direction.shape == (3,)
+        assert engine.calls == 1
+
+    def test_body_uses_guidance_and_engine_as_composed_components(self, earth):
+        guidance = _BodyGuidance(
+            planet=earth, target=MovableObj(position=[earth.radius + 100_000.0, 0.0, 0.0], name="Target")
+        )
+        engine = _BodyEngine()
+        body = Body(
+            position=[earth.radius + 1000.0, 0.0, 0.0],
+            velocity=[1.0, 0.0, 0.0],
+            name="Composed",
+            mass=100.0,
+            area=1.0,
+            guidance=guidance,
+            engine=engine,
+        )
+
+        assert isinstance(body, Body)
+        assert body.guidance is guidance
+        assert body.engine is engine
+        assert body.has_thrust is True
+
+        acc = body.accelerations(earth)
+        assert acc.shape == body.position.shape
+        assert np.linalg.norm(acc) > 0.0
+
+
+class TestRocketComponentSeparation:
+    def test_rocket_keeps_guidance_and_engine_separate(self, earth):
+        stage = RocketStage(
+            RocketStageConfig(
+                thrust=1_000_000.0,
+                ref_radius=1.0,
+                dry_mass=500.0,
+                propellant_mass=10_000.0,
+                Isp=300.0,
+                name="Stage",
+            )
+        )
+        rocket = Rocket(
+            position=[earth.radius + 1000.0, 0.0, 0.0],
+            config=RocketConfig(stages=[stage], guidance=NoGuidance(earth, earth)),
+            velocity=[0.0, 100.0, 0.0],
+        )
+
+        assert isinstance(rocket, Body)
+        assert isinstance(rocket.engine, RocketEngine)
+        assert rocket.guidance is not None
+        assert rocket.engine.stages is rocket.stages
+        assert rocket.guidance_results is not None or rocket.guidance_results is None
+
+        rocket.update(0.1)
+
+        assert rocket.guidance_results is not None
+        assert rocket.engine.stages is rocket.stages
+        assert rocket.thrust_acc == pytest.approx(rocket.engine.thrust_acc)
 
 
 def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
@@ -292,6 +395,16 @@ class TestBallisticMissileProperties:
 
     def test_thrust_acc_positive_with_propellant(self, two_stage_missile):
         assert two_stage_missile.thrust_acc > 0
+
+    def test_engine_component_matches_rocket_thrust(self, two_stage_missile):
+        assert isinstance(two_stage_missile.engine, RocketEngine)
+        assert two_stage_missile.thrust_acc == pytest.approx(two_stage_missile.engine.thrust_acc)
+
+    def test_engine_tracks_same_stage_list(self, two_stage_missile):
+        assert two_stage_missile.engine.stages is two_stage_missile.stages
+        dep = two_stage_missile.stages[0]
+        two_stage_missile.stages.remove(dep)
+        assert dep not in two_stage_missile.engine.stages
 
     def test_thrust_acc_zero_when_stage_inactive(self, two_stage_missile):
         two_stage_missile.stages[0].active = False

@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
-from mad.objs.base import MovableObj, SimulationInterface
+from mad.objs.base import BallisticObj, MovableObj
 
 if TYPE_CHECKING:
-    from mad.objs.base import BallisticObj
     from mad.objs.launchers import Launcher
     from mad.objs.planets import Planet
 
@@ -28,7 +27,7 @@ class ComputerEvent:
     command: ComputerCommand
 
 
-class BattleComputer(MovableObj, SimulationInterface):
+class BattleComputer(MovableObj):
     def __init__(self, name: str = "BattleComputer", t: float = 0.0) -> None:
         MovableObj.__init__(self, np.zeros(3), np.zeros(3), name)
         self.name = name

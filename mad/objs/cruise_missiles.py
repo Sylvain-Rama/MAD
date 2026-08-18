@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import BallisticObj, GuidedObj
+from mad.objs.base import Body
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 from mad.utils.logger import SourceLogger
@@ -34,21 +34,33 @@ class CruiseMissileConfig:
         return CruiseMissile(config=self, position=position, velocity=velocity, t=t)
 
 
-class CruiseMissile(BallisticObj, GuidedObj):
+class _CruiseEngine:
+    def __init__(self, thrust_acc: float):
+        self._thrust_acc = float(thrust_acc)
+
+    @property
+    def thrust_acc(self) -> float:
+        return self._thrust_acc
+
+    def update(self, body, dt: float, command: ComputerCommand | None = None) -> None:
+        return None
+
+
+class CruiseMissile(Body):
     def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
-        BallisticObj.__init__(
-            self,
+        super().__init__(
             position=position,
             velocity=velocity,
             name=config.name,
             mass=config.mass,
             area=config.area,
             Cd=config.Cd,
+            guidance=deepcopy(config.guidance) if config.guidance is not None else None,
+            engine=_CruiseEngine(config.thrust_acc),
+            t=t,
         )
         self.config = config
-        self.guidance = deepcopy(config.guidance)
-        self.guidance_results = self.guidance.get_guidance(self, t)
-        self.t = t
+        self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
         self.total_distance_traveled = 0.0
         self.motor_active = True
 
@@ -62,10 +74,12 @@ class CruiseMissile(BallisticObj, GuidedObj):
 
     @property
     def thrust_acc(self) -> float:
-        return self.config.thrust_acc
+        return self.engine.thrust_acc if self.engine is not None else 0.0
 
     def _update_config(self):
         """Update the missile's configuration based on guidance results."""
+        if self.guidance_results is None:
+            return
         if self.guidance_results.modify_config is not None:
             for attr, value in self.guidance_results.modify_config.items():
                 if hasattr(self.config, attr):
@@ -78,24 +92,26 @@ class CruiseMissile(BallisticObj, GuidedObj):
                         f"{self.t:<.2f}s - {self.name} has no config attribute {attr} to change at {self.t:.2f}."
                     )
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
         self.total_distance_traveled += float(np.linalg.norm(self.velocity)) * dt
         if self.total_distance_traveled >= self.config.max_range_m:
             self.motor_active = False
 
-        self.guidance_results = self.guidance.get_guidance(self, self.t)
-        self._update_config()
-        if self.guidance_results.state == GuidanceStates.DETONATE:
-            self.detonate()
+        if self.guidance is not None and hasattr(self.guidance, "get_guidance"):
+            self.guidance_results = self.guidance.get_guidance(self, self.t)
+            self._update_config()
+            if self.guidance_results is not None and self.guidance_results.state == GuidanceStates.DETONATE:
+                self.detonate()
         return None
 
     def accelerations(self, planet: Planet) -> NDArray:
         if self.distance(planet) <= planet.radius:
-            target_distance = planet.surface_distance(self, self.guidance.target)
-            logger["Missile"].info(
-                f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
-            )
+            if self.guidance is not None:
+                target_distance = planet.surface_distance(self, self.guidance.target)
+                logger["Missile"].info(
+                    f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
+                )
             self.detonate()
             return np.zeros_like(self.velocity)
 
@@ -103,7 +119,7 @@ class CruiseMissile(BallisticObj, GuidedObj):
         drag = planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
-        if self.motor_active:
+        if self.motor_active and self.guidance_results is not None:
             # Apply guidance direction directly. The guidance returns a fractional vector
             # (components scaled relative to thrust_acc), so multiply directly without
             # renormalizing to preserve the absolute radial/tangential magnitudes.
