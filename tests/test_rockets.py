@@ -10,6 +10,7 @@ from mad.objs.rockets import (
     ReentryVehicle,
     RocketConfig,
     Rocket,
+    RocketEngine,
 )
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import MovableObj
@@ -292,6 +293,16 @@ class TestBallisticMissileProperties:
 
     def test_thrust_acc_positive_with_propellant(self, two_stage_missile):
         assert two_stage_missile.thrust_acc > 0
+
+    def test_engine_component_matches_rocket_thrust(self, two_stage_missile):
+        assert isinstance(two_stage_missile.engine, RocketEngine)
+        assert two_stage_missile.thrust_acc == pytest.approx(two_stage_missile.engine.thrust_acc)
+
+    def test_engine_tracks_same_stage_list(self, two_stage_missile):
+        assert two_stage_missile.engine.stages is two_stage_missile.stages
+        dep = two_stage_missile.stages[0]
+        two_stage_missile.stages.remove(dep)
+        assert dep not in two_stage_missile.engine.stages
 
     def test_thrust_acc_zero_when_stage_inactive(self, two_stage_missile):
         two_stage_missile.stages[0].active = False

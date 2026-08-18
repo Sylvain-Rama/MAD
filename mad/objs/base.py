@@ -19,6 +19,7 @@ from mad.utils.logger import SourceLogger
 
 if TYPE_CHECKING:
     from mad.objs.battle_computers import ComputerCommand
+    from mad.guidances.base_guidances import Guidance, GuidanceManager, GuidanceResults
 
 logger = SourceLogger()
 
@@ -66,6 +67,9 @@ class MovableObj:
 
     def distance(self, other: "MovableObj") -> np.floating:
         return np.linalg.norm(self.position - other.position)
+
+    def los(self, other: "MovableObj") -> NDArray:
+        return other.position - self.position
 
     def __repr__(self):
         a = "active" if self.active else "inactive"
@@ -136,12 +140,7 @@ class BallisticObj(MovableObj):
 
 
 class Body(BallisticObj):
-    """Simplified shared implementation for all dynamic bodies in the simulation.
-
-    This keeps the existing physics-heavy API of BallisticObj while allowing
-    optional guidance/engine strategies to be attached without requiring a deep
-    inheritance hierarchy for every concrete object type.
-    """
+    """Simplified shared implementation for all dynamic bodies in the simulation."""
 
     def __init__(
         self,
@@ -151,15 +150,15 @@ class Body(BallisticObj):
         mass: float = 1.0,
         area: float = 0.01,
         Cd: float = 0.47,
-        guidance: Any | None = None,
+        guidance: Guidance | GuidanceManager | None = None,
         engine: Any | None = None,
         t: float = 0.0,
     ):
         super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
-        self.guidance: Any = guidance
+        self.guidance = guidance
         self.engine: Any = engine
         self.t = t
-        self.guidance_results: Any = None
+        self.guidance_results: GuidanceResults | None = None
 
     @property
     def has_thrust(self) -> bool:

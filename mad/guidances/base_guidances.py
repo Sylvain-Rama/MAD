@@ -529,8 +529,8 @@ class DeployChute(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         return GuidanceResults(
-            direction=missile.vel_norm,
-            state=GuidanceStates.POWERED,
+            direction=np.zeros_like(missile.velocity),
+            state=GuidanceStates.IDLE,
             next_guidance=True,
             modify_config={"Cd": self.chute_Cd, "area": np.pi * self.chute_ref_radius**2},
         )

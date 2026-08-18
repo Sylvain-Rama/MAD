@@ -12,6 +12,7 @@ from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 
 from mad.guidances import GuidanceStates, Guidance, GuidanceManager
+from mad.guidances.base_guidances import GuidanceResults
 from mad.utils.logger import SourceLogger
 from mad.configs import G0
 
@@ -303,6 +304,81 @@ class RocketStage:
             self.active = False
 
 
+class RocketEngine:
+    """Propulsion component for a multi-stage rocket.
+
+    This keeps the stage/propellant logic in a dedicated engine object while the
+    rocket class continues to own mission-level state, guidance, and payload
+    release behavior.
+    """
+
+    def __init__(self, stages: list[RocketStage]):
+        self.stages = stages
+
+    @property
+    def mass(self) -> float:
+        return sum(stage.mass for stage in self.stages)
+
+    @property
+    def has_thrust(self) -> bool:
+        return bool(self.stages)
+
+    @property
+    def active_burn_group(self) -> list[RocketStage]:
+        if not self.stages:
+            return []
+        group = [self.stages[0]]
+        for stage in self.stages[1:]:
+            if stage.parallel:
+                group.append(stage)
+            else:
+                break
+        return group
+
+    @property
+    def thrust_acc(self) -> float:
+        if not self.stages:
+            return 0.0
+        total_thrust = sum(stage.thrust_force for stage in self.active_burn_group if stage.active)
+        return total_thrust / self.mass if total_thrust > 0 else 0.0
+
+    @property
+    def burned_fraction(self) -> float:
+        return 0.0
+
+    def update_lifecycle(
+        self, rocket: "Rocket", dt: float, command: ComputerCommand | None = None
+    ) -> tuple[list[RocketStage], list[RocketStage]]:
+        """Advance the engine lifecycle for the current flight state.
+
+        This method centralizes the stage burn/update bookkeeping and the
+        sequencing rules for the next sequential stage. The rocket keeps the
+        mission-level decisions such as payload release and stage separation.
+        """
+        if rocket.guidance_results is None or rocket.guidance_results.state == GuidanceStates.IDLE:
+            return self.active_burn_group, []
+
+        burn_group = self.active_burn_group
+        for stage in burn_group:
+            stage.update(dt, command)
+
+        depleted = [stage for stage in burn_group if not stage.active]
+        if depleted and len(self.stages) == 0:
+            logger["Rocket"].info(f"{rocket.t:<.2f}s - {rocket.name} - all stages depleted.")
+        elif depleted and self.stages and self.stages[0] not in burn_group:
+            self.stages[0].t = rocket.t
+            logger["Rocket"].info(
+                f"{rocket.t:<.2f}s - {rocket.name} - {self.stages[0].name} ignited at {rocket.t:.2f}."
+            )
+
+        return burn_group, depleted
+
+    def update(
+        self, rocket: "Rocket", dt: float, command: ComputerCommand | None = None
+    ) -> tuple[list[RocketStage], list[RocketStage]]:
+        return self.update_lifecycle(rocket, dt, command)
+
+
 @dataclass
 class RocketConfig:
     stages: list[RocketStage]
@@ -325,8 +401,12 @@ class Rocket(Body):
         # to avoid storing unused _mass/_area defaults and to keep stage-derived mass semantics.
         MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
 
-        self.stages = config.stages
-        self.guidance = deepcopy(config.guidance) if config.guidance is not None else None
+        self.stages = deepcopy(config.stages)
+        self.engine = RocketEngine(self.stages)
+        self.guidance: Guidance | GuidanceManager | None = (
+            deepcopy(config.guidance) if config.guidance is not None else None
+        )
+        self.guidance_results: GuidanceResults | None = None
         self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
         self.t = t
         self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction
@@ -344,8 +424,9 @@ class Rocket(Body):
             sum(stage.dry_mass for stage in self.stages)
             + (getattr(self.payloads[0], "mass", 0.0) if self.payloads else 0.0)
         )
-        self.Cd = 1.08  # long cylinder, should be good enough for a first approximation
-        self.guidance_results = self.guidance.get_guidance(self) if self.guidance else None
+        self.Cd = 0.47  # Pointy end
+        if self.guidance is not None:
+            self.guidance_results = self.guidance.get_guidance(self)
 
         # Cached area/Cd for the coasting phase (all stages separated, payloads not yet released).
         # Use the first payload's properties so the drag-to-mass ratio is physically correct.
@@ -357,7 +438,7 @@ class Rocket(Body):
     @property
     def mass(self):
         # Payload masses are excluded: they only exist once released as independent objects.
-        return sum(stage.mass for stage in self.stages)
+        return self.engine.mass if self.engine is not None else sum(stage.mass for stage in self.stages)
 
     @mass.setter
     def mass(self, value):
@@ -374,7 +455,7 @@ class Rocket(Body):
     @property
     def has_thrust(self) -> bool:
         """True while at least one stage is still present (stages are removed upon propellant depletion)."""
-        return bool(self.stages)
+        return self.engine.has_thrust if self.engine is not None else bool(self.stages)
 
     @property
     def deltav(self):
@@ -418,28 +499,12 @@ class Rocket(Body):
 
     @property
     def _active_burn_group(self) -> list["RocketStage"]:
-        """Stage 0 plus any consecutive following stages whose ``parallel`` flag is True.
-
-        All stages in this group burn simultaneously.  The group shrinks as
-        individual stages deplete and separate; the next sequential stage only
-        ignites once the group is completely exhausted.
-        """
-        if not self.stages:
-            return []
-        group = [self.stages[0]]
-        for stage in self.stages[1:]:
-            if stage.parallel:
-                group.append(stage)
-            else:
-                break
-        return group
+        """Compatibility alias to the propulsion component's active burn group."""
+        return self.engine.active_burn_group if self.engine is not None else []
 
     @property
     def thrust_acc(self) -> float:
-        if not self.stages:
-            return 0.0
-        total_thrust = sum(s.thrust_force for s in self._active_burn_group if s.active)
-        return total_thrust / self.mass if total_thrust > 0 else 0.0
+        return self.engine.thrust_acc if self.engine is not None else 0.0
 
     def _update_configs(self) -> None:
         """Update the rocket's configuration based on the guidance results.
@@ -447,11 +512,12 @@ class Rocket(Body):
         For example, we can increase The ref_radius or Cd of the rocket to simulate deploying a drag device,
         or change the mass of the rocket to simulate jettisoning boosters.
         """
-        if self.guidance_results is None:
+        results = self.guidance_results
+        if results is None:
             return
 
-        if self.guidance_results.modify_config is not None:
-            for attr, value in self.guidance_results.modify_config.items():
+        if results.modify_config is not None:
+            for attr, value in results.modify_config.items():
                 if hasattr(self, attr):
                     setattr(self, attr, value)
                     logger["Rocket"].info(
@@ -462,8 +528,8 @@ class Rocket(Body):
                         f"{self.t:<.2f}s - {self.name} has no attribute {attr} to change at {self.t:.2f}."
                     )
 
-        if self.guidance_results.modify_stage is not None and self.stages:
-            for attr, value in self.guidance_results.modify_stage.items():
+        if results.modify_stage is not None and self.stages:
+            for attr, value in results.modify_stage.items():
                 if hasattr(self._active_burn_group[0], attr):
                     setattr(self._active_burn_group[0], attr, value)
                     logger["Rocket"].info(
@@ -480,27 +546,31 @@ class Rocket(Body):
 
         # Snapshot the active burn group before any mutations so that stage-removal
         # logic below can reliably tell which stages were already burning.
-        burn_group = self._active_burn_group
-        self.guidance_results = self.guidance.get_guidance(self, self.t)
-        if self.guidance_results.state != GuidanceStates.IDLE:
-            for stage in burn_group:
-                stage.update(dt)
+        guidance = self.guidance
+        if guidance is not None:
+            self.guidance_results = guidance.get_guidance(self, self.t)
+        else:
+            self.guidance_results = None
+
+        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
+            burn_group, depleted = self.engine.update_lifecycle(self, dt, command)
+        else:
+            burn_group, depleted = self._active_burn_group, []
 
         # Update the rocket's configuration based on the guidance results.
         self._update_configs()
 
+        results = self.guidance_results
         if (
-            self.guidance_results.state == GuidanceStates.RELEASE_PAYLOAD
+            results is not None
+            and results.state == GuidanceStates.RELEASE_PAYLOAD
             and self.t - self.last_payload_separation_time > self.payload_separation_interval
             and self.payloads
         ):
             next_cfg = self.payloads.pop(0)
 
-            release_velocity = (
-                self.guidance_results.release_velocity
-                if self.guidance_results.release_velocity is not None
-                else self.velocity.copy()
-            )
+            release_vector = results.release_velocity
+            release_velocity: NDArray = release_vector.copy() if release_vector is not None else self.velocity.copy()
 
             payload = next_cfg.create(
                 position=self.position.copy(),
