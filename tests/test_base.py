@@ -5,6 +5,8 @@ import pytest
 from mad.objs.base import MovableObj, Body, BallisticObj
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
+from mad.guidances.base_guidances import GuidanceManager, NoGuidance
+from mad.simulation import Simulation
 from mad.configs.planets_cfg import EARTH_SETTINGS
 
 # ---------------------------------------------------------------------------
@@ -123,6 +125,45 @@ class TestBody:
         assert body.Cd == pytest.approx(0.9)
         assert body.guidance is None
         assert body.engine is None
+
+    def test_simulation_binds_reference_body_and_guidance_manager(self):
+        earth = _make_earth()
+        first = NoGuidance(None, MovableObj(position=[earth.radius + 1_000_000.0, 0.0, 0.0]))
+        second = NoGuidance(None, MovableObj(position=[earth.radius + 1_000_000.0, 0.0, 0.0]))
+        body = Body(
+            position=[earth.radius + 1_000_000.0, 0.0, 0.0],
+            guidance=GuidanceManager([first, second]),
+        )
+
+        Simulation(max_time=0.0, reference_body=earth).run([body])
+
+        assert body.reference_body is earth
+        assert body.gravity_bodies == [earth]
+        assert first.planet is earth
+        assert second.planet is earth
+
+    def test_gravity_bodies_add_perturbing_body_without_changing_reference_body(self):
+        earth = _make_earth()
+        moon = Planet(
+            PlanetConfig(
+                position=[earth.radius + 400_000_000.0, 0.0, 0.0],
+                radius=1_737_000.0,
+                mass=7.342e22,
+                name="Moon",
+                rho0=0.0,
+            )
+        )
+        body = Body(
+            position=[earth.radius + 1_000_000.0, 0.0, 0.0],
+            mass=1.0,
+            area=0.0,
+            Cd=0.0,
+        )
+        body.bind_environment(earth, [earth, moon])
+
+        expected = earth.gravity(body) + moon.gravity(body)
+        np.testing.assert_allclose(body.accelerations(), expected)
+        assert body.reference_body is earth
 
 
 # ---------------------------------------------------------------------------

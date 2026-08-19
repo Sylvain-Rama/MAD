@@ -50,12 +50,15 @@ class Satellite(Body):
 
     def accelerations(self, planet) -> NDArray:
         # Typically, we can ignore drag for satellites.
-        if self.distance(planet) <= planet.radius:
+        reference_body = self._reference_planet(planet)
+        if reference_body is None:
+            return np.zeros_like(self.velocity)
+        if self.distance(reference_body) <= reference_body.radius:
             logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity_acc = planet.gravity(self)
+        gravity_acc = self._gravity_acceleration(reference_body)
 
         return gravity_acc
 

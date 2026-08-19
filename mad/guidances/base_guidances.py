@@ -102,7 +102,7 @@ class Guidance(ABC):
 
     def __init__(
         self,
-        planet: Planet,
+        planet: Planet | None,
         target: MovableObj,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
@@ -124,6 +124,10 @@ class Guidance(ABC):
             t=self.t,
             travelled_distance_m=self.travelled_distance,
         )  # Optional guidance interrupt objects that can be used to switch to the next guidance law.
+
+    def bind_planet(self, planet: Planet | None) -> None:
+        """Bind the primary planet supplied by the simulation."""
+        self.planet = planet
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
@@ -197,6 +201,12 @@ class GuidanceManager:
         self.current_index = 0
         self.planet = guidances[0].planet
         self.target = guidances[0].target
+
+    def bind_planet(self, planet: Planet | None) -> None:
+        """Bind the primary planet to this manager and every contained law."""
+        self.planet = planet
+        for guidance in self.guidances:
+            guidance.bind_planet(planet)
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         if self.current_index >= len(self.guidances):
