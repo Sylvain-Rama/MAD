@@ -105,7 +105,7 @@ class CruiseMissile(Body):
                 self.detonate()
         return None
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         reference_body = self._reference_planet(planet)
         if reference_body is None:
             return np.zeros_like(self.velocity)

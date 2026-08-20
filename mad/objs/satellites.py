@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from mad.objs.base import Body
+from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
@@ -48,7 +49,7 @@ class Satellite(Body):
         self.t = t
         self.config = config
 
-    def accelerations(self, planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         # Typically, we can ignore drag for satellites.
         reference_body = self._reference_planet(planet)
         if reference_body is None:

@@ -125,7 +125,7 @@ class Launcher(Body):
     def thrust_acc(self) -> float:
         return self.config.speed
 
-    def accelerations(self, planet: Planet) -> NDArray[np.floating]:
+    def accelerations(self, planet: Planet | None = None) -> NDArray[np.floating]:
         return np.zeros_like(self.position)  # No acceleration for a launcher
 
     @property

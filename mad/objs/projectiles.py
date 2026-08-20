@@ -8,6 +8,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import Body
+from mad.objs.planets import Planet
 from mad.utils.logger import SourceLogger
 from mad.objs.battle_computers import ComputerCommand
 
@@ -46,7 +47,7 @@ class Projectile(Body):
         self.config = config
         self.t = t
 
-    def accelerations(self, planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         reference_body = self._reference_planet(planet)
         if reference_body is None:
             return np.zeros_like(self.velocity)

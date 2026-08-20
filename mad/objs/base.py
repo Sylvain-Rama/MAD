@@ -162,7 +162,9 @@ class Body(BallisticObj):
         self.t = t
         self.planet = planet
         self.reference_body = planet
-        self.gravity_bodies: list["Planet"] = list(gravity_bodies) if gravity_bodies is not None else ([planet] if planet is not None else [])
+        self.gravity_bodies: list["Planet"] = (
+            list(gravity_bodies) if gravity_bodies is not None else ([planet] if planet is not None else [])
+        )
         self.guidance_results: GuidanceResults | None = None
 
     def bind_environment(
@@ -188,7 +190,7 @@ class Body(BallisticObj):
             if callable(bind_planet):
                 bind_planet(reference_body)
             elif hasattr(self.guidance, "planet"):
-                self.guidance.planet = reference_body
+                cast(Any, self.guidance).planet = reference_body
 
     def set_planet(self, planet: "Planet | None") -> None:
         """Compatibility wrapper for binding a single primary planet."""

@@ -81,14 +81,14 @@ class ReentryVehicle(Body):
 
         return None
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         reference_body = self._reference_planet(planet)
         if reference_body is None:
             return np.zeros_like(self.velocity)
 
         if self.distance(reference_body) <= reference_body.radius:
             if self.guidance:
-                distance_to_target = self.guidance.planet.surface_distance(self, self.guidance.target)
+                distance_to_target = reference_body.surface_distance(self, self.guidance.target)
                 logger["Rocket"].info(
                     f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
                 )
@@ -193,7 +193,7 @@ class Capsule(Body):
 
         return None
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         reference_body = self._reference_planet(planet)
         if reference_body is None:
             return np.zeros_like(self.velocity)
@@ -638,7 +638,7 @@ class Rocket(Body):
 
         return released_objects if released_objects else None
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         reference_body = self._reference_planet(planet)
         if reference_body is None:
             return np.zeros_like(self.velocity)

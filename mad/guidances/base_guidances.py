@@ -106,7 +106,7 @@ class Guidance(ABC):
         target: MovableObj,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        self.planet = planet
+        self._planet: Planet | None = planet
         self.target = target
         self.interrupt_fn = interrupt_fn
         self.state = GuidanceStates.POWERED
@@ -124,6 +124,16 @@ class Guidance(ABC):
             t=self.t,
             travelled_distance_m=self.travelled_distance,
         )  # Optional guidance interrupt objects that can be used to switch to the next guidance law.
+
+    @property
+    def planet(self) -> Planet:
+        if self._planet is None:
+            raise RuntimeError("Guidance must be bound to a planet before use.")
+        return self._planet
+
+    @planet.setter
+    def planet(self, value: Planet | None) -> None:
+        self._planet = value
 
     def bind_planet(self, planet: Planet | None) -> None:
         """Bind the primary planet supplied by the simulation."""
@@ -170,7 +180,7 @@ class Guidance(ABC):
         self.guidance_interrupts = GuidanceInterrupts(
             missile=cast(Any, missile),
             target=self.target,
-            planet=self.planet,
+            planet=self._planet,
             t=self.t,
             travelled_distance_m=self.travelled_distance,
         )
@@ -199,7 +209,7 @@ class GuidanceManager:
     def __init__(self, guidances: list[Guidance]):
         self.guidances = guidances
         self.current_index = 0
-        self.planet = guidances[0].planet
+        self.planet: Planet | None = guidances[0]._planet
         self.target = guidances[0].target
 
     def bind_planet(self, planet: Planet | None) -> None:
