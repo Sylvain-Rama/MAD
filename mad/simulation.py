@@ -115,14 +115,14 @@ class Simulation:
         max_time: float = 3600.0,
         dt: float = 1.0,
         planet: Planet | None = None,
-        gravity_bodies: list[Planet] | None = None,
+        gravity_bodies: set[Planet] | None = None,
     ):
         self.max_time = max_time
         self.dt = dt
         self.planet = planet
-        self.gravity_bodies = list(gravity_bodies) if gravity_bodies is not None else None
-        if planet is not None and (self.gravity_bodies is None or planet not in self.gravity_bodies):
-            self.gravity_bodies = [planet, *(self.gravity_bodies or [])]
+        self.gravity_bodies = set(gravity_bodies) if gravity_bodies is not None else set()
+        if planet is not None:
+            self.gravity_bodies.add(planet)
         self.collector = HistoryCollector(["t", "position", "velocity", "gamma"])
 
     def run(
@@ -147,7 +147,7 @@ class Simulation:
             primary_planet = self.planet
         if primary_planet is None:
             raise ValueError("Simulation requires a planet or a run() planet.")
-        gravity_bodies = self.gravity_bodies or [primary_planet]
+        gravity_bodies = self.gravity_bodies or {primary_planet}
 
         active_objs = moving_objs[:]
         for obj in active_objs:

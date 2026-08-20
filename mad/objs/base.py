@@ -80,6 +80,9 @@ class MovableObj:
             return False
         return self._id == other._id
 
+    def __hash__(self) -> int:
+        return hash(self._id)
+
     def degrade(self) -> None:
         """Mark the object inactive when it is degraded or destroyed."""
         self.active = False
@@ -154,34 +157,30 @@ class Body(BallisticObj):
         engine: Any | None = None,
         t: float = 0.0,
         planet: "Planet | None" = None,
-        gravity_bodies: list["Planet"] | None = None,
+        gravity_bodies: set["Planet"] | None = None,
     ):
         super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
         self.guidance = guidance
         self.engine: Any = engine
         self.t = t
         self.planet = planet
-        self.gravity_bodies: list["Planet"] = (
-            list(gravity_bodies) if gravity_bodies is not None else ([planet] if planet is not None else [])
+        self.gravity_bodies: set["Planet"] = (
+            set(gravity_bodies) if gravity_bodies is not None else ({planet} if planet is not None else set())
         )
+        if planet is not None and planet not in self.gravity_bodies:
+            self.gravity_bodies.add(planet)
         self.guidance_results: GuidanceResults | None = None
 
     def bind_environment(
         self,
         planet: "Planet | None",
-        gravity_bodies: list["Planet"] | None = None,
+        gravity_bodies: set["Planet"] | None = None,
     ) -> None:
         """Bind the simulation bodies used by this object and its guidance."""
-        previous_planet = self.planet
         self.planet = planet
-        if gravity_bodies is not None:
-            self.gravity_bodies = list(gravity_bodies)
-        elif planet is None:
-            self.gravity_bodies = []
-        elif not self.gravity_bodies or self.gravity_bodies == [previous_planet]:
-            self.gravity_bodies = [planet]
+        self.gravity_bodies = set(gravity_bodies) if gravity_bodies is not None else set()
         if planet is not None and planet not in self.gravity_bodies:
-            self.gravity_bodies.insert(0, planet)
+            self.gravity_bodies.add(planet)
 
         if self.guidance is not None:
             bind_planet = getattr(self.guidance, "bind_planet", None)
@@ -199,7 +198,7 @@ class Body(BallisticObj):
 
     def _gravity_acceleration(self, planet: "Planet | None") -> NDArray:
         primary_planet = self._primary_planet(planet)
-        bodies = getattr(self, "gravity_bodies", None) or ([primary_planet] if primary_planet is not None else [])
+        bodies = getattr(self, "gravity_bodies", None) or ({primary_planet} if primary_planet is not None else set())
         gravity = np.zeros_like(self.velocity)
         for body in bodies:
             gravity += body.gravity(self)

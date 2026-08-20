@@ -138,7 +138,7 @@ class TestBody:
         Simulation(max_time=0.0, planet=earth).run([body])
 
         assert body.planet is earth
-        assert body.gravity_bodies == [earth]
+        assert body.gravity_bodies == {earth}
         assert first.planet is earth
         assert second.planet is earth
 
