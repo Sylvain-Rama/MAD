@@ -82,13 +82,13 @@ class ReentryVehicle(Body):
         return None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        reference_body = self._reference_planet(planet)
-        if reference_body is None:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
             return np.zeros_like(self.velocity)
 
-        if self.distance(reference_body) <= reference_body.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             if self.guidance:
-                distance_to_target = reference_body.surface_distance(self, self.guidance.target)
+                distance_to_target = primary_planet.surface_distance(self, self.guidance.target)
                 logger["Rocket"].info(
                     f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
                 )
@@ -99,8 +99,8 @@ class ReentryVehicle(Body):
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(reference_body)
-        drag = reference_body.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
 
         thrust = np.zeros_like(self.velocity)
         if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
@@ -194,17 +194,17 @@ class Capsule(Body):
         return None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        reference_body = self._reference_planet(planet)
-        if reference_body is None:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
             return np.zeros_like(self.velocity)
 
-        if self.distance(reference_body) <= reference_body.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(reference_body)
-        drag = reference_body.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
@@ -639,18 +639,18 @@ class Rocket(Body):
         return released_objects if released_objects else None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        reference_body = self._reference_planet(planet)
-        if reference_body is None:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
             return np.zeros_like(self.velocity)
-        if self.distance(reference_body) <= reference_body.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(reference_body)
+        gravity = self._gravity_acceleration(primary_planet)
 
         drag = (
-            reference_body.drag(self) if self.stages else np.zeros_like(self.velocity)
+            primary_planet.drag(self) if self.stages else np.zeros_like(self.velocity)
         )  # No drag if all stages separated and payloads not yet released.
 
         # If there is no thrust, no need to check for direction: we cannot act on it.

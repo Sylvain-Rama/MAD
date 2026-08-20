@@ -126,7 +126,7 @@ class TestBody:
         assert body.guidance is None
         assert body.engine is None
 
-    def test_simulation_binds_reference_body_and_guidance_manager(self):
+    def test_simulation_binds_planet_and_guidance_manager(self):
         earth = _make_earth()
         first = NoGuidance(None, MovableObj(position=[earth.radius + 1_000_000.0, 0.0, 0.0]))
         second = NoGuidance(None, MovableObj(position=[earth.radius + 1_000_000.0, 0.0, 0.0]))
@@ -135,14 +135,14 @@ class TestBody:
             guidance=GuidanceManager([first, second]),
         )
 
-        Simulation(max_time=0.0, reference_body=earth).run([body])
+        Simulation(max_time=0.0, planet=earth).run([body])
 
-        assert body.reference_body is earth
+        assert body.planet is earth
         assert body.gravity_bodies == [earth]
         assert first.planet is earth
         assert second.planet is earth
 
-    def test_gravity_bodies_add_perturbing_body_without_changing_reference_body(self):
+    def test_gravity_bodies_add_perturbing_body_without_changing_planet(self):
         earth = _make_earth()
         moon = Planet(
             PlanetConfig(
@@ -163,7 +163,7 @@ class TestBody:
 
         expected = earth.gravity(body) + moon.gravity(body)
         np.testing.assert_allclose(body.accelerations(), expected)
-        assert body.reference_body is earth
+        assert body.planet is earth
 
 
 # ---------------------------------------------------------------------------

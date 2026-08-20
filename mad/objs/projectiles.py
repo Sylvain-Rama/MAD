@@ -48,16 +48,16 @@ class Projectile(Body):
         self.t = t
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        reference_body = self._reference_planet(planet)
-        if reference_body is None:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
             return np.zeros_like(self.velocity)
-        if self.distance(reference_body) <= reference_body.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             logger["Projectile"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity_acc = self._gravity_acceleration(reference_body)
-        drag_acc = reference_body.drag(self)
+        gravity_acc = self._gravity_acceleration(primary_planet)
+        drag_acc = primary_planet.drag(self)
 
         return gravity_acc + drag_acc
 

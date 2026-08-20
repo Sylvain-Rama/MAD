@@ -106,20 +106,20 @@ class CruiseMissile(Body):
         return None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        reference_body = self._reference_planet(planet)
-        if reference_body is None:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
             return np.zeros_like(self.velocity)
-        if self.distance(reference_body) <= reference_body.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             if self.guidance is not None:
-                target_distance = reference_body.surface_distance(self, self.guidance.target)
+                target_distance = primary_planet.surface_distance(self, self.guidance.target)
                 logger["Missile"].info(
                     f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
                 )
             self.detonate()
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(reference_body)
-        drag = reference_body.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.motor_active and self.guidance_results is not None:

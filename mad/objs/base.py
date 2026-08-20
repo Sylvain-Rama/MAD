@@ -161,7 +161,6 @@ class Body(BallisticObj):
         self.engine: Any = engine
         self.t = t
         self.planet = planet
-        self.reference_body = planet
         self.gravity_bodies: list["Planet"] = (
             list(gravity_bodies) if gravity_bodies is not None else ([planet] if planet is not None else [])
         )
@@ -169,39 +168,38 @@ class Body(BallisticObj):
 
     def bind_environment(
         self,
-        reference_body: "Planet | None",
+        planet: "Planet | None",
         gravity_bodies: list["Planet"] | None = None,
     ) -> None:
         """Bind the simulation bodies used by this object and its guidance."""
-        previous_reference = getattr(self, "reference_body", None)
-        self.planet = reference_body
-        self.reference_body = reference_body
+        previous_planet = self.planet
+        self.planet = planet
         if gravity_bodies is not None:
             self.gravity_bodies = list(gravity_bodies)
-        elif reference_body is None:
+        elif planet is None:
             self.gravity_bodies = []
-        elif not self.gravity_bodies or self.gravity_bodies == [previous_reference]:
-            self.gravity_bodies = [reference_body]
-        if reference_body is not None and reference_body not in self.gravity_bodies:
-            self.gravity_bodies.insert(0, reference_body)
+        elif not self.gravity_bodies or self.gravity_bodies == [previous_planet]:
+            self.gravity_bodies = [planet]
+        if planet is not None and planet not in self.gravity_bodies:
+            self.gravity_bodies.insert(0, planet)
 
         if self.guidance is not None:
             bind_planet = getattr(self.guidance, "bind_planet", None)
             if callable(bind_planet):
-                bind_planet(reference_body)
+                bind_planet(planet)
             elif hasattr(self.guidance, "planet"):
-                cast(Any, self.guidance).planet = reference_body
+                cast(Any, self.guidance).planet = planet
 
     def set_planet(self, planet: "Planet | None") -> None:
         """Compatibility wrapper for binding a single primary planet."""
         self.bind_environment(planet)
 
-    def _reference_planet(self, planet: "Planet | None") -> "Planet | None":
-        return getattr(self, "reference_body", None) or planet or getattr(self, "planet", None)
+    def _primary_planet(self, planet: "Planet | None") -> "Planet | None":
+        return getattr(self, "planet", None) or planet
 
     def _gravity_acceleration(self, planet: "Planet | None") -> NDArray:
-        reference_body = self._reference_planet(planet)
-        bodies = getattr(self, "gravity_bodies", None) or ([reference_body] if reference_body is not None else [])
+        primary_planet = self._primary_planet(planet)
+        bodies = getattr(self, "gravity_bodies", None) or ([primary_planet] if primary_planet is not None else [])
         gravity = np.zeros_like(self.velocity)
         for body in bodies:
             gravity += body.gravity(self)
@@ -243,15 +241,15 @@ class Body(BallisticObj):
         return None
 
     def accelerations(self, planet: "Planet | None" = None) -> NDArray:
-        reference_body = self._reference_planet(planet)
-        if reference_body is None:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
             return np.zeros_like(self.velocity)
-        if self.distance(reference_body) <= reference_body.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(reference_body)
-        drag = reference_body.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.engine is not None:
