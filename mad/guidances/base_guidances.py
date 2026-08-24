@@ -102,7 +102,7 @@ class Guidance(ABC):
 
     def __init__(
         self,
-        planet: Planet | None,
+        planet: Planet,
         target: MovableObj,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
@@ -123,7 +123,9 @@ class Guidance(ABC):
             planet=None,
             t=self.t,
             travelled_distance_m=self.travelled_distance,
+
         )  # Optional guidance interrupt objects that can be used to switch to the next guidance law.
+
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
