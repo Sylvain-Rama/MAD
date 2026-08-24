@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 from mad.utils.base_utils import to_vec3, normalize
@@ -131,7 +132,7 @@ class BallisticObj(MovableObj):
             raise ValueError("Area must be positive.")
         self._area = value
 
-    def integrate(self, dt: float, planet: "Planet") -> None:
+    def integrate(self, dt: float, planet: "Planet | None" = None) -> None:
         """Advance position and velocity by one time step using Velocity Verlet integration."""
         a0 = self.accelerations(planet)
         self.position += self.velocity * dt + 0.5 * a0 * dt**2
@@ -157,50 +158,66 @@ class Body(BallisticObj):
         engine: Any | None = None,
         t: float = 0.0,
         planet: "Planet | None" = None,
-        gravity_bodies: set["Planet"] | None = None,
+        gravity_bodies: Collection["Planet"] | None = None,
     ):
         super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
         self.guidance = guidance
         self.engine: Any = engine
         self.t = t
-        self.planet = planet
-        self.gravity_bodies: set["Planet"] = (
-            set(gravity_bodies) if gravity_bodies is not None else ({planet} if planet is not None else set())
+        self.reference_planet = planet
+        self.gravity_bodies: frozenset["Planet"] = frozenset(
+            gravity_bodies if gravity_bodies is not None else (() if planet is None else (planet,))
         )
-        if planet is not None and planet not in self.gravity_bodies:
-            self.gravity_bodies.add(planet)
         self.guidance_results: GuidanceResults | None = None
+
+    @property
+    def planet(self) -> "Planet | None":
+        """Compatibility alias for the body's current reference planet."""
+        return self.reference_planet
+
+    @planet.setter
+    def planet(self, value: "Planet | None") -> None:
+        self.reference_planet = value
 
     def bind_environment(
         self,
-        planet: "Planet | None",
-        gravity_bodies: set["Planet"] | None = None,
+        planet: "Planet | None" = None,
+        gravity_bodies: Collection["Planet"] | None = None,
     ) -> None:
-        """Bind the simulation bodies used by this object and its guidance."""
-        self.planet = planet
-        self.gravity_bodies = set(gravity_bodies) if gravity_bodies is not None else set()
-        if planet is not None and planet not in self.gravity_bodies:
-            self.gravity_bodies.add(planet)
+        """Optionally set local context and replace the fixed gravity sources."""
+        if planet is not None:
+            self.reference_planet = planet
+        if gravity_bodies is not None:
+            self.gravity_bodies = frozenset(gravity_bodies)
+        self._bind_unconfigured_guidance_planets()
 
-        if self.guidance is not None:
-            bind_planet = getattr(self.guidance, "bind_planet", None)
-            if callable(bind_planet):
-                bind_planet(planet)
-            elif hasattr(self.guidance, "planet"):
-                cast(Any, self.guidance).planet = planet
+    def set_reference_planet(self, planet: "Planet | None") -> None:
+        """Change local drag, impact, and reference-geometry context."""
+        self.reference_planet = planet
 
     def set_planet(self, planet: "Planet | None") -> None:
         """Compatibility wrapper for binding a single primary planet."""
-        self.bind_environment(planet)
+        self.set_reference_planet(planet)
 
-    def _primary_planet(self, planet: "Planet | None") -> "Planet | None":
-        return getattr(self, "planet", None) or planet
+    def _bind_unconfigured_guidance_planets(self) -> None:
+        """Initialize missing guidance planet references without changing configured ones."""
+        if self.guidance is None:
+            return
+        guidances = getattr(self.guidance, "guidances", (self.guidance,))
+        for guidance in guidances:
+            if getattr(guidance, "planet", None) is None:
+                guidance.planet = self.reference_planet
 
-    def _gravity_acceleration(self, planet: "Planet | None") -> NDArray:
-        primary_planet = self._primary_planet(planet)
-        bodies = getattr(self, "gravity_bodies", None) or ({primary_planet} if primary_planet is not None else set())
+    def _primary_planet(self, planet: "Planet | None" = None) -> "Planet | None":
+        """Return the configured reference planet, or a legacy call-site fallback."""
+        return getattr(self, "reference_planet", None) or planet
+
+    def _gravity_acceleration(self, planet: "Planet | None" = None) -> NDArray:
+        gravity_bodies = getattr(self, "gravity_bodies", frozenset())
+        if not gravity_bodies and planet is not None:
+            gravity_bodies = frozenset((planet,))
         gravity = np.zeros_like(self.velocity)
-        for body in bodies:
+        for body in gravity_bodies:
             gravity += body.gravity(self)
         return gravity
 
@@ -230,8 +247,6 @@ class Body(BallisticObj):
 
     def update(self, dt: float, command: "ComputerCommand | None" = None) -> list["Body"] | None:
         self.t += dt
-        if self.guidance is not None and hasattr(self.guidance, "planet") and self.planet is not None:
-            self.guidance.planet = self.planet
         guidance = self.guidance
         if guidance is not None and hasattr(guidance, "get_guidance"):
             self.guidance_results = guidance.get_guidance(self, self.t)
@@ -240,26 +255,23 @@ class Body(BallisticObj):
         return None
 
     def accelerations(self, planet: "Planet | None" = None) -> NDArray:
-        primary_planet = self._primary_planet(planet)
-        if primary_planet is None:
-            return np.zeros_like(self.velocity)
-        if self.distance(primary_planet) <= primary_planet.radius:
+        reference_planet = self.reference_planet if planet is None else planet
+        if reference_planet is None:
+            raise RuntimeError("Body must have a reference planet before acceleration can be calculated.")
+
+        if self.distance(reference_planet) <= reference_planet.radius:
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(primary_planet)
-        drag = primary_planet.drag(self)
+        gravity = self._gravity_acceleration()
+        drag = reference_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.engine is not None:
             engine_thrust = self.thrust_acc
-            if engine_thrust > 0.0 and self.guidance is not None and hasattr(self.guidance, "get_guidance"):
-                try:
-                    guidance_result = self.guidance.get_guidance(self, self.t)
-                except TypeError:
-                    guidance_result = None
-
-                if guidance_result is not None and getattr(guidance_result, "direction", None) is not None:
+            if engine_thrust > 0.0 and self.guidance is not None:
+                guidance_result = self.guidance_results
+                if guidance_result is not None:
                     direction = guidance_result.direction
                     direction_norm = np.linalg.norm(direction)
                     if direction_norm > 1e-8:

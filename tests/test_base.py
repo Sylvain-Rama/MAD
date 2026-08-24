@@ -133,6 +133,7 @@ class TestBody:
         body = Body(
             position=[earth.radius + 1_000_000.0, 0.0, 0.0],
             guidance=GuidanceManager([first, second]),
+            planet=earth,
         )
 
         Simulation(max_time=0.0, planet=earth).run([body])
@@ -164,6 +165,63 @@ class TestBody:
         expected = earth.gravity(body) + moon.gravity(body)
         np.testing.assert_allclose(body.accelerations(), expected)
         assert body.planet is earth
+
+    def test_reference_planet_can_change_without_mutating_guidance_or_gravity_sources(self):
+        earth = _make_earth()
+        moon = Planet(
+            PlanetConfig(
+                position=[earth.radius + 400_000_000.0, 0.0, 0.0],
+                radius=1_737_000.0,
+                mass=7.342e22,
+                name="Moon",
+                rho0=0.0,
+            )
+        )
+        guidance = NoGuidance(earth, MovableObj(position=[0.0, earth.radius, 0.0]))
+        body = Body(
+            position=[earth.radius + 1_000_000.0, 0.0, 0.0],
+            guidance=guidance,
+            planet=earth,
+            gravity_bodies={earth, moon},
+        )
+
+        original_gravity_bodies = body.gravity_bodies
+        body.set_reference_planet(moon)
+
+        assert body.reference_planet is moon
+        assert body.planet is moon
+        assert guidance.planet is earth
+        assert body.gravity_bodies is original_gravity_bodies
+        assert body.gravity_bodies == {earth, moon}
+
+    def test_simulation_preserves_each_bodys_reference_planet(self):
+        earth = _make_earth()
+        moon = Planet(
+            PlanetConfig(
+                position=[earth.radius + 400_000_000.0, 0.0, 0.0],
+                radius=1_737_000.0,
+                mass=7.342e22,
+                name="Moon",
+                rho0=0.0,
+            )
+        )
+        earth_body = Body(
+            position=[earth.radius + 1_000_000.0, 0.0, 0.0],
+            planet=earth,
+            area=0.0,
+        )
+        moon_body = Body(
+            position=[moon.position[0] + 1_000_000.0, 0.0, 0.0],
+            planet=moon,
+            area=0.0,
+        )
+
+        Simulation(max_time=0.0, gravity_bodies={earth, moon}).run([earth_body, moon_body])
+
+        assert earth_body.reference_planet is earth
+        assert moon_body.reference_planet is moon
+        assert earth_body.gravity_bodies == {earth, moon}
+        assert moon_body.gravity_bodies == {earth, moon}
 
 
 # ---------------------------------------------------------------------------
