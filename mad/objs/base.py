@@ -278,6 +278,13 @@ class ReleasableConfig(Protocol):
 
     name: str
 
-    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "BallisticObj":
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None,
+        t: float,
+        reference_planet: "Planet | None" = None,
+        gravity_bodies: Collection["Planet"] | None = None,
+    ) -> "Body":
         """Instantiate and return the deployed object at the given state."""
         ...

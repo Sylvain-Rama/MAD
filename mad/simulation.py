@@ -141,12 +141,13 @@ class Simulation:
         gravity_bodies = set(self.gravity_bodies)
         if planet is not None:
             gravity_bodies.add(planet)
+        reference_planet = planet if planet is not None else self.planet
         if not gravity_bodies:
             gravity_bodies = {obj.reference_planet for obj in active_objs if obj.reference_planet is not None}
         if not gravity_bodies:
             raise ValueError("Simulation requires gravity bodies or objects with reference planets.")
         for obj in active_objs:
-            obj.bind_environment(gravity_bodies=gravity_bodies)
+            obj.bind_environment(reference_planet=reference_planet, gravity_bodies=gravity_bodies)
         t = 0.0
         start = time()
         logger["Simulation"].info(f"{t:<.2f}s - Starting simulation.")
@@ -171,7 +172,7 @@ class Simulation:
                 )
 
                 for obj in new_objects:
-                    obj.bind_environment(gravity_bodies=gravity_bodies)
+                    obj.bind_environment(reference_planet=reference_planet, gravity_bodies=gravity_bodies)
 
                 active_objs.extend(new_objects)
 

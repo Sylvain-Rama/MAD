@@ -589,3 +589,14 @@ class TestPayloadRelease:
         # Mutate the rocket's velocity in-place — payload must be unaffected.
         rocket.velocity[:] = [1.0, 2.0, 3.0]
         np.testing.assert_array_equal(payload.velocity, payload_vel_snapshot)
+
+    def test_released_payload_keeps_body_environment(self, earth):
+        rocket = self._make_rocket(earth, 200_000.0, [0.0, 7_800.0, 0.0])
+        rocket.bind_environment(reference_planet=earth, gravity_bodies={earth})
+
+        released = rocket.update(1.0)
+        payload = next(obj for obj in released if obj.name.startswith("Payload"))
+
+        assert isinstance(payload, Body)
+        assert payload.reference_planet is earth
+        assert payload.gravity_bodies == frozenset({earth})
