@@ -181,12 +181,12 @@ class Body(BallisticObj):
 
     def bind_environment(
         self,
-        planet: "Planet | None" = None,
+        reference_planet: "Planet | None" = None,
         gravity_bodies: Collection["Planet"] | None = None,
     ) -> None:
         """Optionally set local context and replace the fixed gravity sources."""
-        if planet is not None:
-            self.reference_planet = planet
+        if reference_planet is not None:
+            self.reference_planet = reference_planet
         if gravity_bodies is not None:
             self.gravity_bodies = frozenset(gravity_bodies)
 

@@ -2,6 +2,7 @@
 
 from mad.objs import MovableObj
 from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
+from mad.objs.planets import Planet
 from typing import Callable
 
 
@@ -20,12 +21,12 @@ class TabulatedBallistic(Guidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         target: MovableObj,
         ballistic_table_name: str,
         interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        super().__init__(reference_planet, target, interrupt_fn=interrupt_fn)
         self.ballistic_guidance = load_ballistic_table(ballistic_table_name)
 
     def __repr__(self):
