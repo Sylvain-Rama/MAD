@@ -71,7 +71,7 @@ class Launcher(Body):
             guidance.target = target
         self.n_projectiles -= 1
         self.last_release_time = self.t
-        return cast(Body, projectile)
+        return projectile
 
     def reload(self):
         if self._can_reload():
