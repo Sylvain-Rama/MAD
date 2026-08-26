@@ -22,6 +22,7 @@ from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, Guida
 from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
 from mad.guidances.interrupt_guidances import interrupt_at_angle
 from mad.objs.projectiles import ProjectileConfig
+from mad.simulation import Simulation
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -600,3 +601,61 @@ class TestPayloadRelease:
         assert isinstance(payload, Body)
         assert payload.reference_planet is earth
         assert payload.gravity_bodies == frozenset({earth})
+
+
+def test_simulation_runs_nested_rocket_releases(earth):
+    """Simulation should integrate rockets spawned by rockets, including their payloads."""
+    child_stage = RocketStage(
+        RocketStageConfig(
+            thrust=1_000.0,
+            ref_radius=0.5,
+            dry_mass=10.0,
+            propellant_mass=100.0,
+            Isp=300.0,
+            name="ChildStage",
+        )
+    )
+    child_payload = ProjectileConfig(mass=2.0, name="ChildPayload")
+    child_config = RocketConfig(
+        stages=[child_stage],
+        guidance=_ImmediateReleaseGuidance(None, None),
+        payloads=[child_payload],
+        payload_separation_interval=0.0,
+        name="ChildRocket",
+    )
+
+    parent_stage = RocketStage(
+        RocketStageConfig(
+            thrust=1_000.0,
+            ref_radius=0.5,
+            dry_mass=20.0,
+            propellant_mass=100.0,
+            Isp=300.0,
+            name="ParentStage",
+        )
+    )
+    parent_config = RocketConfig(
+        stages=[parent_stage],
+        guidance=_ImmediateReleaseGuidance(None, None),
+        payloads=[child_config],
+        payload_separation_interval=0.0,
+        name="ParentRocket",
+    )
+    parent = Rocket(
+        position=np.array([earth.radius + 200_000.0, 0.0]),
+        velocity=np.array([0.0, 7_800.0]),
+        config=parent_config,
+    )
+
+    simulation = Simulation(max_time=0.3, dt=0.1, gravity_bodies={earth})
+    simulation.run(moving_objs=[parent], planet=earth)
+
+    names = {obj.name for obj in simulation.final_objs}
+    assert {"ParentRocket", "ChildRocket", "ChildPayload"} <= names
+    assert any(isinstance(obj, Rocket) and obj.name == "ChildRocket" for obj in simulation.final_objs)
+    assert any(isinstance(obj, Body) and obj.name == "ChildPayload" for obj in simulation.final_objs)
+    assert {"ParentRocket", "ChildRocket", "ChildPayload"} <= set(simulation.results["name"])
+    assert parent.released_payloads == 1
+    child = next(obj for obj in simulation.final_objs if obj.name == "ChildRocket")
+    assert isinstance(child, Rocket)
+    assert child.released_payloads == 1
