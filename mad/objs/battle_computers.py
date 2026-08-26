@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
-from mad.objs.base import BallisticObj, MovableObj
+from mad.objs.base import Body, MovableObj
 
 if TYPE_CHECKING:
     from mad.objs.launchers import Launcher
@@ -37,9 +37,9 @@ class BattleComputer(MovableObj):
         self.events: list[ComputerEvent] = []
         self.t = t
 
-    def send_command(self, command: ComputerCommand) -> list[BallisticObj] | None:
+    def send_command(self, command: ComputerCommand) -> list[Body] | None:
         """Forward *command* to all managed launchers without advancing their clock."""
-        spawned: list[BallisticObj] = []
+        spawned: list[Body] = []
         for launcher in self.launchers:
             # We collect the spawned objects from launchers, but we don't advance their time here.
             # Launchers can spawn independently through their update() method.
@@ -48,7 +48,7 @@ class BattleComputer(MovableObj):
                 spawned.extend(result)
         return spawned if spawned else None
 
-    def update(self, dt: float, command: ComputerCommand | None = None) -> list[BallisticObj] | None:
+    def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
         fired = [e for e in self.events if e.time <= self.t]
         for event in fired:
@@ -59,8 +59,11 @@ class BattleComputer(MovableObj):
             return None
         return self.send_command(command)
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def bind_environment(self, reference_planet: Planet | None = None, gravity_bodies: list[Body] = []) -> None:
+        return
+
+    def accelerations(self, reference_planet: Planet) -> NDArray:
         return np.zeros(3)
 
-    def integrate(self, dt: float, planet: Planet) -> None:
+    def integrate(self, dt: float, reference_planet: Planet | None = None) -> None:
         pass  # BattleComputer is not a physical object

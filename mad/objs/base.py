@@ -4,8 +4,8 @@ The canonical runtime object for the physics loop is ``Body``: a single shared
 simulated body with position, velocity, mass, drag, and optional guidance/engine
 behaviour attached via composition.
 
-Compatibility aliases such as ``BallisticObj`` remain available for older code
-paths and external consumers during the migration to the simpler model.
+``Body`` is the shared physical runtime object; ``MovableObj`` remains the
+lightweight geometric base for non-physical entities.
 """
 
 from __future__ import annotations
@@ -21,11 +21,9 @@ from mad.utils.logger import SourceLogger
 if TYPE_CHECKING:
     from mad.objs.battle_computers import ComputerCommand
     from mad.guidances.base_guidances import Guidance, GuidanceManager, GuidanceResults
+    from mad.objs.planets import Planet
 
 logger = SourceLogger()
-
-if TYPE_CHECKING:
-    from mad.objs.planets import Planet
 
 
 class MovableObj:
@@ -89,62 +87,8 @@ class MovableObj:
         self.active = False
 
 
-class BallisticObj(MovableObj):
-    """Compatibility base class for physics-bearing objects.
-
-    ``Body`` is the preferred canonical implementation for new or refactored
-    objects. ``BallisticObj`` is retained so existing object factories and tests
-    continue to work while the project migrates to the simplified composition-based
-    model.
-    """
-
-    def __init__(
-        self,
-        position: list[float] | NDArray,
-        velocity: list[float] | NDArray | None = None,
-        name: str = "BallisticObject",
-        mass: float = 1.0,
-        area: float = 0.01,
-        Cd: float = 0.47,
-    ):
-        MovableObj.__init__(self, position, velocity, name)
-        self._mass = mass
-        self._area = area
-        self.Cd = Cd
-
-    @property
-    def mass(self) -> float:
-        return self._mass
-
-    @property
-    def area(self) -> float:
-        return self._area
-
-    @mass.setter
-    def mass(self, value: float):
-        if value <= 0:
-            raise ValueError("Mass must be positive.")
-        self._mass = value
-
-    @area.setter
-    def area(self, value: float):
-        if value <= 0:
-            raise ValueError("Area must be positive.")
-        self._area = value
-
-    def integrate(self, dt: float, planet: "Planet | None" = None) -> None:
-        """Advance position and velocity by one time step using Velocity Verlet integration."""
-        a0 = self.accelerations(planet)
-        self.position += self.velocity * dt + 0.5 * a0 * dt**2
-        a1 = self.accelerations(planet)
-        self.velocity += 0.5 * (a0 + a1) * dt
-
-    def accelerations(self, planet: "Planet | None" = None) -> NDArray:
-        raise NotImplementedError("BallisticObj subclasses must implement accelerations().")
-
-
-class Body(BallisticObj):
-    """Simplified shared implementation for all dynamic bodies in the simulation."""
+class Body(MovableObj):
+    """Shared implementation for all dynamic physical bodies in the simulation."""
 
     def __init__(
         self,
@@ -160,24 +104,54 @@ class Body(BallisticObj):
         reference_planet: "Planet | None" = None,
         gravity_bodies: Collection["Planet"] | None = None,
     ):
-        super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
+        super().__init__(position=position, velocity=velocity, name=name)
+        self._mass = mass
+        self._area = area
+        self.Cd = Cd
         self.guidance = guidance
         self.engine: Any = engine
         self.t = t
-        self.reference_planet = reference_planet
+        self._reference_planet = reference_planet
         self.gravity_bodies: frozenset["Planet"] = frozenset(
             gravity_bodies if gravity_bodies is not None else (() if reference_planet is None else (reference_planet,))
         )
         self.guidance_results: GuidanceResults | None = None
 
     @property
-    def planet(self) -> "Planet | None":
-        """Compatibility alias for the body's current reference planet."""
-        return self.reference_planet
+    def mass(self) -> float:
+        return self._mass
 
-    @planet.setter
-    def planet(self, value: "Planet | None") -> None:
-        self.reference_planet = value
+    @mass.setter
+    def mass(self, value: float) -> None:
+        if value <= 0:
+            raise ValueError("Mass must be positive.")
+        self._mass = value
+
+    @property
+    def area(self) -> float:
+        return self._area
+
+    @area.setter
+    def area(self, value: float) -> None:
+        if value <= 0:
+            raise ValueError("Area must be positive.")
+        self._area = value
+
+    def integrate(self, dt: float, planet: "Planet | None" = None) -> None:
+        """Advance position and velocity by one time step using Velocity Verlet integration."""
+        a0 = self.accelerations(planet)
+        self.position += self.velocity * dt + 0.5 * a0 * dt**2
+        a1 = self.accelerations(planet)
+        self.velocity += 0.5 * (a0 + a1) * dt
+
+    @property
+    def reference_planet(self) -> "Planet | None":
+        """Compatibility alias for the body's current reference planet."""
+        return self._reference_planet
+
+    @reference_planet.setter
+    def reference_planet(self, value: "Planet | None") -> None:
+        self._reference_planet = value
 
     def bind_environment(
         self,
@@ -186,17 +160,13 @@ class Body(BallisticObj):
     ) -> None:
         """Optionally set local context and replace the fixed gravity sources."""
         if reference_planet is not None:
-            self.reference_planet = reference_planet
+            self._reference_planet = reference_planet
         if gravity_bodies is not None:
             self.gravity_bodies = frozenset(gravity_bodies)
 
     def set_reference_planet(self, planet: "Planet | None") -> None:
         """Change local drag, impact, and reference-geometry context."""
         self.reference_planet = planet
-
-    def _primary_planet(self, planet: "Planet | None" = None) -> "Planet | None":
-        """Return the configured reference planet, or a legacy call-site fallback."""
-        return getattr(self, "reference_planet", None) or planet
 
     def _gravity_acceleration(self, planet: "Planet | None" = None) -> NDArray:
         gravity_bodies = getattr(self, "gravity_bodies", frozenset())
@@ -268,12 +238,12 @@ class Body(BallisticObj):
 
 @runtime_checkable
 class ReleasableConfig(Protocol):
-    """Protocol for config objects that can produce a BallisticObj via a factory method.
+    """Protocol for config objects that can produce a Body via a factory method.
 
     Any dataclass with a ``name`` field and a ``create()`` method satisfies this
     protocol and can be used as a missile payload config.  This includes
     ``RVConfig``, ``RocketConfig``, ``CruiseMissileConfig``, and any other
-    config whose ``create()`` returns a ``BallisticObj``.
+    config whose ``create()`` returns a ``Body``.
     """
 
     name: str

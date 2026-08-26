@@ -3,7 +3,7 @@ The Planet class will calculate gravitational forces, drag forces, and distances
 
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import MovableObj, BallisticObj
+from mad.objs.base import MovableObj, Body
 from mad.configs import G
 from dataclasses import dataclass, asdict
 
@@ -62,7 +62,7 @@ class Planet(MovableObj):
             f"Escape velocity: {self.escape_velocity:.2f} m/s"
         )
 
-    def drag(self, obj: BallisticObj) -> NDArray:
+    def drag(self, obj: Body) -> NDArray:
         # Returns the drag acceleration vector (m/s^2) on the object, if it is in the atmosphere.
         drag = np.zeros_like(obj.velocity)
         alt = max(0.0, float(np.linalg.norm(obj.position - self.position)) - self.radius)

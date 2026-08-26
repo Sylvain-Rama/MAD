@@ -107,7 +107,7 @@ class ReentryVehicle(Body):
         return None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = self._primary_planet(planet)
+        primary_planet = planet or self.reference_planet
         if primary_planet is None:
             return np.zeros_like(self.velocity)
 
@@ -243,7 +243,7 @@ class Capsule(Body):
         return None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = self._primary_planet(planet)
+        primary_planet = planet or self.reference_planet
         if primary_planet is None:
             return np.zeros_like(self.velocity)
 
@@ -725,7 +725,7 @@ class Rocket(Body):
         return released_objects if released_objects else None
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = self._primary_planet(planet)
+        primary_planet = planet or self.reference_planet
         if primary_planet is None:
             return np.zeros_like(self.velocity)
         if self.distance(primary_planet) <= primary_planet.radius:

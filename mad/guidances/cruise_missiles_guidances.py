@@ -44,12 +44,12 @@ class CruiseWaypointGuidance(Guidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         target: MovableObj,
         config: CruiseGuidanceConfig,
         interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        super().__init__(reference_planet, target, interrupt_fn=interrupt_fn)
 
         self.config = config
 
