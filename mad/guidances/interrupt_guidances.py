@@ -20,9 +20,9 @@ def interrupt_at_travelled_distance(interrupts: GuidanceInterrupts, travelled_di
 
 def interrupt_at_altitude(interrupts: GuidanceInterrupts, reached_altitude_m: float) -> bool:
     """Interrupt the current guidance law when missile reaches a certain altitude (m)."""
-    if interrupts.missile is None or interrupts.planet is None:
-        raise ValueError("Missile and planet must be provided for this GuidanceInterrupt.")
-    altitude = np.linalg.norm(interrupts.missile.position) - interrupts.planet.radius
+    if interrupts.missile is None or interrupts.reference_planet is None:
+        raise ValueError("Missile and reference planet must be provided for this GuidanceInterrupt.")
+    altitude = np.linalg.norm(interrupts.missile.position) - interrupts.reference_planet.radius
     return float(altitude) > reached_altitude_m
 
 
@@ -36,10 +36,10 @@ def interrupt_at_linear_distance_to_target(interrupts: GuidanceInterrupts, reach
 
 def interrupt_at_surface_distance_to_target(interrupts: GuidanceInterrupts, reached_distance_m: float) -> bool:
     """Interrupt the current guidance law when missile reaches a certain surface distance to the target (m)."""
-    if interrupts.missile is None or interrupts.target is None or interrupts.planet is None:
-        raise ValueError("Missile, target, and planet must be provided for this GuidanceInterrupt.")
+    if interrupts.missile is None or interrupts.target is None or interrupts.reference_planet is None:
+        raise ValueError("Missile, target, and reference planet must be provided for this GuidanceInterrupt.")
 
-    surface_distance = interrupts.planet.surface_distance(interrupts.missile, interrupts.target)
+    surface_distance = interrupts.reference_planet.surface_distance(interrupts.missile, interrupts.target)
     return surface_distance < reached_distance_m
 
 

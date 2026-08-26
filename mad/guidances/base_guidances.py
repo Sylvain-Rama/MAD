@@ -84,7 +84,7 @@ class GuidanceInterrupts:
 
     missile: MovableObj | None = None  # Switch when action on missile
     target: MovableObj | None = None  # Switch when action on target
-    planet: Planet | None = None  # Switch when action on planet
+    reference_planet: Planet | None = None  # Switch when action on planet
     t: float = 0.0  # Switch when simulation time reaches a value (s)
     travelled_distance_m: float = 0.0  # Switch when missile has travelled a distance (m)
     gamma: float | None = None  # Current flight-path angle from the active guidance law (rad)
@@ -102,11 +102,11 @@ class Guidance(ABC):
 
     def __init__(
         self,
-        planet: Planet,
+        reference_planet: Planet,
         target: MovableObj,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        self.planet = planet
+        self.reference_planet = reference_planet
         self.target = target
         self.interrupt_fn = interrupt_fn
         self.state = GuidanceStates.POWERED
@@ -120,12 +120,10 @@ class Guidance(ABC):
         self.guidance_interrupts = GuidanceInterrupts(
             missile=None,
             target=None,
-            planet=None,
+            reference_planet=None,
             t=self.t,
             travelled_distance_m=self.travelled_distance,
-
         )  # Optional guidance interrupt objects that can be used to switch to the next guidance law.
-
 
     @staticmethod
     def central_angle(missile: GuidableObj, target: MovableObj) -> NDArray:
@@ -145,7 +143,9 @@ class Guidance(ABC):
 
     def optimal_gamma(self, missile: GuidableObj, sigma: NDArray) -> NDArray:
         v = np.linalg.norm(missile.velocity)
-        gamma = np.arctan((v**2 - self.planet.mu / np.linalg.norm(missile.position)) / v**2 * np.tan(sigma / 2))
+        gamma = np.arctan(
+            (v**2 - self.reference_planet.mu / np.linalg.norm(missile.position)) / v**2 * np.tan(sigma / 2)
+        )
         return gamma
 
     def _resolve_t_hat_sign(self, r_hat: NDArray, t_hat: NDArray) -> float:
@@ -168,7 +168,7 @@ class Guidance(ABC):
         self.guidance_interrupts = GuidanceInterrupts(
             missile=cast(Any, missile),
             target=self.target,
-            planet=self.planet,
+            reference_planet=self.reference_planet,
             t=self.t,
             travelled_distance_m=self.travelled_distance,
         )
@@ -199,7 +199,7 @@ class GuidanceManager:
         self.guidances = guidances
         self.current_index = 0
         self.target = guidances[0].target
-        self.planet = guidances[0].planet
+        self.reference_planet = guidances[0].reference_planet
 
     def get_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         if self.current_index >= len(self.guidances):
@@ -217,7 +217,7 @@ class GuidanceManager:
                 logger["Guidance"].info(
                     f"{t:<.2f}s - Switching to guidance law {self.current_index}: {self.guidances[self.current_index].__class__.__name__}"
                 )
-                self.planet = self.guidances[self.current_index].planet
+                self.reference_planet = self.guidances[self.current_index].reference_planet
                 self.target = self.guidances[self.current_index].target
             else:
                 logger["Guidance"].info(f"{t:<.2f}s - No more guidance laws to switch to.")
@@ -277,7 +277,7 @@ class HoldPosition(Guidance):
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Acceleration required to cancel gravity at the current position.
-        gravity = self.planet.gravity(cast(Any, missile))
+        gravity = self.reference_planet.gravity(cast(Any, missile))
         a_required = -gravity
 
         # Retro-thrust component to damp any residual velocity.
@@ -389,8 +389,8 @@ class ProportionalNavigation(Guidance):
 
         # Check arming conditions; reset LOS history on the transition.
         if not self._armed:
-            altitude = np.linalg.norm(missile.position) - self.planet.radius
-            surface_range = self.planet.radius * self.central_angle(missile, self.target)
+            altitude = np.linalg.norm(missile.position) - self.reference_planet.radius
+            surface_range = self.reference_planet.radius * self.central_angle(missile, self.target)
             armed_by_alt = self.activation_altitude_m is not None and altitude <= self.activation_altitude_m
             armed_by_range = self.activation_range_m is not None and surface_range <= self.activation_range_m
             if armed_by_alt or armed_by_range:

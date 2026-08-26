@@ -126,23 +126,6 @@ class TestBody:
         assert body.guidance is None
         assert body.engine is None
 
-    def test_simulation_binds_planet_and_guidance_manager(self):
-        earth = _make_earth()
-        first = NoGuidance(None, MovableObj(position=[earth.radius + 1_000_000.0, 0.0, 0.0]))
-        second = NoGuidance(None, MovableObj(position=[earth.radius + 1_000_000.0, 0.0, 0.0]))
-        body = Body(
-            position=[earth.radius + 1_000_000.0, 0.0, 0.0],
-            guidance=GuidanceManager([first, second]),
-            planet=earth,
-        )
-
-        Simulation(max_time=0.0, planet=earth).run([body])
-
-        assert body.planet is earth
-        assert body.gravity_bodies == {earth}
-        assert first.planet is earth
-        assert second.planet is earth
-
     def test_gravity_bodies_add_perturbing_body_without_changing_planet(self):
         earth = _make_earth()
         moon = Planet(
@@ -164,7 +147,7 @@ class TestBody:
 
         expected = earth.gravity(body) + moon.gravity(body)
         np.testing.assert_allclose(body.accelerations(), expected)
-        assert body.planet is earth
+        assert body.reference_planet is earth
 
     def test_reference_planet_can_change_without_mutating_guidance_or_gravity_sources(self):
         earth = _make_earth()
@@ -181,7 +164,7 @@ class TestBody:
         body = Body(
             position=[earth.radius + 1_000_000.0, 0.0, 0.0],
             guidance=guidance,
-            planet=earth,
+            reference_planet=earth,
             gravity_bodies={earth, moon},
         )
 
@@ -189,8 +172,7 @@ class TestBody:
         body.set_reference_planet(moon)
 
         assert body.reference_planet is moon
-        assert body.planet is moon
-        assert guidance.planet is earth
+        assert guidance.reference_planet is earth
         assert body.gravity_bodies is original_gravity_bodies
         assert body.gravity_bodies == {earth, moon}
 
@@ -207,12 +189,12 @@ class TestBody:
         )
         earth_body = Body(
             position=[earth.radius + 1_000_000.0, 0.0, 0.0],
-            planet=earth,
+            reference_planet=earth,
             area=0.0,
         )
         moon_body = Body(
             position=[moon.position[0] + 1_000_000.0, 0.0, 0.0],
-            planet=moon,
+            reference_planet=moon,
             area=0.0,
         )
 

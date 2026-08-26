@@ -157,16 +157,16 @@ class Body(BallisticObj):
         guidance: Guidance | GuidanceManager | None = None,
         engine: Any | None = None,
         t: float = 0.0,
-        planet: "Planet | None" = None,
+        reference_planet: "Planet | None" = None,
         gravity_bodies: Collection["Planet"] | None = None,
     ):
         super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
         self.guidance = guidance
         self.engine: Any = engine
         self.t = t
-        self.reference_planet = planet
+        self.reference_planet = reference_planet
         self.gravity_bodies: frozenset["Planet"] = frozenset(
-            gravity_bodies if gravity_bodies is not None else (() if planet is None else (planet,))
+            gravity_bodies if gravity_bodies is not None else (() if reference_planet is None else (reference_planet,))
         )
         self.guidance_results: GuidanceResults | None = None
 
@@ -189,24 +189,10 @@ class Body(BallisticObj):
             self.reference_planet = planet
         if gravity_bodies is not None:
             self.gravity_bodies = frozenset(gravity_bodies)
-        self._bind_unconfigured_guidance_planets()
 
     def set_reference_planet(self, planet: "Planet | None") -> None:
         """Change local drag, impact, and reference-geometry context."""
         self.reference_planet = planet
-
-    def set_planet(self, planet: "Planet | None") -> None:
-        """Compatibility wrapper for binding a single primary planet."""
-        self.set_reference_planet(planet)
-
-    def _bind_unconfigured_guidance_planets(self) -> None:
-        """Initialize missing guidance planet references without changing configured ones."""
-        if self.guidance is None:
-            return
-        guidances = getattr(self.guidance, "guidances", (self.guidance,))
-        for guidance in guidances:
-            if getattr(guidance, "planet", None) is None:
-                guidance.planet = self.reference_planet
 
     def _primary_planet(self, planet: "Planet | None" = None) -> "Planet | None":
         """Return the configured reference planet, or a legacy call-site fallback."""

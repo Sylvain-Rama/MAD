@@ -206,7 +206,7 @@ def run_simple_simulation(
             if not obj.active:
                 continue
             _ = obj.update(dt)
-            obj.integrate(dt)
+            obj.integrate(dt, planet=planet)
 
         t += dt
 

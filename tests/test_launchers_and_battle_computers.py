@@ -30,7 +30,7 @@ def target(earth):
 
 @pytest.fixture
 def missile_config(earth, target):
-    guidance = NoGuidanceNoThrust(planet=earth, target=target)
+    guidance = NoGuidanceNoThrust(reference_planet=earth, target=target)
     return CruiseMissileConfig(
         mass=100.0,
         ref_radius=0.1,

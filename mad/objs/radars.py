@@ -32,7 +32,7 @@ class Radar(MovableObj):
         super().__init__(config.position, velocity=None, name=config.name)
         self.range = config.range
         self.voxel_size = config.voxel_size
-        self.planet = planet
+        self.reference_planet = planet
 
         self.detection_voxels = self.get_detection_voxels()
 
@@ -54,10 +54,10 @@ class Radar(MovableObj):
         dist_from_radar = np.linalg.norm(voxel_centers - self.position, axis=1)
         within_range = dist_from_radar <= self.range
 
-        dist_from_planet = np.linalg.norm(voxel_centers - self.planet.position, axis=1)
+        dist_from_planet = np.linalg.norm(voxel_centers - self.reference_planet.position, axis=1)
         # Check if voxel is above planet surface, accounting for voxel diagonal
         # (worst case where radar is directly above the corner of the voxel)
-        above_surface = dist_from_planet >= self.planet.radius - np.sqrt(3) * self.voxel_size / 2
+        above_surface = dist_from_planet >= self.reference_planet.radius - np.sqrt(3) * self.voxel_size / 2
 
         valid_mask = within_range & above_surface
         valid_keys = candidate_keys[valid_mask]
