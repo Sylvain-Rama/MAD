@@ -1,11 +1,11 @@
-"""Tests for mad.objs.base — MovableObj, BallisticObj, SimulationInterface."""
+"""Tests for mad.objs.base — MovableObj and Body."""
 
 import numpy as np
 import pytest
-from mad.objs.base import MovableObj, Body, BallisticObj
+from mad.objs.base import MovableObj, Body
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.projectiles import Projectile, ProjectileConfig
-from mad.guidances.base_guidances import GuidanceManager, NoGuidance
+from mad.guidances.base_guidances import NoGuidance
 from mad.simulation import Simulation
 from mad.configs.planets_cfg import EARTH_SETTINGS
 
@@ -88,12 +88,12 @@ class TestMovableObj:
 
 
 # ---------------------------------------------------------------------------
-# BallisticObj
+# Body physics
 # ---------------------------------------------------------------------------
 
 
-class TestBallisticObj:
-    """BallisticObj is abstract; test its interface via Projectile."""
+class TestBodyPhysics:
+    """Test the shared physical interface through Projectile."""
 
     def _make(self, **kwargs):
         cfg = ProjectileConfig(mass=kwargs.get("mass", 1.0))
@@ -117,9 +117,9 @@ class TestBallisticObj:
 
 
 class TestBody:
-    def test_body_is_a_ballistic_object_with_optional_behaviour(self):
+    def test_body_is_a_movable_object_with_optional_behaviour(self):
         body = Body(position=[1.0, 2.0, 3.0], velocity=[0.0, 1.0, 0.0], mass=2.0, area=0.5, Cd=0.9, name="Body")
-        assert isinstance(body, BallisticObj)
+        assert isinstance(body, MovableObj)
         assert body.mass == pytest.approx(2.0)
         assert body.area == pytest.approx(0.5)
         assert body.Cd == pytest.approx(0.9)
@@ -212,8 +212,8 @@ class TestBody:
 
 
 class TestVelocityVerletIntegration:
-    """The shared integrator lives on SimulationInterface and is inherited
-    by BallisticObj subclasses.  We test it via Projectile which provides
+    """The shared integrator lives on Body and is inherited
+    by physical subclasses. We test it via Projectile which provides
     a concrete accelerations() implementation."""
 
     def test_free_fall_acceleration(self):

@@ -29,7 +29,7 @@ Work In Progress!
 
 ### Simulation objects
 
-The runtime model is centered on a single `Body` abstraction. `MovableObj` handles geometric state (position, velocity, active flag), `BallisticObj` adds physics-like mass/drag properties, and `Body` is the canonical simulation object used by the loop. Guidance and propulsion are attached as runtime components rather than encoded in a deep inheritance tree.
+The runtime model is centered on a single `Body` abstraction. `MovableObj` handles geometric state (position, velocity, active flag), while `Body` adds physical state and is the canonical simulation object used by the loop. Guidance and propulsion are attached as runtime components rather than encoded in a deep inheritance tree.
 
 The simulation loop calls `update(dt, command)` to advance internal state and optionally spawn child bodies, then `integrate(dt, planet)` to step position and velocity forward using **Velocity Verlet** integration.
 
@@ -117,7 +117,7 @@ mad/
 ├── simulation.py          # Simulation orchestrator and run_simple_simulation helper
 ├── objs/                  # Simulation object classes
 │   ├── OBJECTS.MD         # ← architecture docs
-│   ├── base.py            # MovableObj, BallisticObj, Body and composition model
+│   ├── base.py            # MovableObj, Body and composition model
 │   ├── projectiles.py
 │   ├── rockets.py
 │   ├── satellites.py

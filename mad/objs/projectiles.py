@@ -1,6 +1,6 @@
 """This module defines the Projectile class, which represents a simple ballistic object that can be launched
 and will be affected by gravity and drag forces.
-The Projectile class is a subclass of BallisticObj and is initialized with a ProjectileConfig dataclass
+The Projectile class is a subclass of Body and is initialized with a ProjectileConfig dataclass
 that contains its properties such as mass, reference radius, drag coefficient, and initial position and velocity.
 """
 
@@ -65,7 +65,7 @@ class Projectile(Body):
         self.t = t
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = self._primary_planet(planet)
+        primary_planet = planet or self.reference_planet
         if primary_planet is None:
             return np.zeros_like(self.velocity)
         if self.distance(primary_planet) <= primary_planet.radius:

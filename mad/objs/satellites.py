@@ -51,7 +51,7 @@ class Satellite(Body):
 
     def accelerations(self, planet: Planet | None = None) -> NDArray:
         # Typically, we can ignore drag for satellites.
-        primary_planet = self._primary_planet(planet)
+        primary_planet = planet or self.reference_planet
         if primary_planet is None:
             return np.zeros_like(self.velocity)
         if self.distance(primary_planet) <= primary_planet.radius:

@@ -44,8 +44,7 @@ The codebase now uses a single dynamic-body abstraction: `Body`.
 
 ```
 MovableObj                     # geometric carrier: position, velocity, id, active flag
-└── BallisticObj(MovableObj)   # compatibility physics base with mass / area / Cd
-    └── Body(BallisticObj)    # canonical runtime body used by the simulation loop
+└── Body(MovableObj)           # canonical runtime body with mass / area / Cd
 
 Body owns optional runtime components via composition:
 - guidance: guidance object or strategy
@@ -53,7 +52,7 @@ Body owns optional runtime components via composition:
 - guidance_results: last guidance output
 ```
 
-`BallisticObj` remains as a compatibility layer for older code paths, but new and refactored simulation code should target `Body` directly. The project intentionally avoids the deep inheritance tree previously used for `GuidedObj` and `SimulationInterface`.
+The project uses `Body` as the sole physical runtime abstraction and intentionally avoids the deep inheritance tree previously used for `BallisticObj`, `GuidedObj`, and `SimulationInterface`.
 
 ### Simulation loop (`mad/simulation.py`)
 
@@ -69,11 +68,11 @@ Body owns optional runtime components via composition:
 - All distances in **metres**, velocities in **m/s**, time in **seconds**.
 - Positions are 3-D ECEF-like vectors (`numpy` arrays via `mad.utils.to_vec3`).
 - Gravity and drag are computed by `Planet` objects (`mad/objs/planets.py`).
-- Integrator: **Velocity Verlet** is the default physics update pattern used by `BallisticObj.integrate`.
+- Integrator: **Velocity Verlet** is the default physics update pattern used by `Body.integrate`.
 
 ### Adding a new simulated object
 
-1. Create a `Body` instance (or a subclass of `BallisticObj` if compatibility is needed).
+1. Create a `Body` instance (or a subclass of `Body` if specialized behavior is needed).
 2. Attach optional `guidance` and/or `engine` runtime components.
 3. Implement `accelerations(planet)`, `integrate(dt, planet)`, and `update(dt, command)` as needed.
 4. Create a `*Config` dataclass with a `create()` factory method when the object should be built from configuration.

@@ -10,8 +10,7 @@ The project now centers on `Body`, which is the simulation's canonical runtime o
 
 ```
 MovableObj                          # geometric point: position, velocity, id, active flag
-└── BallisticObj(MovableObj)         # compatibility physics base with mass, area, Cd
-    └── Body(BallisticObj)          # canonical dynamic body for the simulation loop
+└── Body(MovableObj)                # physical body with mass, drag, guidance, and propulsion
 
 Body owns optional components via composition:
 - guidance: guidance strategy or manager
@@ -19,7 +18,7 @@ Body owns optional components via composition:
 - guidance_results: last guidance outputs
 ```
 
-`Body` is the baseline for the simulation loop, while `BallisticObj` remains available as a compatibility layer for older factories and external callers.
+`Body` is the baseline for the simulation loop and the only physical runtime base.
 
 ---
 
@@ -36,15 +35,9 @@ Key helpers:
 
 `MovableObj` has no mass and is not connected to the simulation loop. It is only a geometric carrier.
 
-### `BallisticObj` (`base.py`)
-
-A compatibility base for physical objects subject to gravity and aerodynamic drag. Adds `mass` (kg), `area` (m²), and `Cd` (dimensionless drag coefficient), as well as the standard physics API used by the integrator.
-
-It includes the default Velocity Verlet `integrate(dt, planet)` and expects concrete subclasses to implement `accelerations(planet)`.
-
 ### `Body` (`base.py`)
 
-The canonical dynamic body used by the active simulation. `Body` extends `BallisticObj` and adds optional runtime behaviour through composition:
+The canonical dynamic body used by the active simulation. It owns physical state and optional runtime behaviour through composition:
 
 - `guidance` — object with a `get_guidance()`-style interface
 - `engine` — propulsion model with `thrust_acc`, `burned_fraction`, or update hooks
@@ -103,7 +96,7 @@ for each time step:
 
 ## Adding a new simulated object
 
-1. Instantiate or subclass a `Body`/`BallisticObj` as appropriate.
+1. Instantiate or subclass `Body` as appropriate.
 2. Attach optional `guidance` and `engine` components via composition.
 3. Implement `accelerations(planet)` and `update(dt, command)`.
 4. Override `integrate(dt, planet)` only if the default Velocity Verlet logic is insufficient.
