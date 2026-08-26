@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 from mad.utils.base_utils import to_vec3, normalize
@@ -80,6 +81,9 @@ class MovableObj:
             return False
         return self._id == other._id
 
+    def __hash__(self) -> int:
+        return hash(self._id)
+
     def degrade(self) -> None:
         """Mark the object inactive when it is degraded or destroyed."""
         self.active = False
@@ -128,14 +132,14 @@ class BallisticObj(MovableObj):
             raise ValueError("Area must be positive.")
         self._area = value
 
-    def integrate(self, dt: float, planet: "Planet") -> None:
+    def integrate(self, dt: float, planet: "Planet | None" = None) -> None:
         """Advance position and velocity by one time step using Velocity Verlet integration."""
         a0 = self.accelerations(planet)
         self.position += self.velocity * dt + 0.5 * a0 * dt**2
         a1 = self.accelerations(planet)
         self.velocity += 0.5 * (a0 + a1) * dt
 
-    def accelerations(self, planet: "Planet") -> NDArray:
+    def accelerations(self, planet: "Planet | None" = None) -> NDArray:
         raise NotImplementedError("BallisticObj subclasses must implement accelerations().")
 
 
@@ -153,12 +157,55 @@ class Body(BallisticObj):
         guidance: Guidance | GuidanceManager | None = None,
         engine: Any | None = None,
         t: float = 0.0,
+        reference_planet: "Planet | None" = None,
+        gravity_bodies: Collection["Planet"] | None = None,
     ):
         super().__init__(position=position, velocity=velocity, name=name, mass=mass, area=area, Cd=Cd)
         self.guidance = guidance
         self.engine: Any = engine
         self.t = t
+        self.reference_planet = reference_planet
+        self.gravity_bodies: frozenset["Planet"] = frozenset(
+            gravity_bodies if gravity_bodies is not None else (() if reference_planet is None else (reference_planet,))
+        )
         self.guidance_results: GuidanceResults | None = None
+
+    @property
+    def planet(self) -> "Planet | None":
+        """Compatibility alias for the body's current reference planet."""
+        return self.reference_planet
+
+    @planet.setter
+    def planet(self, value: "Planet | None") -> None:
+        self.reference_planet = value
+
+    def bind_environment(
+        self,
+        reference_planet: "Planet | None" = None,
+        gravity_bodies: Collection["Planet"] | None = None,
+    ) -> None:
+        """Optionally set local context and replace the fixed gravity sources."""
+        if reference_planet is not None:
+            self.reference_planet = reference_planet
+        if gravity_bodies is not None:
+            self.gravity_bodies = frozenset(gravity_bodies)
+
+    def set_reference_planet(self, planet: "Planet | None") -> None:
+        """Change local drag, impact, and reference-geometry context."""
+        self.reference_planet = planet
+
+    def _primary_planet(self, planet: "Planet | None" = None) -> "Planet | None":
+        """Return the configured reference planet, or a legacy call-site fallback."""
+        return getattr(self, "reference_planet", None) or planet
+
+    def _gravity_acceleration(self, planet: "Planet | None" = None) -> NDArray:
+        gravity_bodies = getattr(self, "gravity_bodies", frozenset())
+        if not gravity_bodies and planet is not None:
+            gravity_bodies = frozenset((planet,))
+        gravity = np.zeros_like(self.velocity)
+        for body in gravity_bodies:
+            gravity += body.gravity(self)
+        return gravity
 
     @property
     def has_thrust(self) -> bool:
@@ -193,24 +240,24 @@ class Body(BallisticObj):
             self.engine.update(self, dt, command)
         return None
 
-    def accelerations(self, planet: "Planet") -> NDArray:
-        if self.distance(planet) <= planet.radius:
+    def accelerations(self, planet: "Planet | None" = None) -> NDArray:
+        reference_planet = self.reference_planet if planet is None else planet
+        if reference_planet is None:
+            raise RuntimeError("Body must have a reference planet before acceleration can be calculated.")
+
+        if self.distance(reference_planet) <= reference_planet.radius:
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = planet.gravity(self)
-        drag = planet.drag(self)
+        gravity = self._gravity_acceleration()
+        drag = reference_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.engine is not None:
             engine_thrust = self.thrust_acc
-            if engine_thrust > 0.0 and self.guidance is not None and hasattr(self.guidance, "get_guidance"):
-                try:
-                    guidance_result = self.guidance.get_guidance(self, self.t)
-                except TypeError:
-                    guidance_result = None
-
-                if guidance_result is not None and getattr(guidance_result, "direction", None) is not None:
+            if engine_thrust > 0.0 and self.guidance is not None:
+                guidance_result = self.guidance_results
+                if guidance_result is not None:
                     direction = guidance_result.direction
                     direction_norm = np.linalg.norm(direction)
                     if direction_norm > 1e-8:
@@ -231,6 +278,13 @@ class ReleasableConfig(Protocol):
 
     name: str
 
-    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "BallisticObj":
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None,
+        t: float,
+        reference_planet: "Planet | None" = None,
+        gravity_bodies: Collection["Planet"] | None = None,
+    ) -> "Body":
         """Instantiate and return the deployed object at the given state."""
         ...

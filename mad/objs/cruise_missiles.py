@@ -3,6 +3,7 @@ This module defines the CruiseMissile class, which is a type of guided missile."
 
 from copy import deepcopy
 from dataclasses import dataclass
+from collections.abc import Collection
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import Body
@@ -30,8 +31,22 @@ class CruiseMissileConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "CruiseMissile":
-        return CruiseMissile(config=self, position=position, velocity=velocity, t=t)
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None = None,
+        t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "CruiseMissile":
+        return CruiseMissile(
+            config=self,
+            position=position,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )
 
 
 class _CruiseEngine:
@@ -47,7 +62,15 @@ class _CruiseEngine:
 
 
 class CruiseMissile(Body):
-    def __init__(self, config: CruiseMissileConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
+    def __init__(
+        self,
+        config: CruiseMissileConfig,
+        position: NDArray,
+        velocity: NDArray | None = None,
+        t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ):
         super().__init__(
             position=position,
             velocity=velocity,
@@ -58,6 +81,8 @@ class CruiseMissile(Body):
             guidance=deepcopy(config.guidance) if config.guidance is not None else None,
             engine=_CruiseEngine(config.thrust_acc),
             t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
         self.config = config
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
@@ -105,18 +130,21 @@ class CruiseMissile(Body):
                 self.detonate()
         return None
 
-    def accelerations(self, planet: Planet) -> NDArray:
-        if self.distance(planet) <= planet.radius:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
+            return np.zeros_like(self.velocity)
+        if self.distance(primary_planet) <= primary_planet.radius:
             if self.guidance is not None:
-                target_distance = planet.surface_distance(self, self.guidance.target)
+                target_distance = primary_planet.surface_distance(self, self.guidance.target)
                 logger["Missile"].info(
                     f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
                 )
             self.detonate()
             return np.zeros_like(self.velocity)
 
-        gravity = planet.gravity(self)
-        drag = planet.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.motor_active and self.guidance_results is not None:

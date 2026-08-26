@@ -110,26 +110,44 @@ class HistoryCollector:
 
 
 class Simulation:
-    def __init__(self, max_time: float = 3600.0, dt: float = 1.0):
+    def __init__(
+        self,
+        max_time: float = 3600.0,
+        dt: float = 1.0,
+        planet: Planet | None = None,
+        gravity_bodies: set[Planet] | None = None,
+    ):
         self.max_time = max_time
         self.dt = dt
+        self.planet = planet
+        self.gravity_bodies = set(gravity_bodies) if gravity_bodies is not None else set()
+        if planet is not None:
+            self.gravity_bodies.add(planet)
         self.collector = HistoryCollector(["t", "position", "velocity", "gamma"])
 
     def run(
         self,
         moving_objs: list[Body],
-        planet: Planet,
+        planet: Planet | None = None,
     ) -> None:
         """Run a simple simulation of the given objects moving under the influence of the planet's gravity and atmospheric drag.
         The objects must have their initial position and velocity set. The simulation runs until max_time
         or until all objects are inactive (e.g. impacted). The results are stored in self.results.
 
-        If collision_radius > 0, voxel-based broad-phase collision detection is run each step via
-        build_voxel_grid / detect_collisions / apply_collisions.
-
         If a *collector* is provided, it records the requested fields for every active object after
         each integration step (including the initial state before the first step)."""
+
         active_objs = moving_objs[:]
+        gravity_bodies = set(self.gravity_bodies)
+        if planet is not None:
+            gravity_bodies.add(planet)
+        reference_planet = planet if planet is not None else self.planet
+        if not gravity_bodies:
+            gravity_bodies = {obj.reference_planet for obj in active_objs if obj.reference_planet is not None}
+        if not gravity_bodies:
+            raise ValueError("Simulation requires gravity bodies or objects with reference planets.")
+        for obj in active_objs:
+            obj.bind_environment(reference_planet=reference_planet, gravity_bodies=gravity_bodies)
         t = 0.0
         start = time()
         logger["Simulation"].info(f"{t:<.2f}s - Starting simulation.")
@@ -152,13 +170,17 @@ class Simulation:
                 logger["Simulation"].info(
                     f"{t:<.2f}s - New objects spawned this step: {[obj.name for obj in new_objects]}"
                 )
+
+                for obj in new_objects:
+                    obj.bind_environment(reference_planet=reference_planet, gravity_bodies=gravity_bodies)
+
                 active_objs.extend(new_objects)
 
             # Integrate all active objects' positions and velocities according to planet's gravity and drag.
             for obj in active_objs:
                 if not obj.active:
                     continue
-                obj.integrate(self.dt, planet)
+                obj.integrate(self.dt)
 
             self.collector.record(active_objs)
 
@@ -185,7 +207,7 @@ def run_simple_simulation(
             if not obj.active:
                 continue
             _ = obj.update(dt)
-            obj.integrate(dt, planet)
+            obj.integrate(dt, planet=planet)
 
         t += dt
 

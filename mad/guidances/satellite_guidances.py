@@ -3,7 +3,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Callable
-
+from mad.objs.planets import Planet
 from mad.objs import MovableObj
 from mad.guidances.base_guidances import (
     Guidance,
@@ -25,11 +25,11 @@ class _ProgradeTrackingGuidance(Guidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         target: MovableObj | None = None,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        super().__init__(planet, target=target, interrupt_fn=interrupt_fn)  # type: ignore[arg-type]
+        super().__init__(reference_planet=reference_planet, target=target, interrupt_fn=interrupt_fn)  # type: ignore[arg-type]
         self._prograde_hat: NDArray | None = None
 
     def _resolve_t_hat(self, missile: GuidableObj, r_hat: NDArray) -> NDArray:
@@ -64,19 +64,19 @@ class CosinePitchProgram(_ProgradeTrackingGuidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         target: MovableObj | None = None,
         min_turn_altitude_m: float = 0.0,
         turn_end_altitude_m: float = 0.0,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        super().__init__(planet, target=target, interrupt_fn=interrupt_fn)
+        super().__init__(reference_planet=reference_planet, target=target, interrupt_fn=interrupt_fn)
         self.min_turn_altitude_m = min_turn_altitude_m
         self.turn_end_altitude_m = turn_end_altitude_m
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         r_hat = missile.pos_norm
-        altitude = np.linalg.norm(missile.position) - self.planet.radius
+        altitude = np.linalg.norm(missile.position) - self.reference_planet.radius
         t_hat = self._resolve_t_hat(missile, r_hat)
 
         turn_range = self.turn_end_altitude_m - self.min_turn_altitude_m
@@ -99,31 +99,33 @@ class OrbitalInsertion(_ProgradeTrackingGuidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         perigee_altitude_m: float,
         apogee_altitude_m: float | None = None,
         target: MovableObj | None = None,
         altitude_tol_m: float | None = None,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
     ):
-        super().__init__(planet, target=target, interrupt_fn=interrupt_fn)
+        super().__init__(reference_planet=reference_planet, target=target, interrupt_fn=interrupt_fn)
         self.perigee_altitude_m = perigee_altitude_m
-        self.perigee_radius_m = planet.radius + perigee_altitude_m
+        self.perigee_radius_m = self.reference_planet.radius + perigee_altitude_m
         self.altitude_tol_m = altitude_tol_m if altitude_tol_m is not None else 0.05 * perigee_altitude_m
 
         # Target orbital speed at perigee.
         # Circular:    v = √(μ / r_p)
         # Elliptical:  v = √(μ · (2/r_p − 1/a)),  a = (r_p + r_a) / 2  [vis-viva]
         if apogee_altitude_m is not None:
-            r_a = planet.radius + apogee_altitude_m
+            r_a = self.reference_planet.radius + apogee_altitude_m
             semi_major_axis = (self.perigee_radius_m + r_a) / 2.0
-            self._v_target = float(np.sqrt(planet.mu * (2.0 / self.perigee_radius_m - 1.0 / semi_major_axis)))
+            self._v_target = float(
+                np.sqrt(self.reference_planet.mu * (2.0 / self.perigee_radius_m - 1.0 / semi_major_axis))
+            )
         else:
-            self._v_target = float(np.sqrt(planet.mu / self.perigee_radius_m))
+            self._v_target = float(np.sqrt(self.reference_planet.mu / self.perigee_radius_m))
 
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         r_hat = missile.pos_norm
-        altitude = np.linalg.norm(missile.position) - self.planet.radius
+        altitude = np.linalg.norm(missile.position) - self.reference_planet.radius
         t_hat = self._resolve_t_hat(missile, r_hat)
         v_horiz_mag = abs(np.dot(missile.velocity, t_hat))
 
@@ -165,7 +167,7 @@ class OrbitalInsertion(_ProgradeTrackingGuidance):
 
 
 def LEOInsertionGuidance(
-    planet,
+    reference_planet: Planet,
     perigee_altitude_m: float,
     apogee_altitude_m: float | None = None,
     target: MovableObj | None = None,
@@ -179,19 +181,19 @@ def LEOInsertionGuidance(
     tol = altitude_tol_m if altitude_tol_m is not None else 0.05 * perigee_altitude_m
 
     vertical_rise = StraightUp(
-        planet=planet,
+        reference_planet=reference_planet,
         target=target,  # type: ignore[arg-type]
         interrupt_fn=lambda i: interrupt_at_altitude(i, min_turn_altitude_m),
     )
     pitch_program = CosinePitchProgram(
-        planet=planet,
+        reference_planet=reference_planet,
         target=target,
         min_turn_altitude_m=min_turn_altitude_m,
         turn_end_altitude_m=turn_end,
         interrupt_fn=lambda i: interrupt_at_altitude(i, perigee_altitude_m - tol),
     )
     orbital_insertion = OrbitalInsertion(
-        planet=planet,
+        reference_planet=reference_planet,
         perigee_altitude_m=perigee_altitude_m,
         apogee_altitude_m=apogee_altitude_m,
         target=target,

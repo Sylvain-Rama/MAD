@@ -4,6 +4,7 @@ Rockets are defined by a list of RocketStage objects, a guidance system, and a l
 """
 
 from dataclasses import dataclass, asdict, field
+from collections.abc import Collection
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import Body, MovableObj, ReleasableConfig
@@ -34,8 +35,22 @@ class RVConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "ReentryVehicle":
-        return ReentryVehicle(config=self, position=position, velocity=velocity, t=t)
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None,
+        t: float,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "ReentryVehicle":
+        return ReentryVehicle(
+            config=self,
+            position=position,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )
 
 
 class ReentryVehicle(Body):
@@ -45,7 +60,15 @@ class ReentryVehicle(Body):
     This is a simplification, but it allows us to focus on the guidance and detonation aspects of the RV without worrying about propellant management.
     """
 
-    def __init__(self, config: RVConfig, position: NDArray, velocity: NDArray | None = None, t=0.0):
+    def __init__(
+        self,
+        config: RVConfig,
+        position: NDArray,
+        velocity: NDArray | None = None,
+        t=0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ):
         super().__init__(
             position=position,
             velocity=velocity,
@@ -55,6 +78,8 @@ class ReentryVehicle(Body):
             Cd=config.Cd,
             guidance=deepcopy(config.guidance),
             t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
         self.t = t
         self.yield_kt = config.yield_kt
@@ -81,11 +106,14 @@ class ReentryVehicle(Body):
 
         return None
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
+            return np.zeros_like(self.velocity)
 
-        if self.distance(planet) <= planet.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             if self.guidance:
-                distance_to_target = self.guidance.planet.surface_distance(self, self.guidance.target)
+                distance_to_target = primary_planet.surface_distance(self, self.guidance.target)
                 logger["Rocket"].info(
                     f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
                 )
@@ -96,8 +124,8 @@ class ReentryVehicle(Body):
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = planet.gravity(self)
-        drag = planet.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
 
         thrust = np.zeros_like(self.velocity)
         if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
@@ -127,8 +155,22 @@ class CapsuleConfig:
     def __post_init__(self):
         self.area = np.pi * self.ref_radius**2
 
-    def create(self, position: NDArray, velocity: NDArray | None, t: float) -> "Capsule":
-        return Capsule(config=self, position=position, velocity=velocity, t=t)
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None,
+        t: float,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "Capsule":
+        return Capsule(
+            config=self,
+            position=position,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )
 
 
 class Capsule(Body):
@@ -138,7 +180,15 @@ class Capsule(Body):
     This is a simplification, but it allows us to focus on the guidance aspects of the capsule without worrying about propellant management.
     """
 
-    def __init__(self, config: CapsuleConfig, position: NDArray, velocity: NDArray | None = None, t: float = 0.0):
+    def __init__(
+        self,
+        config: CapsuleConfig,
+        position: NDArray,
+        velocity: NDArray | None = None,
+        t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ):
         super().__init__(
             position=position,
             velocity=velocity,
@@ -148,6 +198,8 @@ class Capsule(Body):
             Cd=config.Cd,
             guidance=deepcopy(config.guidance),
             t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
         self.t = t
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
@@ -190,15 +242,18 @@ class Capsule(Body):
 
         return None
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
+            return np.zeros_like(self.velocity)
 
-        if self.distance(planet) <= planet.radius:
+        if self.distance(primary_planet) <= primary_planet.radius:
             logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = planet.gravity(self)
-        drag = planet.drag(self)
+        gravity = self._gravity_acceleration(primary_planet)
+        drag = primary_planet.drag(self)
         thrust = np.zeros_like(self.velocity)
 
         if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
@@ -391,12 +446,34 @@ class RocketConfig:
     def to_dict(self):
         return asdict(self)
 
-    def create(self, position: NDArray, velocity: NDArray | None = None, t: float = 0.0) -> "Rocket":
-        return Rocket(position=position, config=self, velocity=velocity, t=t)
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None = None,
+        t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "Rocket":
+        return Rocket(
+            position=position,
+            config=self,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )
 
 
 class Rocket(Body):
-    def __init__(self, position, config: RocketConfig, velocity: NDArray | None = None, t: float = 0.0):
+    def __init__(
+        self,
+        position,
+        config: RocketConfig,
+        velocity: NDArray | None = None,
+        t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ):
         # mass and area are computed properties on this class; bypass the default Body initializer
         # to avoid storing unused _mass/_area defaults and to keep stage-derived mass semantics.
         MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
@@ -405,6 +482,10 @@ class Rocket(Body):
         self.engine = RocketEngine(self.stages)
         self.guidance: Guidance | GuidanceManager | None = (
             deepcopy(config.guidance) if config.guidance is not None else None
+        )
+        self.reference_planet = reference_planet
+        self.gravity_bodies = frozenset(
+            gravity_bodies if gravity_bodies is not None else (() if reference_planet is None else (reference_planet,))
         )
         self.guidance_results: GuidanceResults | None = None
         self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
@@ -576,6 +657,8 @@ class Rocket(Body):
                 position=self.position.copy(),
                 velocity=release_velocity,
                 t=deepcopy(self.t),
+                reference_planet=self.reference_planet,
+                gravity_bodies=self.gravity_bodies,
             )
 
             released_objects.append(payload)
@@ -615,7 +698,16 @@ class Rocket(Body):
             )
             self.stages.remove(dep)
             logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} - {dep.name} separated at {self.t:.2f}.")
-            released_objects.append(Projectile(stage_cfg, self.position.copy(), sep_velocity, t=deepcopy(self.t)))
+            released_objects.append(
+                Projectile(
+                    stage_cfg,
+                    self.position.copy(),
+                    sep_velocity,
+                    t=deepcopy(self.t),
+                    reference_planet=self.reference_planet,
+                    gravity_bodies=self.gravity_bodies,
+                )
+            )
 
         if depleted:
             if len(self.stages) == 0:
@@ -632,16 +724,19 @@ class Rocket(Body):
 
         return released_objects if released_objects else None
 
-    def accelerations(self, planet: Planet) -> NDArray:
-        if self.distance(planet) <= planet.radius:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
+            return np.zeros_like(self.velocity)
+        if self.distance(primary_planet) <= primary_planet.radius:
             logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = planet.gravity(self)
+        gravity = self._gravity_acceleration(primary_planet)
 
         drag = (
-            planet.drag(self) if self.stages else np.zeros_like(self.velocity)
+            primary_planet.drag(self) if self.stages else np.zeros_like(self.velocity)
         )  # No drag if all stages separated and payloads not yet released.
 
         # If there is no thrust, no need to check for direction: we cannot act on it.

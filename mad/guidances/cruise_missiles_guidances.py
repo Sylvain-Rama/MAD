@@ -12,6 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.interpolate import CubicSpline
 
+from mad.objs.planets import Planet
 from mad.utils.logger import SourceLogger
 
 logger = SourceLogger()
@@ -77,7 +78,7 @@ class CruiseWaypointGuidance(Guidance):
         sphere surface at ``cruise_altitude_m``.
         """
 
-        r = self.planet.radius + self.config.cruise_altitude_m
+        r = self.reference_planet.radius + self.config.cruise_altitude_m
         normals = [wp.pos_norm for wp in self.waypoints]
 
         # Densify each segment with SLERP-interpolated points at cruise altitude.
@@ -185,10 +186,10 @@ class CruiseWaypointGuidance(Guidance):
         # CruiseMissile can apply `thrust_acc * direction` directly without re-normalizing,
         # preserving the absolute radial and tangential acceleration magnitudes.
         pos_norm = float(np.linalg.norm(missile.position))
-        current_alt = pos_norm - self.planet.radius
+        current_alt = pos_norm - self.reference_planet.radius
         alt_error = self.config.cruise_altitude_m - current_alt
         v_radial = float(np.dot(missile.velocity, r_hat))
-        g_mag = self.planet.mu / max(pos_norm**2, 1e-9)
+        g_mag = self.reference_planet.mu / max(pos_norm**2, 1e-9)
         omega_n = 4.0 / max(self.config.altitude_settling_time_s, 1.0)
         Kp = omega_n**2
         Kd = 2.0 * omega_n
@@ -240,7 +241,7 @@ class Chase(Guidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         target: MovableObj,
         cruise_altitude_m: float | None = None,
         altitude_settling_time_s: float = 30.0,
@@ -248,7 +249,7 @@ class Chase(Guidance):
         kill_radius_m: float = 30.0,
         interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        super().__init__(reference_planet, target, interrupt_fn=interrupt_fn)
         self._cruise_altitude_m = cruise_altitude_m
         self.altitude_settling_time_s = altitude_settling_time_s
         self.terminal_range_m = terminal_range_m
@@ -257,7 +258,7 @@ class Chase(Guidance):
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         # Initialise cruise altitude from the missile's current altitude on the first call.
         # if self._cruise_altitude_m is None:
-        self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.planet.radius
+        self._cruise_altitude_m = float(np.linalg.norm(missile.position)) - self.reference_planet.radius
 
         los = self.target.position - missile.position
         los_norm = np.linalg.norm(los)
@@ -290,10 +291,10 @@ class Chase(Guidance):
 
         # Altitude-hold: gravity compensation + critically-damped PD.
         pos_norm = float(np.linalg.norm(missile.position))
-        current_alt = pos_norm - self.planet.radius
+        current_alt = pos_norm - self.reference_planet.radius
         alt_error = self._cruise_altitude_m - current_alt
         v_radial = float(np.dot(missile.velocity, r_hat))
-        g_mag = self.planet.mu / max(pos_norm**2, 1e-9)
+        g_mag = self.reference_planet.mu / max(pos_norm**2, 1e-9)
         omega_n = 4.0 / max(self.altitude_settling_time_s, 1.0)
         Kp = omega_n**2
         Kd = 2.0 * omega_n

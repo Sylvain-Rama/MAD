@@ -2,6 +2,7 @@
 
 from mad.objs import MovableObj
 from mad.guidances import Guidance, GuidableObj, GuidanceResults, GuidanceStates, GuidanceInterrupts
+from mad.objs.planets import Planet
 from typing import Callable
 
 
@@ -20,12 +21,12 @@ class TabulatedBallistic(Guidance):
 
     def __init__(
         self,
-        planet,
+        reference_planet: Planet,
         target: MovableObj,
         ballistic_table_name: str,
         interrupt_fn: Callable[[GuidanceInterrupts], bool] | None = None,
     ):
-        super().__init__(planet, target, interrupt_fn=interrupt_fn)
+        super().__init__(reference_planet, target, interrupt_fn=interrupt_fn)
         self.ballistic_guidance = load_ballistic_table(ballistic_table_name)
 
     def __repr__(self):
@@ -49,9 +50,9 @@ class TabulatedBallistic(Guidance):
         sign = self._resolve_t_hat_sign(r_hat, t_hat)
 
         sigma = self.central_angle(missile, self.target)
-        range_to_target = self.planet.radius * sigma
+        range_to_target = self.reference_planet.radius * sigma
 
-        altitude = np.linalg.norm(missile.position) - self.planet.radius
+        altitude = np.linalg.norm(missile.position) - self.reference_planet.radius
         velocity = np.linalg.norm(missile.velocity)
 
         # Convert missile gamma to the table's prograde convention using the detected sign.
@@ -74,7 +75,9 @@ class TabulatedBallistic(Guidance):
                 f"{clamped_velocity:.1f} m/s. The table likely needs a wider velocity grid."
             )
 
-        optimal_range = float(table.range_interp([clamped_altitude, clamped_velocity, gamma])[0]) * self.planet.radius
+        optimal_range = (
+            float(table.range_interp([clamped_altitude, clamped_velocity, gamma])[0]) * self.reference_planet.radius
+        )
 
         release_velocity = None
         if range_to_target <= optimal_range:

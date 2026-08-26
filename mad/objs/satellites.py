@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from mad.objs.base import Body
+from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 from mad.guidances import Guidance, GuidanceManager
 from mad.utils.logger import SourceLogger
@@ -48,14 +49,17 @@ class Satellite(Body):
         self.t = t
         self.config = config
 
-    def accelerations(self, planet) -> NDArray:
+    def accelerations(self, planet: Planet | None = None) -> NDArray:
         # Typically, we can ignore drag for satellites.
-        if self.distance(planet) <= planet.radius:
+        primary_planet = self._primary_planet(planet)
+        if primary_planet is None:
+            return np.zeros_like(self.velocity)
+        if self.distance(primary_planet) <= primary_planet.radius:
             logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity_acc = planet.gravity(self)
+        gravity_acc = self._gravity_acceleration(primary_planet)
 
         return gravity_acc
 
