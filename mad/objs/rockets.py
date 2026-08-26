@@ -106,37 +106,18 @@ class ReentryVehicle(Body):
 
         return None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        if self.guidance:
+            distance_to_target = planet.surface_distance(self, self.guidance.target)
+            logger["Rocket"].info(
+                f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
+            )
+        self.detonate()
+
+    def _thrust_acceleration(self) -> NDArray:
+        if self.guidance_results is None or self.guidance_results.state == GuidanceStates.IDLE:
             return np.zeros_like(self.velocity)
-
-        if self.distance(primary_planet) <= primary_planet.radius:
-            if self.guidance:
-                distance_to_target = primary_planet.surface_distance(self, self.guidance.target)
-                logger["Rocket"].info(
-                    f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
-                )
-                self.detonate()
-            else:
-                self.detonate()
-
-            self.active = False
-            return np.zeros_like(self.velocity)
-
-        gravity = self._gravity_acceleration(primary_planet)
-        drag = primary_planet.drag(self)
-
-        thrust = np.zeros_like(self.velocity)
-        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
-            d = self.guidance_results.direction
-            d_norm = np.linalg.norm(d)
-            if d_norm > 1e-8:
-                desired_acc = self.guidance_results.magnitude
-                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
-                thrust = acc * d / d_norm
-
-        return gravity + drag + thrust
+        return super()._thrust_acceleration()
 
     def detonate(self):
         logger["Rocket"].info(f"{self.t:<.2f}s - Warhead {self.name} detonated with yield {self.yield_kt:.2f} kt.")
@@ -242,29 +223,13 @@ class Capsule(Body):
 
         return None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
+
+    def _thrust_acceleration(self) -> NDArray:
+        if self.guidance_results is None or self.guidance_results.state == GuidanceStates.IDLE:
             return np.zeros_like(self.velocity)
-
-        if self.distance(primary_planet) <= primary_planet.radius:
-            logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
-            self.active = False
-            return np.zeros_like(self.velocity)
-
-        gravity = self._gravity_acceleration(primary_planet)
-        drag = primary_planet.drag(self)
-        thrust = np.zeros_like(self.velocity)
-
-        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
-            d = self.guidance_results.direction
-            d_norm = np.linalg.norm(d)
-            if d_norm > 1e-8:
-                desired_acc = self.guidance_results.magnitude
-                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
-                thrust = acc * d / d_norm
-
-        return gravity + drag + thrust
+        return super()._thrust_acceleration()
 
 
 @dataclass
@@ -724,32 +689,24 @@ class Rocket(Body):
 
         return released_objects if released_objects else None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
+
+    def _drag_acceleration(self, planet: Planet) -> NDArray:
+        # No drag if all stages separated and payloads not yet released.
+        return planet.drag(self) if self.stages else np.zeros_like(self.velocity)
+
+    def _thrust_acceleration(self) -> NDArray:
+        engine_thrust = self.thrust_acc
+        if engine_thrust <= 0.0:
             return np.zeros_like(self.velocity)
-        if self.distance(primary_planet) <= primary_planet.radius:
-            logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
-            self.active = False
-            return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(primary_planet)
+        # If no guidance, we continue along the same direction.
+        guidance_result = self.guidance_results
+        direction = guidance_result.direction if guidance_result is not None else self.pos_norm
+        direction_norm = np.linalg.norm(direction)
+        direction = direction / direction_norm if direction_norm > 0.0 else self.pos_norm
 
-        drag = (
-            primary_planet.drag(self) if self.stages else np.zeros_like(self.velocity)
-        )  # No drag if all stages separated and payloads not yet released.
-
-        # If there is no thrust, no need to check for direction: we cannot act on it.
-        if self.thrust_acc > 0:
-            # If no guidance, we continue along the same direction.
-            direction = self.guidance_results.direction if self.guidance_results else self.pos_norm
-            direction_norm = np.linalg.norm(direction)
-            if direction_norm > 0.0:
-                direction = direction / direction_norm
-            else:
-                direction = self.pos_norm
-            thrust = self.thrust_acc * direction
-        else:
-            thrust = np.zeros_like(self.velocity)
-
-        return gravity + drag + thrust
+        desired_acc = guidance_result.magnitude if guidance_result is not None else None
+        acc = min(engine_thrust, desired_acc) if desired_acc is not None else engine_thrust
+        return acc * direction

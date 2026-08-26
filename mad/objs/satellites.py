@@ -49,19 +49,12 @@ class Satellite(Body):
         self.t = t
         self.config = config
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
+    def _on_impact(self, planet: Planet) -> None:
+        logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
+
+    def _drag_acceleration(self, planet: Planet) -> NDArray:
         # Typically, we can ignore drag for satellites.
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
-            return np.zeros_like(self.velocity)
-        if self.distance(primary_planet) <= primary_planet.radius:
-            logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
-            self.active = False
-            return np.zeros_like(self.velocity)
-
-        gravity_acc = self._gravity_acceleration(primary_planet)
-
-        return gravity_acc
+        return np.zeros_like(self.velocity)
 
     def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt

@@ -130,34 +130,24 @@ class CruiseMissile(Body):
                 self.detonate()
         return None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        if self.guidance is not None:
+            target_distance = planet.surface_distance(self, self.guidance.target)
+            logger["Missile"].info(
+                f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
+            )
+        self.detonate()
+
+    def _thrust_acceleration(self) -> NDArray:
+        if not self.motor_active or self.guidance_results is None:
             return np.zeros_like(self.velocity)
-        if self.distance(primary_planet) <= primary_planet.radius:
-            if self.guidance is not None:
-                target_distance = primary_planet.surface_distance(self, self.guidance.target)
-                logger["Missile"].info(
-                    f"{self.t:<.2f}s - {self.name} hit the ground at {target_distance:.2f} m from target!"
-                )
-            self.detonate()
-            return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(primary_planet)
-        drag = primary_planet.drag(self)
-        thrust = np.zeros_like(self.velocity)
-
-        if self.motor_active and self.guidance_results is not None:
-            # Apply guidance direction directly. The guidance returns a fractional vector
-            # (components scaled relative to thrust_acc), so multiply directly without
-            # renormalizing to preserve the absolute radial/tangential magnitudes.
-
-            d = self.guidance_results.direction
-            d_norm = np.linalg.norm(d)
-            if d_norm > 1e-8:
-                thrust += self.thrust_acc * d
-
-        return gravity + drag + thrust
+        # Guidance returns a fractional vector (components already scaled relative to thrust_acc),
+        # so multiply directly without renormalizing to preserve the absolute radial/tangential magnitudes.
+        d = self.guidance_results.direction
+        if np.linalg.norm(d) > 1e-8:
+            return self.thrust_acc * d
+        return np.zeros_like(self.velocity)
 
     def detonate(self):
         logger["Missile"].info(
