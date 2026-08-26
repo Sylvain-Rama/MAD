@@ -1,3 +1,5 @@
+from collections.abc import Collection
+
 from mad.objs.base import Body, MovableObj, ReleasableConfig
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerOrder, ComputerCommand
@@ -5,7 +7,6 @@ from dataclasses import dataclass, asdict
 import numpy as np
 from enum import Enum
 from copy import deepcopy
-from typing import cast
 from numpy.typing import NDArray
 from mad.utils.logger import SourceLogger
 
@@ -27,13 +28,36 @@ class LauncherConfig:
     def to_dict(self):
         return asdict(self)
 
-    def create(self, position, velocity=None, t=0.0) -> "Launcher":
-        launcher = Launcher(self, position, velocity, t)
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray | None = None,
+        t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "Launcher":
+        launcher = Launcher(
+            self,
+            position=position,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )
+
         return launcher
 
 
 class Launcher(Body):
-    def __init__(self, config: LauncherConfig, position: NDArray, velocity=None, t=0.0):
+    def __init__(
+        self,
+        config: LauncherConfig,
+        position: NDArray,
+        velocity=None,
+        t=0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ):
         super().__init__(
             position=position,
             velocity=velocity,
@@ -42,6 +66,8 @@ class Launcher(Body):
             area=1.0,
             Cd=0.0,
             t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
         self.config = config
         self.projectiles: ReleasableConfig = config.projectiles
@@ -71,6 +97,7 @@ class Launcher(Body):
             guidance.target = target
         self.n_projectiles -= 1
         self.last_release_time = self.t
+        projectile.reference_planet = self.reference_planet
         return projectile
 
     def reload(self):

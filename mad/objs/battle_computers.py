@@ -59,8 +59,11 @@ class BattleComputer(MovableObj):
             return None
         return self.send_command(command)
 
-    def accelerations(self, planet: Planet) -> NDArray:
+    def bind_environment(self, reference_planet: Planet | None = None, gravity_bodies: list[Body] = []) -> None:
+        return
+
+    def accelerations(self, reference_planet: Planet) -> NDArray:
         return np.zeros(3)
 
-    def integrate(self, dt: float, planet: Planet) -> None:
+    def integrate(self, dt: float, reference_planet: Planet | None = None) -> None:
         pass  # BattleComputer is not a physical object
