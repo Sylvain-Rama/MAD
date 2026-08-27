@@ -638,11 +638,16 @@ class Rocket(Body):
         # Separate every depleted stage in the burn group (may be >1 for parallel stages).
         depleted = [s for s in burn_group if not s.active]
         for dep in depleted:
-            speed = np.linalg.norm(self.velocity)
+            separation_velocity = (
+                results.release_velocity
+                if results is not None and results.release_velocity is not None
+                else self.velocity
+            )
+            speed = np.linalg.norm(separation_velocity)
             if dep.separation_retrograde_dv > 0 and speed > 1e-6:
-                sep_velocity = self.velocity - dep.separation_retrograde_dv * (self.velocity / speed)
+                sep_velocity = separation_velocity - dep.separation_retrograde_dv * (separation_velocity / speed)
             else:
-                sep_velocity = self.velocity.copy()
+                sep_velocity = separation_velocity.copy()
             stage_cfg = ProjectileConfig(
                 mass=dep.dry_mass,
                 name=dep.name,
