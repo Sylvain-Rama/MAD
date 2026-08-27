@@ -7,6 +7,7 @@ from collections.abc import Collection
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import Body
+from mad.objs.engines import ConstantAccelerationEngine
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 from mad.utils.logger import SourceLogger
@@ -49,18 +50,6 @@ class CruiseMissileConfig:
         )
 
 
-class _CruiseEngine:
-    def __init__(self, thrust_acc: float):
-        self._thrust_acc = float(thrust_acc)
-
-    @property
-    def thrust_acc(self) -> float:
-        return self._thrust_acc
-
-    def update(self, body, dt: float, command: ComputerCommand | None = None) -> None:
-        return None
-
-
 class CruiseMissile(Body):
     def __init__(
         self,
@@ -79,7 +68,7 @@ class CruiseMissile(Body):
             area=config.area,
             Cd=config.Cd,
             guidance=deepcopy(config.guidance) if config.guidance is not None else None,
-            engine=_CruiseEngine(config.thrust_acc),
+            engine=ConstantAccelerationEngine(config.thrust_acc),
             t=t,
             reference_planet=reference_planet,
             gravity_bodies=gravity_bodies,
@@ -88,18 +77,6 @@ class CruiseMissile(Body):
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
         self.total_distance_traveled = 0.0
         self.motor_active = True
-
-    @property
-    def burned_fraction(self) -> float:
-        return 1.0
-
-    @property
-    def has_thrust(self) -> bool:
-        return True
-
-    @property
-    def thrust_acc(self) -> float:
-        return self.engine.thrust_acc if self.engine is not None else 0.0
 
     def _update_config(self):
         """Update the missile's configuration based on guidance results."""

@@ -5,9 +5,11 @@ Rockets are defined by a list of RocketStage objects, a guidance system, and a l
 
 from dataclasses import dataclass, asdict, field
 from collections.abc import Collection
+from typing import cast
 import numpy as np
 from numpy.typing import NDArray
 from mad.objs.base import Body, ReleasableConfig
+from mad.objs.engines import Engine, RCSEngine
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
@@ -19,25 +21,6 @@ from mad.configs import G0
 from copy import deepcopy
 
 logger = SourceLogger()
-
-
-class RCSEngine:
-    """Constant-thrust reaction-control engine for terminal-guidance payloads with unlimited propellant."""
-
-    def __init__(self, thrust_n: float):
-        self.thrust_n = thrust_n
-
-    @property
-    def has_thrust(self) -> bool:
-        return self.thrust_n > 0
-
-    @property
-    def burned_fraction(self) -> float:
-        # Payloads don't burn propellant; fixed at 0.5 to smoothly bias ballistic-to-terminal steering laws.
-        return 0.5
-
-    def thrust_acc(self, body: Body) -> float:
-        return self.thrust_n / body.mass
 
 
 @dataclass
@@ -324,7 +307,7 @@ class RocketStage:
             self.active = False
 
 
-class RocketEngine:
+class RocketEngine(Engine):
     """Propulsion component for a multi-stage rocket.
 
     This keeps the stage/propellant logic in a dedicated engine object while the
@@ -355,8 +338,7 @@ class RocketEngine:
                 break
         return group
 
-    @property
-    def thrust_acc(self) -> float:
+    def thrust_acc(self, body: Body) -> float:
         if not self.stages:
             return 0.0
         total_thrust = sum(stage.thrust_force for stage in self.active_burn_group if stage.active)
@@ -393,10 +375,9 @@ class RocketEngine:
 
         return burn_group, depleted
 
-    def update(
-        self, rocket: "Rocket", dt: float, command: ComputerCommand | None = None
-    ) -> tuple[list[RocketStage], list[RocketStage]]:
-        return self.update_lifecycle(rocket, dt, command)
+    def update(self, body: Body, dt: float, command: ComputerCommand | None = None) -> None:
+        self.update_lifecycle(cast("Rocket", body), dt, command)
+        return None
 
 
 @dataclass
@@ -484,9 +465,14 @@ class Rocket(Body):
         self._coasting_Cd: float = getattr(self.payloads[0], "Cd", self.Cd) if self.payloads else self.Cd
 
     @property
+    def _rocket_engine(self) -> RocketEngine | None:
+        """Typed accessor: every `Rocket`'s engine is a `RocketEngine`, unlike the base `Engine` type."""
+        return cast("RocketEngine | None", self.engine)
+
+    @property
     def mass(self):
         # Payload masses are excluded: they only exist once released as independent objects.
-        return self.engine.mass if self.engine is not None else sum(stage.mass for stage in self.stages)
+        return self._rocket_engine.mass if self._rocket_engine is not None else sum(stage.mass for stage in self.stages)
 
     @mass.setter
     def mass(self, value):
@@ -548,11 +534,11 @@ class Rocket(Body):
     @property
     def _active_burn_group(self) -> list["RocketStage"]:
         """Compatibility alias to the propulsion component's active burn group."""
-        return self.engine.active_burn_group if self.engine is not None else []
+        return self._rocket_engine.active_burn_group if self._rocket_engine is not None else []
 
     @property
     def thrust_acc(self) -> float:
-        return self.engine.thrust_acc if self.engine is not None else 0.0
+        return self.engine.thrust_acc(self) if self.engine is not None else 0.0
 
     def _update_configs(self) -> None:
         """Update the rocket's configuration based on the guidance results.
@@ -601,7 +587,7 @@ class Rocket(Body):
             self.guidance_results = None
 
         if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
-            burn_group, depleted = self.engine.update_lifecycle(self, dt, command)
+            burn_group, depleted = cast(RocketEngine, self.engine).update_lifecycle(self, dt, command)
         else:
             burn_group, depleted = self._active_burn_group, []
 

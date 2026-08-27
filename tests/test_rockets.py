@@ -12,6 +12,7 @@ from mad.objs.rockets import (
     Rocket,
     RocketEngine,
 )
+from mad.objs.engines import Engine
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import Body, MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
@@ -91,10 +92,17 @@ class _BodyGuidance(Guidance):
         return GuidanceResults(direction=direction, state=GuidanceStates.POWERED, magnitude=5.0)
 
 
-class _BodyEngine:
+class _BodyEngine(Engine):
     def __init__(self):
-        self.thrust_acc = 9.81
+        self._thrust_acc = 9.81
         self.calls = 0
+
+    @property
+    def has_thrust(self) -> bool:
+        return True
+
+    def thrust_acc(self, body) -> float:
+        return self._thrust_acc
 
     def update(self, body, dt, command=None):
         self.calls += 1
@@ -181,7 +189,7 @@ class TestRocketComponentSeparation:
 
         assert rocket.guidance_results is not None
         assert rocket.engine.stages is rocket.stages
-        assert rocket.thrust_acc == pytest.approx(rocket.engine.thrust_acc)
+        assert rocket.thrust_acc == pytest.approx(rocket.engine.thrust_acc(rocket))
 
 
 def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
@@ -399,7 +407,7 @@ class TestBallisticMissileProperties:
 
     def test_engine_component_matches_rocket_thrust(self, two_stage_missile):
         assert isinstance(two_stage_missile.engine, RocketEngine)
-        assert two_stage_missile.thrust_acc == pytest.approx(two_stage_missile.engine.thrust_acc)
+        assert two_stage_missile.thrust_acc == pytest.approx(two_stage_missile.engine.thrust_acc(two_stage_missile))
 
     def test_engine_tracks_same_stage_list(self, two_stage_missile):
         assert two_stage_missile.engine.stages is two_stage_missile.stages
