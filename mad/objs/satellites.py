@@ -1,6 +1,7 @@
 """Satellites are payloads that can be launched into orbit and will be affected by gravity and drag forces."""
 
 from dataclasses import dataclass
+from collections.abc import Collection
 from mad.objs.base import Body
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
@@ -35,6 +36,8 @@ class Satellite(Body):
         position: NDArray,
         velocity: NDArray | None = None,
         t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
     ):
         super().__init__(
             position=position,
@@ -43,10 +46,11 @@ class Satellite(Body):
             mass=config.mass,
             area=config.area,
             Cd=config.Cd,
-            guidance=deepcopy(config.guidance) if getattr(config, "guidance", None) is not None else None,
+            guidance=deepcopy(config.guidance),
             t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
-        self.t = t
         self.config = config
 
     def _on_impact(self, planet: Planet) -> None:
@@ -76,6 +80,20 @@ class Sputnik(Satellite):
 class SputnikConfig(SatelliteConfig):
     name: str = "Sputnik"
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Sputnik":
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray,
+        t: float,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "Sputnik":
         logger["Satellite"].info(f"{t:<.2f}s - {self.name} released into orbit -- Beep Beep!")
-        return Sputnik(config=self, position=position, velocity=velocity, t=t)
+        return Sputnik(
+            config=self,
+            position=position,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )
