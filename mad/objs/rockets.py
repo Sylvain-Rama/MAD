@@ -5,15 +5,16 @@ Rockets are defined by a list of RocketStage objects, a guidance system, and a l
 
 from dataclasses import dataclass, asdict, field
 from collections.abc import Collection
+from typing import cast
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import Body, MovableObj, ReleasableConfig
+from mad.objs.base import Body, ReleasableConfig
+from mad.objs.engines import Engine, RCSEngine
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 
 from mad.guidances import GuidanceStates, Guidance, GuidanceManager
-from mad.guidances.base_guidances import GuidanceResults
 from mad.utils.logger import SourceLogger
 from mad.configs import G0
 
@@ -77,6 +78,7 @@ class ReentryVehicle(Body):
             area=config.area,
             Cd=config.Cd,
             guidance=deepcopy(config.guidance),
+            engine=RCSEngine(config.RCS_thrust),
             t=t,
             reference_planet=reference_planet,
             gravity_bodies=gravity_bodies,
@@ -84,20 +86,10 @@ class ReentryVehicle(Body):
         self.t = t
         self.yield_kt = config.yield_kt
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
-        self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
     def has_thrust(self) -> bool:
-        return self.RCS_thrust > 0
-
-    @property
-    def thrust_acc(self) -> float:
-        return self.RCS_thrust / self.mass
-
-    @property
-    def burned_fraction(self) -> float:
-        # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
-        return 0.5
+        return self.engine.has_thrust if self.engine is not None else False
 
     def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
@@ -106,37 +98,18 @@ class ReentryVehicle(Body):
 
         return None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        if self.guidance:
+            distance_to_target = planet.surface_distance(self, self.guidance.target)
+            logger["Rocket"].info(
+                f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
+            )
+        self.detonate()
+
+    def _thrust_acceleration(self) -> NDArray:
+        if self.guidance_results is None or self.guidance_results.state == GuidanceStates.IDLE:
             return np.zeros_like(self.velocity)
-
-        if self.distance(primary_planet) <= primary_planet.radius:
-            if self.guidance:
-                distance_to_target = primary_planet.surface_distance(self, self.guidance.target)
-                logger["Rocket"].info(
-                    f"{self.t:<.2f}s - Warhead {self.name} hit target at {distance_to_target/1000:.2f} km."
-                )
-                self.detonate()
-            else:
-                self.detonate()
-
-            self.active = False
-            return np.zeros_like(self.velocity)
-
-        gravity = self._gravity_acceleration(primary_planet)
-        drag = primary_planet.drag(self)
-
-        thrust = np.zeros_like(self.velocity)
-        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
-            d = self.guidance_results.direction
-            d_norm = np.linalg.norm(d)
-            if d_norm > 1e-8:
-                desired_acc = self.guidance_results.magnitude
-                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
-                thrust = acc * d / d_norm
-
-        return gravity + drag + thrust
+        return super()._thrust_acceleration()
 
     def detonate(self):
         logger["Rocket"].info(f"{self.t:<.2f}s - Warhead {self.name} detonated with yield {self.yield_kt:.2f} kt.")
@@ -197,26 +170,17 @@ class Capsule(Body):
             area=config.area,
             Cd=config.Cd,
             guidance=deepcopy(config.guidance),
+            engine=RCSEngine(config.RCS_thrust),
             t=t,
             reference_planet=reference_planet,
             gravity_bodies=gravity_bodies,
         )
         self.t = t
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
-        self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
     def has_thrust(self) -> bool:
-        return self.RCS_thrust > 0
-
-    @property
-    def thrust_acc(self) -> float:
-        return self.RCS_thrust / self.mass
-
-    @property
-    def burned_fraction(self) -> float:
-        # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
-        return 0.5
+        return self.engine.has_thrust if self.engine is not None else False
 
     def _update_configs(self) -> None:
         if self.guidance_results is None:
@@ -242,29 +206,13 @@ class Capsule(Body):
 
         return None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
+
+    def _thrust_acceleration(self) -> NDArray:
+        if self.guidance_results is None or self.guidance_results.state == GuidanceStates.IDLE:
             return np.zeros_like(self.velocity)
-
-        if self.distance(primary_planet) <= primary_planet.radius:
-            logger["Rocket"].info(f"{self.t:<.2f}s - Capsule {self.name} hit the ground.")
-            self.active = False
-            return np.zeros_like(self.velocity)
-
-        gravity = self._gravity_acceleration(primary_planet)
-        drag = primary_planet.drag(self)
-        thrust = np.zeros_like(self.velocity)
-
-        if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
-            d = self.guidance_results.direction
-            d_norm = np.linalg.norm(d)
-            if d_norm > 1e-8:
-                desired_acc = self.guidance_results.magnitude
-                acc = min(self.thrust_acc, desired_acc) if desired_acc is not None else self.thrust_acc
-                thrust = acc * d / d_norm
-
-        return gravity + drag + thrust
+        return super()._thrust_acceleration()
 
 
 @dataclass
@@ -359,7 +307,7 @@ class RocketStage:
             self.active = False
 
 
-class RocketEngine:
+class RocketEngine(Engine):
     """Propulsion component for a multi-stage rocket.
 
     This keeps the stage/propellant logic in a dedicated engine object while the
@@ -390,8 +338,7 @@ class RocketEngine:
                 break
         return group
 
-    @property
-    def thrust_acc(self) -> float:
+    def thrust_acc(self, body: Body) -> float:
         if not self.stages:
             return 0.0
         total_thrust = sum(stage.thrust_force for stage in self.active_burn_group if stage.active)
@@ -428,10 +375,9 @@ class RocketEngine:
 
         return burn_group, depleted
 
-    def update(
-        self, rocket: "Rocket", dt: float, command: ComputerCommand | None = None
-    ) -> tuple[list[RocketStage], list[RocketStage]]:
-        return self.update_lifecycle(rocket, dt, command)
+    def update(self, body: Body, dt: float, command: ComputerCommand | None = None) -> None:
+        self.update_lifecycle(cast("Rocket", body), dt, command)
+        return None
 
 
 @dataclass
@@ -474,22 +420,25 @@ class Rocket(Body):
         reference_planet: Planet | None = None,
         gravity_bodies: Collection[Planet] | None = None,
     ):
-        # mass and area are computed properties on this class; bypass the default Body initializer
-        # to avoid storing unused _mass/_area defaults and to keep stage-derived mass semantics.
-        MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
-
-        self.stages = deepcopy(config.stages)
-        self.engine = RocketEngine(self.stages)
-        self.guidance: Guidance | GuidanceManager | None = (
-            deepcopy(config.guidance) if config.guidance is not None else None
+        stages = deepcopy(config.stages)
+        engine = RocketEngine(stages)
+        # mass/area are computed properties overridden below; the values passed here are placeholders
+        # only used to populate the unused Body._mass/_area backing fields.
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=engine.mass,
+            area=stages[-1].area if stages else 0.01,
+            Cd=0.47,  # Pointy end
+            guidance=deepcopy(config.guidance) if config.guidance is not None else None,
+            engine=engine,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
-        self.reference_planet = reference_planet
-        self.gravity_bodies = frozenset(
-            gravity_bodies if gravity_bodies is not None else (() if reference_planet is None else (reference_planet,))
-        )
-        self.guidance_results: GuidanceResults | None = None
+        self.stages = stages
         self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
-        self.t = t
         self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction
         self.released_payloads = 0
         self.payload_separation_interval = config.payload_separation_interval
@@ -505,7 +454,6 @@ class Rocket(Body):
             sum(stage.dry_mass for stage in self.stages)
             + (getattr(self.payloads[0], "mass", 0.0) if self.payloads else 0.0)
         )
-        self.Cd = 0.47  # Pointy end
         if self.guidance is not None:
             self.guidance_results = self.guidance.get_guidance(self)
 
@@ -517,9 +465,14 @@ class Rocket(Body):
         self._coasting_Cd: float = getattr(self.payloads[0], "Cd", self.Cd) if self.payloads else self.Cd
 
     @property
+    def _rocket_engine(self) -> RocketEngine | None:
+        """Typed accessor: every `Rocket`'s engine is a `RocketEngine`, unlike the base `Engine` type."""
+        return cast("RocketEngine | None", self.engine)
+
+    @property
     def mass(self):
         # Payload masses are excluded: they only exist once released as independent objects.
-        return self.engine.mass if self.engine is not None else sum(stage.mass for stage in self.stages)
+        return self._rocket_engine.mass if self._rocket_engine is not None else sum(stage.mass for stage in self.stages)
 
     @mass.setter
     def mass(self, value):
@@ -581,11 +534,11 @@ class Rocket(Body):
     @property
     def _active_burn_group(self) -> list["RocketStage"]:
         """Compatibility alias to the propulsion component's active burn group."""
-        return self.engine.active_burn_group if self.engine is not None else []
+        return self._rocket_engine.active_burn_group if self._rocket_engine is not None else []
 
     @property
     def thrust_acc(self) -> float:
-        return self.engine.thrust_acc if self.engine is not None else 0.0
+        return self.engine.thrust_acc(self) if self.engine is not None else 0.0
 
     def _update_configs(self) -> None:
         """Update the rocket's configuration based on the guidance results.
@@ -634,7 +587,7 @@ class Rocket(Body):
             self.guidance_results = None
 
         if self.guidance_results is not None and self.guidance_results.state != GuidanceStates.IDLE:
-            burn_group, depleted = self.engine.update_lifecycle(self, dt, command)
+            burn_group, depleted = cast(RocketEngine, self.engine).update_lifecycle(self, dt, command)
         else:
             burn_group, depleted = self._active_burn_group, []
 
@@ -685,11 +638,16 @@ class Rocket(Body):
         # Separate every depleted stage in the burn group (may be >1 for parallel stages).
         depleted = [s for s in burn_group if not s.active]
         for dep in depleted:
-            speed = np.linalg.norm(self.velocity)
+            separation_velocity = (
+                results.release_velocity
+                if results is not None and results.release_velocity is not None
+                else self.velocity
+            )
+            speed = np.linalg.norm(separation_velocity)
             if dep.separation_retrograde_dv > 0 and speed > 1e-6:
-                sep_velocity = self.velocity - dep.separation_retrograde_dv * (self.velocity / speed)
+                sep_velocity = separation_velocity - dep.separation_retrograde_dv * (separation_velocity / speed)
             else:
-                sep_velocity = self.velocity.copy()
+                sep_velocity = separation_velocity.copy()
             stage_cfg = ProjectileConfig(
                 mass=dep.dry_mass,
                 name=dep.name,
@@ -724,32 +682,24 @@ class Rocket(Body):
 
         return released_objects if released_objects else None
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
+    def _on_impact(self, planet: Planet) -> None:
+        logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
+
+    def _drag_acceleration(self, planet: Planet) -> NDArray:
+        # No drag if all stages separated and payloads not yet released.
+        return planet.drag(self) if self.stages else np.zeros_like(self.velocity)
+
+    def _thrust_acceleration(self) -> NDArray:
+        engine_thrust = self.thrust_acc
+        if engine_thrust <= 0.0:
             return np.zeros_like(self.velocity)
-        if self.distance(primary_planet) <= primary_planet.radius:
-            logger["Rocket"].info(f"{self.t:<.2f}s - {self.name} impacted the ground at {self.t:.2f}.")
-            self.active = False
-            return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration(primary_planet)
+        # If no guidance, we continue along the same direction.
+        guidance_result = self.guidance_results
+        direction = guidance_result.direction if guidance_result is not None else self.pos_norm
+        direction_norm = np.linalg.norm(direction)
+        direction = direction / direction_norm if direction_norm > 0.0 else self.pos_norm
 
-        drag = (
-            primary_planet.drag(self) if self.stages else np.zeros_like(self.velocity)
-        )  # No drag if all stages separated and payloads not yet released.
-
-        # If there is no thrust, no need to check for direction: we cannot act on it.
-        if self.thrust_acc > 0:
-            # If no guidance, we continue along the same direction.
-            direction = self.guidance_results.direction if self.guidance_results else self.pos_norm
-            direction_norm = np.linalg.norm(direction)
-            if direction_norm > 0.0:
-                direction = direction / direction_norm
-            else:
-                direction = self.pos_norm
-            thrust = self.thrust_acc * direction
-        else:
-            thrust = np.zeros_like(self.velocity)
-
-        return gravity + drag + thrust
+        desired_acc = guidance_result.magnitude if guidance_result is not None else None
+        acc = min(engine_thrust, desired_acc) if desired_acc is not None else engine_thrust
+        return acc * direction

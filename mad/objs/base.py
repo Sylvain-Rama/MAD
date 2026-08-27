@@ -13,8 +13,9 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from collections.abc import Collection
-from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from mad.objs.engines import Engine
 from mad.utils.base_utils import to_vec3, normalize
 from mad.utils.logger import SourceLogger
 
@@ -99,7 +100,7 @@ class Body(MovableObj):
         area: float = 0.01,
         Cd: float = 0.47,
         guidance: Guidance | GuidanceManager | None = None,
-        engine: Any | None = None,
+        engine: Engine | None = None,
         t: float = 0.0,
         reference_planet: "Planet | None" = None,
         gravity_bodies: Collection["Planet"] | None = None,
@@ -109,7 +110,7 @@ class Body(MovableObj):
         self._area = area
         self.Cd = Cd
         self.guidance = guidance
-        self.engine: Any = engine
+        self.engine = engine
         self.t = t
         self._reference_planet = reference_planet
         self.gravity_bodies: frozenset["Planet"] = frozenset(
@@ -179,61 +180,64 @@ class Body(MovableObj):
 
     @property
     def has_thrust(self) -> bool:
-        return self.engine is not None and getattr(self.engine, "thrust_acc", None) is not None
+        return self.engine is not None and self.engine.has_thrust
 
     @property
     def burned_fraction(self) -> float:
-        if self.engine is None:
-            return 0.0
-        burned = getattr(self.engine, "burned_fraction", None)
-        return float(burned) if burned is not None else 0.0
+        return float(self.engine.burned_fraction) if self.engine is not None else 0.0
 
     @property
     def thrust_acc(self) -> float:
-        if self.engine is None:
-            return 0.0
-        thrust_value: Any = getattr(self.engine, "thrust_acc", None)
-        if callable(thrust_value):
-            try:
-                thrust_func = cast(Any, thrust_value)
-                return float(thrust_func(self))
-            except TypeError:
-                return 0.0
-        return float(thrust_value) if thrust_value is not None else 0.0
+        return float(self.engine.thrust_acc(self)) if self.engine is not None else 0.0
 
     def update(self, dt: float, command: "ComputerCommand | None" = None) -> list["Body"] | None:
         self.t += dt
         guidance = self.guidance
         if guidance is not None and hasattr(guidance, "get_guidance"):
             self.guidance_results = guidance.get_guidance(self, self.t)
-        if self.engine is not None and hasattr(self.engine, "update"):
+        if self.engine is not None:
             self.engine.update(self, dt, command)
         return None
 
     def accelerations(self, planet: "Planet | None" = None) -> NDArray:
+        """Template method: subclasses customize impact/drag/thrust via the hooks below instead of overriding this."""
         reference_planet = self.reference_planet if planet is None else planet
         if reference_planet is None:
             raise RuntimeError("Body must have a reference planet before acceleration can be calculated.")
 
         if self.distance(reference_planet) <= reference_planet.radius:
+            self._on_impact(reference_planet)
             self.active = False
             return np.zeros_like(self.velocity)
 
-        gravity = self._gravity_acceleration()
-        drag = reference_planet.drag(self)
-        thrust = np.zeros_like(self.velocity)
-
-        if self.engine is not None:
-            engine_thrust = self.thrust_acc
-            if engine_thrust > 0.0 and self.guidance is not None:
-                guidance_result = self.guidance_results
-                if guidance_result is not None:
-                    direction = guidance_result.direction
-                    direction_norm = np.linalg.norm(direction)
-                    if direction_norm > 1e-8:
-                        thrust = engine_thrust * direction / direction_norm
+        gravity = self._gravity_acceleration(reference_planet)
+        drag = self._drag_acceleration(reference_planet)
+        thrust = self._thrust_acceleration()
 
         return gravity + drag + thrust
+
+    def _on_impact(self, planet: "Planet") -> None:
+        """Hook called when the body reaches the surface of `planet`, before it is deactivated."""
+        return None
+
+    def _drag_acceleration(self, planet: "Planet") -> NDArray:
+        return planet.drag(self)
+
+    def _thrust_acceleration(self) -> NDArray:
+        """Resolve engine thrust along the guidance direction, honoring any requested magnitude cap."""
+        engine_thrust = self.thrust_acc
+        guidance_result = self.guidance_results
+        if engine_thrust <= 0.0 or guidance_result is None:
+            return np.zeros_like(self.velocity)
+
+        direction = guidance_result.direction
+        direction_norm = np.linalg.norm(direction)
+        if direction_norm <= 1e-8:
+            return np.zeros_like(self.velocity)
+
+        desired_acc = guidance_result.magnitude
+        acc = min(engine_thrust, desired_acc) if desired_acc is not None else engine_thrust
+        return acc * direction / direction_norm
 
 
 @runtime_checkable

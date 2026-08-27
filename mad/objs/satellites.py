@@ -1,6 +1,7 @@
 """Satellites are payloads that can be launched into orbit and will be affected by gravity and drag forces."""
 
 from dataclasses import dataclass
+from collections.abc import Collection
 from mad.objs.base import Body
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
@@ -35,6 +36,8 @@ class Satellite(Body):
         position: NDArray,
         velocity: NDArray | None = None,
         t: float = 0.0,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
     ):
         super().__init__(
             position=position,
@@ -43,25 +46,19 @@ class Satellite(Body):
             mass=config.mass,
             area=config.area,
             Cd=config.Cd,
-            guidance=deepcopy(config.guidance) if getattr(config, "guidance", None) is not None else None,
+            guidance=deepcopy(config.guidance),
             t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
-        self.t = t
         self.config = config
 
-    def accelerations(self, planet: Planet | None = None) -> NDArray:
+    def _on_impact(self, planet: Planet) -> None:
+        logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
+
+    def _drag_acceleration(self, planet: Planet) -> NDArray:
         # Typically, we can ignore drag for satellites.
-        primary_planet = planet or self.reference_planet
-        if primary_planet is None:
-            return np.zeros_like(self.velocity)
-        if self.distance(primary_planet) <= primary_planet.radius:
-            logger["Satellite"].info(f"{self.t:<.2f}s - {self.name} landed on the ground!")
-            self.active = False
-            return np.zeros_like(self.velocity)
-
-        gravity_acc = self._gravity_acceleration(primary_planet)
-
-        return gravity_acc
+        return np.zeros_like(self.velocity)
 
     def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
@@ -83,6 +80,20 @@ class Sputnik(Satellite):
 class SputnikConfig(SatelliteConfig):
     name: str = "Sputnik"
 
-    def create(self, position: NDArray, velocity: NDArray, t: float) -> "Sputnik":
+    def create(
+        self,
+        position: NDArray,
+        velocity: NDArray,
+        t: float,
+        reference_planet: Planet | None = None,
+        gravity_bodies: Collection[Planet] | None = None,
+    ) -> "Sputnik":
         logger["Satellite"].info(f"{t:<.2f}s - {self.name} released into orbit -- Beep Beep!")
-        return Sputnik(config=self, position=position, velocity=velocity, t=t)
+        return Sputnik(
+            config=self,
+            position=position,
+            velocity=velocity,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
+        )

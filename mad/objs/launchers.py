@@ -148,10 +148,6 @@ class Launcher(Body):
         # Needs guidance and all.
         self.position += self.velocity * dt
 
-    @property
-    def thrust_acc(self) -> float:
-        return self.config.speed
-
     def accelerations(self, planet: Planet | None = None) -> NDArray[np.floating]:
         return np.zeros_like(self.position)  # No acceleration for a launcher
 

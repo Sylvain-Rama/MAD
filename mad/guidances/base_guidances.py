@@ -54,8 +54,7 @@ class GuidableObj(Protocol):
     @property
     def thrust_acc(self) -> float: ...
 
-    def degrade(self):
-        logger["Guidable"].info(f"{self.name} degraded.")
+    def degrade(self) -> None: ...
 
 
 @dataclass
@@ -117,6 +116,7 @@ class Guidance(ABC):
 
         self.t = 0.0
         self.travelled_distance = 0.0
+        self._started = False  # Guards against a bogus dt on the first update, e.g. after a mid-flight guidance switch.
         self.guidance_interrupts = GuidanceInterrupts(
             missile=None,
             target=None,
@@ -161,9 +161,14 @@ class Guidance(ABC):
         return self._t_hat_sign
 
     def update(self, missile: GuidableObj, t: float) -> None:
-        dt = t - self.t
-        self.travelled_distance += float(np.linalg.norm(missile.velocity) * dt)
-        self.t = t
+        if not self._started:
+            # First call for this guidance instance (including mid-flight switches): seed the clock, don't backfill distance.
+            self.t = t
+            self._started = True
+        else:
+            dt = t - self.t
+            self.travelled_distance += float(np.linalg.norm(missile.velocity) * dt)
+            self.t = t
 
         self.guidance_interrupts = GuidanceInterrupts(
             missile=cast(Any, missile),

@@ -151,16 +151,19 @@ class OrbitalInsertion(_ProgradeTrackingGuidance):
                     release_velocity=missile.velocity.copy(),
                 )
 
-        if v_horiz_mag >= 0.99 * self._v_target:
+        if v_horiz_mag >= self._v_target:
             logger["Guidance"].info(
                 f"{t:<.2f}s - {missile.name} Orbit insertion achieved at altitude {altitude / 1e3:.1f} km, "
                 f"v_horiz = {v_horiz_mag:.1f} m/s (target {self._v_target:.1f} m/s)."
             )
             self.state = GuidanceStates.RELEASE_PAYLOAD
+            release_velocity = missile.velocity.copy()
+            tangential_speed = np.dot(release_velocity, t_hat)
+            release_velocity += (np.sign(tangential_speed) * self._v_target - tangential_speed) * t_hat
             return GuidanceResults(
                 direction=np.zeros(3),
                 state=self.state,
-                release_velocity=missile.velocity.copy(),
+                release_velocity=release_velocity,
             )
 
         return GuidanceResults(direction=t_hat.copy(), state=self.state, next_guidance=self.next_guidance)

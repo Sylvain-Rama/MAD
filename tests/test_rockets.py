@@ -12,6 +12,7 @@ from mad.objs.rockets import (
     Rocket,
     RocketEngine,
 )
+from mad.objs.engines import Engine
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import Body, MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
@@ -19,6 +20,7 @@ from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
 from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, GuidanceStates, PitchRollManoeuver
+from mad.guidances.satellite_guidances import OrbitalInsertion
 from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
 from mad.guidances.interrupt_guidances import interrupt_at_angle
 from mad.objs.projectiles import ProjectileConfig
@@ -91,10 +93,17 @@ class _BodyGuidance(Guidance):
         return GuidanceResults(direction=direction, state=GuidanceStates.POWERED, magnitude=5.0)
 
 
-class _BodyEngine:
+class _BodyEngine(Engine):
     def __init__(self):
-        self.thrust_acc = 9.81
+        self._thrust_acc = 9.81
         self.calls = 0
+
+    @property
+    def has_thrust(self) -> bool:
+        return True
+
+    def thrust_acc(self, body) -> float:
+        return self._thrust_acc
 
     def update(self, body, dt, command=None):
         self.calls += 1
@@ -181,7 +190,7 @@ class TestRocketComponentSeparation:
 
         assert rocket.guidance_results is not None
         assert rocket.engine.stages is rocket.stages
-        assert rocket.thrust_acc == pytest.approx(rocket.engine.thrust_acc)
+        assert rocket.thrust_acc == pytest.approx(rocket.engine.thrust_acc(rocket))
 
 
 def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
@@ -399,7 +408,7 @@ class TestBallisticMissileProperties:
 
     def test_engine_component_matches_rocket_thrust(self, two_stage_missile):
         assert isinstance(two_stage_missile.engine, RocketEngine)
-        assert two_stage_missile.thrust_acc == pytest.approx(two_stage_missile.engine.thrust_acc)
+        assert two_stage_missile.thrust_acc == pytest.approx(two_stage_missile.engine.thrust_acc(two_stage_missile))
 
     def test_engine_tracks_same_stage_list(self, two_stage_missile):
         assert two_stage_missile.engine.stages is two_stage_missile.stages
@@ -601,6 +610,34 @@ class TestPayloadRelease:
         assert isinstance(payload, Body)
         assert payload.reference_planet is earth
         assert payload.gravity_bodies == frozenset({earth})
+
+    def test_orbital_insertion_releases_payload_at_target_speed(self, earth):
+        """Payload release should use the requested vis-viva speed at perigee."""
+        perigee_altitude = 200_000.0
+        apogee_altitude = 400_000.0
+        perigee_radius = earth.radius + perigee_altitude
+        apogee_radius = earth.radius + apogee_altitude
+        expected_speed = np.sqrt(earth.mu * (2.0 / perigee_radius - 2.0 / (perigee_radius + apogee_radius)))
+        insertion = OrbitalInsertion(
+            reference_planet=earth,
+            perigee_altitude_m=perigee_altitude,
+            apogee_altitude_m=apogee_altitude,
+        )
+        rocket = self._make_rocket(earth, perigee_altitude, [0.0, expected_speed, 0.0])
+        rocket.guidance = insertion
+        rocket.guidance_results = insertion.get_guidance(rocket, rocket.t)
+        rocket.bind_environment(reference_planet=earth, gravity_bodies={earth})
+        position_before = rocket.position.copy()
+
+        released = rocket.update(1.0)
+
+        assert released is not None
+        payload = next(obj for obj in released if obj.name == "Payload")
+        np.testing.assert_allclose(payload.position, position_before, rtol=1e-12)
+        np.testing.assert_allclose(payload.velocity, [0.0, expected_speed, 0.0], rtol=1e-12)
+        assert payload.reference_planet is earth
+        assert payload.gravity_bodies == frozenset({earth})
+        assert np.linalg.norm(payload.velocity) == pytest.approx(expected_speed)
 
 
 def test_simulation_runs_nested_rocket_releases(earth):
