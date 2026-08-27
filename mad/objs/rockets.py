@@ -7,19 +7,37 @@ from dataclasses import dataclass, asdict, field
 from collections.abc import Collection
 import numpy as np
 from numpy.typing import NDArray
-from mad.objs.base import Body, MovableObj, ReleasableConfig
+from mad.objs.base import Body, ReleasableConfig
 from mad.objs.projectiles import ProjectileConfig, Projectile
 from mad.objs.planets import Planet
 from mad.objs.battle_computers import ComputerCommand
 
 from mad.guidances import GuidanceStates, Guidance, GuidanceManager
-from mad.guidances.base_guidances import GuidanceResults
 from mad.utils.logger import SourceLogger
 from mad.configs import G0
 
 from copy import deepcopy
 
 logger = SourceLogger()
+
+
+class RCSEngine:
+    """Constant-thrust reaction-control engine for terminal-guidance payloads with unlimited propellant."""
+
+    def __init__(self, thrust_n: float):
+        self.thrust_n = thrust_n
+
+    @property
+    def has_thrust(self) -> bool:
+        return self.thrust_n > 0
+
+    @property
+    def burned_fraction(self) -> float:
+        # Payloads don't burn propellant; fixed at 0.5 to smoothly bias ballistic-to-terminal steering laws.
+        return 0.5
+
+    def thrust_acc(self, body: Body) -> float:
+        return self.thrust_n / body.mass
 
 
 @dataclass
@@ -77,6 +95,7 @@ class ReentryVehicle(Body):
             area=config.area,
             Cd=config.Cd,
             guidance=deepcopy(config.guidance),
+            engine=RCSEngine(config.RCS_thrust),
             t=t,
             reference_planet=reference_planet,
             gravity_bodies=gravity_bodies,
@@ -84,20 +103,10 @@ class ReentryVehicle(Body):
         self.t = t
         self.yield_kt = config.yield_kt
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
-        self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
     def has_thrust(self) -> bool:
-        return self.RCS_thrust > 0
-
-    @property
-    def thrust_acc(self) -> float:
-        return self.RCS_thrust / self.mass
-
-    @property
-    def burned_fraction(self) -> float:
-        # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
-        return 0.5
+        return self.engine.has_thrust if self.engine is not None else False
 
     def update(self, dt: float, command: ComputerCommand | None = None) -> list[Body] | None:
         self.t += dt
@@ -178,26 +187,17 @@ class Capsule(Body):
             area=config.area,
             Cd=config.Cd,
             guidance=deepcopy(config.guidance),
+            engine=RCSEngine(config.RCS_thrust),
             t=t,
             reference_planet=reference_planet,
             gravity_bodies=gravity_bodies,
         )
         self.t = t
         self.guidance_results = self.guidance.get_guidance(self, t) if self.guidance is not None else None
-        self.RCS_thrust = config.RCS_thrust  # N, typical for small thrusters
 
     @property
     def has_thrust(self) -> bool:
-        return self.RCS_thrust > 0
-
-    @property
-    def thrust_acc(self) -> float:
-        return self.RCS_thrust / self.mass
-
-    @property
-    def burned_fraction(self) -> float:
-        # Payloads don't burn, but we can use this to smoothly transition from ballistic to terminal guidance.
-        return 0.5
+        return self.engine.has_thrust if self.engine is not None else False
 
     def _update_configs(self) -> None:
         if self.guidance_results is None:
@@ -439,22 +439,25 @@ class Rocket(Body):
         reference_planet: Planet | None = None,
         gravity_bodies: Collection[Planet] | None = None,
     ):
-        # mass and area are computed properties on this class; bypass the default Body initializer
-        # to avoid storing unused _mass/_area defaults and to keep stage-derived mass semantics.
-        MovableObj.__init__(self, position=position, velocity=velocity, name=config.name)
-
-        self.stages = deepcopy(config.stages)
-        self.engine = RocketEngine(self.stages)
-        self.guidance: Guidance | GuidanceManager | None = (
-            deepcopy(config.guidance) if config.guidance is not None else None
+        stages = deepcopy(config.stages)
+        engine = RocketEngine(stages)
+        # mass/area are computed properties overridden below; the values passed here are placeholders
+        # only used to populate the unused Body._mass/_area backing fields.
+        super().__init__(
+            position=position,
+            velocity=velocity,
+            name=config.name,
+            mass=engine.mass,
+            area=stages[-1].area if stages else 0.01,
+            Cd=0.47,  # Pointy end
+            guidance=deepcopy(config.guidance) if config.guidance is not None else None,
+            engine=engine,
+            t=t,
+            reference_planet=reference_planet,
+            gravity_bodies=gravity_bodies,
         )
-        self.reference_planet = reference_planet
-        self.gravity_bodies = frozenset(
-            gravity_bodies if gravity_bodies is not None else (() if reference_planet is None else (reference_planet,))
-        )
-        self.guidance_results: GuidanceResults | None = None
+        self.stages = stages
         self.payloads: list[ReleasableConfig] = list(config.payloads)  # mutable copy; entries popped on release
-        self.t = t
         self.n_payloads = len(self.payloads)  # initial count, used for burned_fraction
         self.released_payloads = 0
         self.payload_separation_interval = config.payload_separation_interval
@@ -470,7 +473,6 @@ class Rocket(Body):
             sum(stage.dry_mass for stage in self.stages)
             + (getattr(self.payloads[0], "mass", 0.0) if self.payloads else 0.0)
         )
-        self.Cd = 0.47  # Pointy end
         if self.guidance is not None:
             self.guidance_results = self.guidance.get_guidance(self)
 
