@@ -20,7 +20,7 @@ from mad.configs.ballistic_objects_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
 from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, GuidanceStates, PitchRollManoeuver
-from mad.guidances.satellite_guidances import OrbitalInsertion
+from mad.guidances.satellite_guidances import OrbitalInsertion, OrbitalInjectionGuidance
 from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
 from mad.guidances.interrupt_guidances import interrupt_at_angle
 from mad.objs.projectiles import ProjectileConfig
@@ -213,6 +213,28 @@ def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
     assert results.gamma == pytest.approx(threshold)
     assert results.next_guidance is True
     assert missile.guidance.current_index == 1
+
+
+def test_trans_lunar_injection_uses_target_orbit_as_transfer_apoapsis():
+    earth = Planet(PlanetConfig(position=[0.0, 0.0, 0.0], radius=6_371_000.0, mass=5.972e24, name="Earth"))
+    moon = Planet(PlanetConfig(position=[384_400_000.0, 0.0, 0.0], radius=1_737_400.0, mass=7.346e22, name="Moon"))
+    parking_radius = earth.radius + 200_000.0
+    missile = GuidanceMissile(position=[parking_radius, 0.0, 0.0], velocity=[0.0, 0.0, 0.0], name="TLI")
+    guidance = OrbitalInjectionGuidance(earth, moon)
+
+    result = guidance.get_guidance(missile)
+    semi_major_axis = (parking_radius + np.linalg.norm(moon.position)) / 2.0
+    expected_speed = np.sqrt(earth.mu * (2.0 / parking_radius - 1.0 / semi_major_axis))
+
+    assert result.direction == pytest.approx([0.0, 1.0, 0.0])
+    assert guidance.target_orbit_radius_m == pytest.approx(384_400_000.0)
+
+    missile.velocity = result.direction * expected_speed
+    result = guidance.get_guidance(missile, t=1.0)
+
+    assert result.state == GuidanceStates.COASTING
+    assert result.next_guidance is True
+    assert result.direction == pytest.approx([0.0, 0.0, 0.0])
 
 
 # ---------------------------------------------------------------------------

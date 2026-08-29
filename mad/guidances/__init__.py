@@ -16,7 +16,13 @@ from mad.guidances.base_guidances import (
     ReleasePayload,
 )
 from mad.guidances.ICBM_guidances import TabulatedBallistic
-from mad.guidances.satellite_guidances import LEOInsertionGuidance, RCSGuidance, CosinePitchProgram, OrbitalInsertion
+from mad.guidances.satellite_guidances import (
+    LEOInsertionGuidance,
+    RCSGuidance,
+    CosinePitchProgram,
+    OrbitalInsertion,
+    OrbitalInjectionGuidance,
+)
 from mad.guidances.cruise_missiles_guidances import CruiseWaypointGuidance, CruiseGuidanceConfig, Chase
 
 __all__ = [
@@ -32,6 +38,7 @@ __all__ = [
     "LEOInsertionGuidance",
     "CosinePitchProgram",
     "OrbitalInsertion",
+    "OrbitalInjectionGuidance",
     "StraightUp",
     "CruiseWaypointGuidance",
     "CruiseGuidanceConfig",

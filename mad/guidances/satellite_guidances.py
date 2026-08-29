@@ -169,6 +169,67 @@ class OrbitalInsertion(_ProgradeTrackingGuidance):
         return GuidanceResults(direction=t_hat.copy(), state=self.state, next_guidance=self.next_guidance)
 
 
+class OrbitalInjectionGuidance(Guidance):
+    """Inject a body from a circular parking orbit onto an outbound Hohmann transfer.
+
+    The target planet's current distance from ``reference_planet`` is used as the
+    transfer apoapsis. This is a patched-conic approximation: it does not
+    propagate the target planet or solve a Lambert problem.
+    """
+
+    def __init__(
+        self,
+        reference_planet: Planet,
+        target_planet: Planet,
+        target: MovableObj | None = None,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+    ):
+        super().__init__(
+            reference_planet=reference_planet,
+            target=target if target is not None else target_planet,
+            interrupt_fn=interrupt_fn,
+        )
+        self.target_planet = target_planet
+        self._target_orbit_radius = float(np.linalg.norm(target_planet.position - reference_planet.position))
+        if self._target_orbit_radius <= reference_planet.radius:
+            raise ValueError("target_planet must orbit outside the reference planet")
+
+        self._injection_complete = False
+
+    @property
+    def target_orbit_radius_m(self) -> float:
+        """Distance from the reference planet to the target planet's orbit."""
+        return self._target_orbit_radius
+
+    def _prograde_direction(self, position: NDArray) -> NDArray:
+        orbit_normal = np.array([0.0, 0.0, 1.0])
+        radial = position / np.linalg.norm(position)
+        if abs(np.dot(orbit_normal, radial)) > 1.0 - 1e-8:
+            orbit_normal = np.array([0.0, 1.0, 0.0])
+        tangent = np.cross(orbit_normal, radial)
+        return tangent / np.linalg.norm(tangent)
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        position = missile.position - self.reference_planet.position
+        position_norm = np.linalg.norm(position)
+        if position_norm <= self.reference_planet.radius:
+            raise ValueError("missile must be outside the reference planet")
+
+        tangent = self._prograde_direction(position)
+        semi_major_axis = (position_norm + self._target_orbit_radius) / 2.0
+        injection_speed = float(np.sqrt(self.reference_planet.mu * (2.0 / position_norm - 1.0 / semi_major_axis)))
+        relative_velocity = missile.velocity - self.reference_planet.velocity
+        tangential_speed = float(np.dot(relative_velocity, tangent))
+
+        if self._injection_complete or tangential_speed >= injection_speed:
+            self._injection_complete = True
+            self.state = GuidanceStates.COASTING
+            self.next_guidance = True
+            return GuidanceResults(direction=np.zeros_like(missile.velocity), state=self.state, next_guidance=True)
+
+        return GuidanceResults(direction=tangent, state=self.state, next_guidance=self.next_guidance)
+
+
 def LEOInsertionGuidance(
     reference_planet: Planet,
     perigee_altitude_m: float,
