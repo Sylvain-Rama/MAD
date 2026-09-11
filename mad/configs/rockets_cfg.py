@@ -105,3 +105,38 @@ sputnik_stages = [
         "separation_retrograde_dv": 75.0,  # m/s retrograde kick at separation to ensure reentry.
     },
 ]
+
+SaturnV_stages = [
+    {
+        "dry_mass": 137_000.0,
+        "full_mass": 2_214_000.0,
+        "thrust": 34_020 * 1000,  # N
+        "Isp": 260,
+        "ref_radius": 5,  # m
+        "Cd": 0.5,  # Pointy end
+        "name": "S-IC",
+        "parallel": False,  # First stage — ignites at T=0 by default.
+    },
+    {
+        "dry_mass": 43_000.0,
+        "full_mass": 470_000.0,
+        "thrust": 4400 * 1000,  # N
+        "Isp": 424,
+        "ref_radius": 3.3,  # m
+        "Cd": 0.5,  # Pointy end
+        "name": "S-II",
+        "parallel": False,  # Second stage — ignites after S-IC separation.
+    },
+    {
+        "dry_mass": 15_200.0,
+        "full_mass": 120_500.0,
+        "thrust": 1000 * 1000,  # N
+        "Isp": 424,
+        "ref_radius": 3.3,  # m
+        "Cd": 0.5,  # Pointy end
+        "name": "S-IVB",
+        "parallel": False,  # Third stage — ignites after S-II separation.
+    },
+
+
+]

@@ -16,7 +16,7 @@ from mad.objs.engines import Engine
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import Body, MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
-from mad.configs.ballistic_objects_cfg import titan1_stages
+from mad.configs.rockets_cfg import titan1_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
 from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, GuidanceStates, PitchRollManoeuver
