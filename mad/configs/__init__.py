@@ -1,4 +1,4 @@
-from mad.configs.rockets_cfg import titan1_stages, titan2_stages, minuteman_stages, sputnik_stages
+from mad.configs.rockets_cfg import titan1_stages, titan2_stages, minuteman_stages, sputnik_stages, SaturnV_stages
 from mad.configs.planets_cfg import EARTH_SETTINGS, MOON_SETTINGS
 from mad.configs.satellites_cfg import sputnik
 from mad.configs.warheads_cfg import B53_warhead, rod_of_god
@@ -10,6 +10,7 @@ __all__ = [
     "titan1_stages",
     "titan2_stages",
     "minuteman_stages",
+    "SaturnV_stages",
     "EARTH_SETTINGS",
     "MOON_SETTINGS",
     "sputnik_stages",
