@@ -7,11 +7,15 @@ The source is color-coded based on the source name.
 from loguru import logger
 import sys
 
-_inactive_sources: set[str] = set()
-_active_sources: set[str] = set()
-_all_disabled: bool = False
-_handler_id: int | None = None
-_default_removed: bool = False
+_STATE = {
+    "inactive_sources": set(),
+    "active_sources": set(),
+    "disable_all": False,
+}
+_SINK = {
+    "handler_id": None,
+    "default_removed": False,
+}
 
 # Definition of colors for the different sources.
 # If unspecified, the default color is yellow.
@@ -30,12 +34,12 @@ SOURCE_COLORS = {
 
 
 def _source_filter(record) -> bool:
-    if _all_disabled:
+    if _STATE["disable_all"]:
         return False
     source = record["extra"].get("source", "Unknown")
-    if _active_sources:
-        return source in _active_sources
-    return source not in _inactive_sources
+    if _STATE["active_sources"]:
+        return source in _STATE["active_sources"]
+    return source not in _STATE["inactive_sources"]
 
 
 def formatter(record):
@@ -46,17 +50,16 @@ def formatter(record):
 
 
 def get_logger():
-    global _handler_id, _default_removed
-    if not _default_removed:
+    if not _SINK["default_removed"]:
         # Loguru's default stderr sink (id 0) would otherwise duplicate our output.
         try:
             logger.remove(0)
         except ValueError:
             pass
-        _default_removed = True
-    if _handler_id is not None:
-        logger.remove(_handler_id)
-    _handler_id = logger.add(
+        _SINK["default_removed"] = True
+    if _SINK["handler_id"] is not None:
+        logger.remove(_SINK["handler_id"])
+    _SINK["handler_id"] = logger.add(
         sys.stdout,
         format=formatter,
         colorize=True,
@@ -71,11 +74,10 @@ def configure_logger(
     active_sources: list[str] | None = None,
     disable_all: bool = False,
 ):
-    global _inactive_sources, _active_sources, _all_disabled
-    _inactive_sources = set(inactive_sources or [])
-    _active_sources = set(active_sources or [])
-    _all_disabled = disable_all
-    get_logger()
+    # _source_filter reads _STATE on every record, so no handler rebuild is needed.
+    _STATE["inactive_sources"] = set(inactive_sources or [])
+    _STATE["active_sources"] = set(active_sources or [])
+    _STATE["disable_all"] = disable_all
 
 
 class SourceLogger:
