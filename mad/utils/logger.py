@@ -10,6 +10,8 @@ import sys
 _inactive_sources: set[str] = set()
 _active_sources: set[str] = set()
 _all_disabled: bool = False
+_handler_id: int | None = None
+_default_removed: bool = False
 
 # Definition of colors for the different sources.
 # If unspecified, the default color is yellow.
@@ -44,8 +46,17 @@ def formatter(record):
 
 
 def get_logger():
-    logger.remove()
-    logger.add(
+    global _handler_id, _default_removed
+    if not _default_removed:
+        # Loguru's default stderr sink (id 0) would otherwise duplicate our output.
+        try:
+            logger.remove(0)
+        except ValueError:
+            pass
+        _default_removed = True
+    if _handler_id is not None:
+        logger.remove(_handler_id)
+    _handler_id = logger.add(
         sys.stdout,
         format=formatter,
         colorize=True,
@@ -64,18 +75,14 @@ def configure_logger(
     _inactive_sources = set(inactive_sources or [])
     _active_sources = set(active_sources or [])
     _all_disabled = disable_all
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format=formatter,
-        colorize=True,
-        filter=_source_filter,
-    )
+    get_logger()
 
 
-class _BoundSourceLogger:
-    def __init__(self, base_logger, source: str):
-        self._logger = base_logger.bind(source=source)
+class SourceLogger:
+    def __init__(self, base_logger=None, source: str | None = None):
+        self._logger = base_logger or get_logger()
+        if source is not None:
+            self._logger = self._logger.bind(source=source)
 
     def debug(self, message, *a, **kw):
         self._logger.debug(message, *a, **kw)
@@ -95,13 +102,8 @@ class _BoundSourceLogger:
     def success(self, message, *a, **kw):
         self._logger.success(message, *a, **kw)
 
-
-class SourceLogger:
-    def __init__(self, base_logger=get_logger()):
-        self._logger = base_logger
-
     def __getitem__(self, source: str):
-        return _BoundSourceLogger(self._logger, source)
+        return SourceLogger(self._logger, source)
 
 
 if __name__ == "__main__":
