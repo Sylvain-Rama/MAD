@@ -234,6 +234,97 @@ class OrbitalInjectionGuidance(Guidance):
         return GuidanceResults(direction=tangent, state=self.state, next_guidance=self.next_guidance)
 
 
+class CircularOrbitAscent(_ProgradeTrackingGuidance):
+    """Closed-loop ascent to a circular orbit that keeps the vehicle's propellant for later burns.
+
+    Unlike ``OrbitalInsertion`` it never releases a payload: it hands over to the next guidance
+    law (``next_guidance``) as soon as the horizontal speed reaches the local circular speed.
+
+    The thrust is split between the local vertical and horizontal directions every step:
+
+    - The vertical part makes the vehicle climb along a vertical-speed profile
+      ``vr = sqrt(2 * braking_acc * (orbit_altitude - altitude))`` that reaches zero at the orbit altitude,
+      and then holds that altitude by cancelling gravity minus centrifugal acceleration.
+    - The rest of the thrust accelerates the vehicle horizontally.
+
+    As the vertical part is computed from the available thrust acceleration, the law works for any thrust-to-weight ratio.
+    """
+
+    def __init__(
+        self,
+        reference_planet: Planet,
+        orbit_altitude_m: float,
+        braking_acc: float = 4.0,
+        gain: float = 0.3,
+        target: MovableObj | None = None,
+        interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+    ):
+        super().__init__(reference_planet=reference_planet, target=target, interrupt_fn=interrupt_fn)
+        self.orbit_altitude_m = orbit_altitude_m
+        self.braking_acc = braking_acc  # m/s², vertical deceleration used to reach the orbit altitude.
+        self.gain = gain  # 1/s, tracking gain on the vertical-speed profile.
+
+    def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
+        mu = self.reference_planet.mu
+        radius = float(np.linalg.norm(missile.position))
+        r_hat = missile.position / radius
+        altitude = radius - self.reference_planet.radius
+        t_hat = self._resolve_t_hat(missile, r_hat)
+        radial_speed = float(np.dot(missile.velocity, r_hat))
+        horizontal_speed = float(np.dot(missile.velocity, t_hat))
+
+        if altitude > 0.5 * self.orbit_altitude_m and horizontal_speed >= np.sqrt(mu / radius):
+            logger["Guidance"].info(
+                f"{t:<.2f}s - {missile.name} Circular orbit reached at altitude {altitude / 1e3:.1f} km, "
+                f"v_horiz = {horizontal_speed:.1f} m/s."
+            )
+            self.state = GuidanceStates.COASTING
+            self.next_guidance = True
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=True)
+
+        thrust_acc = missile.thrust_acc
+        if thrust_acc <= 0.0:
+            return GuidanceResults(direction=np.zeros(3), state=self.state, next_guidance=self.next_guidance)
+
+        desired_radial_speed = np.sqrt(2.0 * self.braking_acc * max(self.orbit_altitude_m - altitude, 0.0))
+        radial_acc = self.gain * (desired_radial_speed - radial_speed) + mu / radius**2 - horizontal_speed**2 / radius
+        radial_acc = float(np.clip(radial_acc, -0.9 * thrust_acc, 0.95 * thrust_acc))
+        horizontal_acc = np.sqrt(thrust_acc**2 - radial_acc**2)
+
+        direction = (radial_acc * r_hat + horizontal_acc * t_hat) / thrust_acc
+        return GuidanceResults(direction=direction, state=self.state, next_guidance=self.next_guidance)
+
+
+def LEOAscentGuidance(
+    reference_planet: Planet,
+    orbit_altitude_m: float,
+    vertical_rise_altitude_m: float = 1_000.0,
+    braking_acc: float = 4.0,
+    gain: float = 0.3,
+    target: MovableObj | None = None,
+    interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+) -> GuidanceManager:
+    """Assemble a launch-to-circular-orbit guidance sequence that keeps the payload on board.
+
+    Same idea as ``LEOInsertionGuidance``, but the last law is ``CircularOrbitAscent``: it ends with a
+    coast instead of a payload release, so a later guidance law (e.g. a trans-lunar injection) can keep using the rocket.
+    """
+    vertical_rise = StraightUp(
+        reference_planet=reference_planet,
+        target=target,  # type: ignore[arg-type]
+        interrupt_fn=lambda i: interrupt_at_altitude(i, vertical_rise_altitude_m),
+    )
+    ascent = CircularOrbitAscent(
+        reference_planet=reference_planet,
+        orbit_altitude_m=orbit_altitude_m,
+        braking_acc=braking_acc,
+        gain=gain,
+        target=target,
+        interrupt_fn=interrupt_fn,
+    )
+    return GuidanceManager([vertical_rise, ascent])
+
+
 def LEOInsertionGuidance(
     reference_planet: Planet,
     perigee_altitude_m: float,

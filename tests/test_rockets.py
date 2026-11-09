@@ -16,11 +16,11 @@ from mad.objs.engines import Engine
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import Body, MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
-from mad.configs.rockets_cfg import titan1_stages
+from mad.configs.rockets_cfg import titan1_stages, SaturnV_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
 from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, GuidanceStates, PitchRollManoeuver
-from mad.guidances.satellite_guidances import OrbitalInsertion, OrbitalInjectionGuidance
+from mad.guidances.satellite_guidances import OrbitalInsertion, OrbitalInjectionGuidance, LEOAscentGuidance
 from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
 from mad.guidances.interrupt_guidances import interrupt_at_angle
 from mad.objs.projectiles import ProjectileConfig
@@ -256,6 +256,42 @@ def test_trans_lunar_injection_counts_radial_velocity_toward_injection_speed():
 
     assert result.state == GuidanceStates.COASTING
     assert result.next_guidance is True
+
+
+def test_rocket_does_not_thrust_when_guidance_is_idle(earth):
+    stages = [RocketStage(RocketStageConfig(**titan1_stages[0]))]
+    cfg = RocketConfig(stages=stages, guidance=NoGuidanceNoThrust(earth, earth))
+    rocket = Rocket(position=[earth.radius + 10.0, 0.0], config=cfg, reference_planet=earth)
+
+    assert rocket.thrust_acc > 0.0
+    assert not np.any(rocket._thrust_acceleration())
+
+
+def test_leo_ascent_guidance_reaches_circular_orbit_and_keeps_propellant():
+    earth = Planet(PlanetConfig(**EARTH_SETTINGS))
+    stages = [RocketStage(RocketStageConfig(**stage_cfg)) for stage_cfg in SaturnV_stages]
+    guidance = LEOAscentGuidance(earth, orbit_altitude_m=185_000.0)
+    cfg = RocketConfig(stages=stages, guidance=guidance, name="Saturn V")
+    rocket = Rocket(position=[0.0, earth.radius + 10.0, 0.0], config=cfg, reference_planet=earth)
+
+    sim = Simulation(max_time=1000.0, dt=2.0, planet=earth)
+    sim.run(moving_objs=[rocket])
+
+    assert rocket.guidance.current_index == 2
+    radius = np.linalg.norm(rocket.position)
+    speed = np.linalg.norm(rocket.velocity)
+    semi_major_axis = 1.0 / (2.0 / radius - speed**2 / earth.mu)
+    eccentricity = np.sqrt(
+        1.0
+        + 2.0
+        * (0.5 * speed**2 - earth.mu / radius)
+        * np.linalg.norm(np.cross(rocket.position, rocket.velocity)) ** 2
+        / earth.mu**2
+    )
+    perigee_altitude = semi_major_axis * (1.0 - eccentricity) - earth.radius
+
+    assert perigee_altitude > 150_000.0
+    assert sum(stage.propellant_mass for stage in rocket.stages) > 50_000.0
 
 
 # ---------------------------------------------------------------------------

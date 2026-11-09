@@ -22,6 +22,8 @@ from mad.guidances.satellite_guidances import (
     CosinePitchProgram,
     OrbitalInsertion,
     OrbitalInjectionGuidance,
+    CircularOrbitAscent,
+    LEOAscentGuidance,
 )
 from mad.guidances.cruise_missiles_guidances import CruiseWaypointGuidance, CruiseGuidanceConfig, Chase
 
@@ -39,6 +41,8 @@ __all__ = [
     "CosinePitchProgram",
     "OrbitalInsertion",
     "OrbitalInjectionGuidance",
+    "CircularOrbitAscent",
+    "LEOAscentGuidance",
     "StraightUp",
     "CruiseWaypointGuidance",
     "CruiseGuidanceConfig",

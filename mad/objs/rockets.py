@@ -696,10 +696,16 @@ class Rocket(Body):
 
         # If no guidance, we continue along the same direction.
         guidance_result = self.guidance_results
-        direction = guidance_result.direction if guidance_result is not None else self.pos_norm
-        direction_norm = np.linalg.norm(direction)
-        direction = direction / direction_norm if direction_norm > 0.0 else self.pos_norm
+        if guidance_result is None:
+            return engine_thrust * self.pos_norm
 
-        desired_acc = guidance_result.magnitude if guidance_result is not None else None
+        # An idle guidance or a zero direction is a coast: the engine is not firing.
+        direction = guidance_result.direction
+        direction_norm = np.linalg.norm(direction)
+        if guidance_result.state == GuidanceStates.IDLE or direction_norm <= 1e-8:
+            return np.zeros_like(self.velocity)
+        direction = direction / direction_norm
+
+        desired_acc = guidance_result.magnitude
         acc = min(engine_thrust, desired_acc) if desired_acc is not None else engine_thrust
         return acc * direction
