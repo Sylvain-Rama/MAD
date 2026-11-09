@@ -16,11 +16,11 @@ from mad.objs.engines import Engine
 from mad.objs.planets import Planet, PlanetConfig
 from mad.objs.base import Body, MovableObj
 from mad.configs.planets_cfg import EARTH_SETTINGS
-from mad.configs.ballistic_objects_cfg import titan1_stages
+from mad.configs.rockets_cfg import titan1_stages, SaturnV_stages
 from mad.configs.warheads_cfg import B53_warhead
 from mad.configs.physics_cfg import G0
 from mad.guidances import GuidanceManager, NoGuidance, NoGuidanceNoThrust, GuidanceStates, PitchRollManoeuver
-from mad.guidances.satellite_guidances import OrbitalInsertion
+from mad.guidances.satellite_guidances import OrbitalInsertion, OrbitalInjectionGuidance, LEOAscentGuidance
 from mad.guidances.base_guidances import Guidance, GuidanceResults, GuidableObj
 from mad.guidances.interrupt_guidances import interrupt_at_angle
 from mad.objs.projectiles import ProjectileConfig
@@ -213,6 +213,139 @@ def test_pitch_roll_interrupts_when_flight_path_angle_reaches_threshold(earth):
     assert results.gamma == pytest.approx(threshold)
     assert results.next_guidance is True
     assert missile.guidance.current_index == 1
+
+
+def test_trans_lunar_injection_uses_target_orbit_as_transfer_apoapsis():
+    earth = Planet(PlanetConfig(position=[0.0, 0.0, 0.0], radius=6_371_000.0, mass=5.972e24, name="Earth"))
+    moon = Planet(PlanetConfig(position=[384_400_000.0, 0.0, 0.0], radius=1_737_400.0, mass=7.346e22, name="Moon"))
+    parking_radius = earth.radius + 200_000.0
+    missile = GuidanceMissile(position=[parking_radius, 0.0, 0.0], velocity=[0.0, 0.0, 0.0], name="TLI")
+    guidance = OrbitalInjectionGuidance(earth, moon)
+
+    result = guidance.get_guidance(missile)
+    semi_major_axis = (parking_radius + np.linalg.norm(moon.position)) / 2.0
+    expected_speed = np.sqrt(earth.mu * (2.0 / parking_radius - 1.0 / semi_major_axis))
+
+    assert result.direction == pytest.approx([0.0, 1.0, 0.0])
+    assert guidance.target_orbit_radius_m == pytest.approx(384_400_000.0)
+
+    missile.velocity = result.direction * expected_speed
+    result = guidance.get_guidance(missile, t=1.0)
+
+    assert result.state == GuidanceStates.COASTING
+    assert result.next_guidance is True
+    assert result.direction == pytest.approx([0.0, 0.0, 0.0])
+
+
+def test_trans_lunar_injection_counts_radial_velocity_toward_injection_speed():
+    earth = Planet(PlanetConfig(position=[0.0, 0.0, 0.0], radius=6_371_000.0, mass=5.972e24, name="Earth"))
+    moon = Planet(PlanetConfig(position=[384_400_000.0, 0.0, 0.0], radius=1_737_400.0, mass=7.346e22, name="Moon"))
+    parking_radius = 6_556_000.0
+    missile = GuidanceMissile(position=[parking_radius, 0.0, 0.0], velocity=[0.0, 0.0, 0.0], name="TLI")
+    guidance = OrbitalInjectionGuidance(earth, moon)
+
+    semi_major_axis = (parking_radius + np.linalg.norm(moon.position)) / 2.0
+    injection_speed = np.sqrt(earth.mu * (2.0 / parking_radius - 1.0 / semi_major_axis))
+
+    # A finite burn builds radial velocity: tangential speed alone is still short of the injection speed.
+    tangential_speed = 0.9 * injection_speed
+    radial_speed = np.sqrt(injection_speed**2 - tangential_speed**2) * 1.01
+    missile.velocity = np.array([radial_speed, tangential_speed, 0.0])
+
+    result = guidance.get_guidance(missile, t=1.0)
+
+    assert result.state == GuidanceStates.COASTING
+    assert result.next_guidance is True
+
+
+class _ThrustingMissile(GuidanceMissile):
+    @property
+    def thrust_acc(self) -> float:
+        return 10.0
+
+
+def _earth_moon_system():
+    earth = Planet(PlanetConfig(position=[0.0, 0.0, 0.0], radius=6_371_000.0, mass=5.972e24, name="Earth"))
+    moon = Planet(PlanetConfig(position=[384_400_000.0, 0.0, 0.0], radius=1_737_400.0, mass=7.346e22, name="Moon"))
+    return earth, moon
+
+
+def test_trans_lunar_injection_waits_for_start_angle_then_ignites_within_the_step():
+    earth, moon = _earth_moon_system()
+    radius = earth.radius + 185_000.0
+    speed = np.sqrt(earth.mu / radius)
+    angular_step = speed / radius  # rad, for dt = 1 s
+    guidance = OrbitalInjectionGuidance(earth, moon, start_angle_rad=np.radians(90.0))
+
+    def missile_at(angle: float) -> _ThrustingMissile:
+        position = radius * np.array([np.cos(angle), np.sin(angle), 0.0])
+        velocity = speed * np.array([-np.sin(angle), np.cos(angle), 0.0])
+        return _ThrustingMissile(position=position, velocity=velocity, name="TLI")
+
+    result = guidance.get_guidance(missile_at(np.radians(80.0)), t=0.0)
+    assert result.state == GuidanceStates.IDLE
+    assert result.direction == pytest.approx([0.0, 0.0, 0.0])
+
+    result = guidance.get_guidance(missile_at(np.radians(80.0)), t=1.0)
+    assert result.state == GuidanceStates.IDLE
+
+    # The start angle is half a step ahead: the engine fires during the second half of the step only.
+    result = guidance.get_guidance(missile_at(np.radians(90.0) - 0.5 * angular_step), t=2.0)
+    assert result.state == GuidanceStates.POWERED
+    assert result.magnitude == pytest.approx(5.0)
+
+
+def test_trans_lunar_injection_scales_the_last_step_to_reach_the_injection_speed():
+    earth, moon = _earth_moon_system()
+    radius = earth.radius + 185_000.0
+    semi_major_axis = (radius + np.linalg.norm(moon.position)) / 2.0
+    injection_speed = np.sqrt(earth.mu * (2.0 / radius - 1.0 / semi_major_axis))
+    guidance = OrbitalInjectionGuidance(earth, moon)
+
+    missile = _ThrustingMissile(position=[radius, 0.0, 0.0], velocity=[0.0, injection_speed - 1.0, 0.0], name="TLI")
+    guidance.get_guidance(missile, t=0.0)
+    result = guidance.get_guidance(missile, t=1.0)
+
+    assert result.state == GuidanceStates.POWERED
+    assert result.magnitude == pytest.approx(1.0, abs=0.1)
+
+
+def test_rocket_does_not_thrust_when_guidance_is_idle(earth):
+    stages = [RocketStage(RocketStageConfig(**titan1_stages[0]))]
+    cfg = RocketConfig(stages=stages, guidance=NoGuidanceNoThrust(earth, earth))
+    rocket = Rocket(position=[earth.radius + 10.0, 0.0], config=cfg, reference_planet=earth)
+
+    assert rocket.thrust_acc > 0.0
+    assert not np.any(rocket._thrust_acceleration())
+
+
+def test_leo_ascent_guidance_reaches_circular_orbit_and_keeps_propellant():
+    earth = Planet(PlanetConfig(**EARTH_SETTINGS))
+    stages = [RocketStage(RocketStageConfig(**stage_cfg)) for stage_cfg in SaturnV_stages]
+    guidance = LEOAscentGuidance(earth, orbit_altitude_m=185_000.0)
+    cfg = RocketConfig(stages=stages, guidance=guidance, name="Saturn V")
+    rocket = Rocket(position=[0.0, earth.radius + 10.0, 0.0], config=cfg, reference_planet=earth)
+
+    sim = Simulation(max_time=1000.0, dt=2.0, planet=earth)
+    sim.run(moving_objs=[rocket])
+
+    assert rocket.guidance.current_index == 2
+    radius = np.linalg.norm(rocket.position)
+    speed = np.linalg.norm(rocket.velocity)
+    semi_major_axis = 1.0 / (2.0 / radius - speed**2 / earth.mu)
+    eccentricity = np.sqrt(
+        1.0
+        + 2.0
+        * (0.5 * speed**2 - earth.mu / radius)
+        * np.linalg.norm(np.cross(rocket.position, rocket.velocity)) ** 2
+        / earth.mu**2
+    )
+    perigee_altitude = semi_major_axis * (1.0 - eccentricity) - earth.radius
+    apogee_altitude = semi_major_axis * (1.0 + eccentricity) - earth.radius
+
+    assert perigee_altitude > 180_000.0
+    assert apogee_altitude < 190_000.0
+    assert sum(stage.propellant_mass for stage in rocket.stages) > 50_000.0
 
 
 # ---------------------------------------------------------------------------

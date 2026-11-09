@@ -115,6 +115,7 @@ class Guidance(ABC):
         self.next_guidance: bool = False  # Whether to switch to the next guidance in the guidance list.
 
         self.t = 0.0
+        self.dt = 0.0  # Duration of the last update step (s), 0 on the first call.
         self.travelled_distance = 0.0
         self._started = False  # Guards against a bogus dt on the first update, e.g. after a mid-flight guidance switch.
         self.guidance_interrupts = GuidanceInterrupts(
@@ -164,11 +165,13 @@ class Guidance(ABC):
         if not self._started:
             # First call for this guidance instance (including mid-flight switches): seed the clock, don't backfill distance.
             self.t = t
+            self.dt = 0.0
             self._started = True
         else:
             dt = t - self.t
             self.travelled_distance += float(np.linalg.norm(missile.velocity) * dt)
             self.t = t
+            self.dt = dt
 
         self.guidance_interrupts = GuidanceInterrupts(
             missile=cast(Any, missile),
