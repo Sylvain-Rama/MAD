@@ -137,6 +137,4 @@ SaturnV_stages = [
         "name": "S-IVB",
         "parallel": False,  # Third stage — ignites after S-II separation.
     },
-
-
 ]

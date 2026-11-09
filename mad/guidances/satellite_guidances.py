@@ -2,7 +2,7 @@
 
 import numpy as np
 from numpy.typing import NDArray
-from typing import Callable
+from typing import Any, Callable, cast
 from mad.objs.planets import Planet
 from mad.objs import MovableObj
 from mad.guidances.base_guidances import (
@@ -179,6 +179,11 @@ class OrbitalInjectionGuidance(Guidance):
     The thrust is always prograde and the burn ends once the total speed relative to
     the reference planet reaches the vis-viva speed of the transfer ellipse, so the
     radial velocity built up during a finite burn is accounted for.
+
+    If ``start_angle_rad`` is given, the body first waits in its parking orbit, without thrust,
+    until it reaches this polar angle (counter-clockwise around +z, from +x, relative to the
+    reference planet). The thrust of the first and of the last step is scaled so that the burn
+    starts at that angle, and ends at the injection speed, regardless of the simulation step.
     """
 
     def __init__(
@@ -187,6 +192,7 @@ class OrbitalInjectionGuidance(Guidance):
         target_planet: Planet,
         target: MovableObj | None = None,
         interrupt_fn: Callable[["GuidanceInterrupts"], bool] | None = None,
+        start_angle_rad: float | None = None,
     ):
         super().__init__(
             reference_planet=reference_planet,
@@ -198,6 +204,8 @@ class OrbitalInjectionGuidance(Guidance):
         if self._target_orbit_radius <= reference_planet.radius:
             raise ValueError("target_planet must orbit outside the reference planet")
 
+        self.start_angle_rad = start_angle_rad
+        self._burning = start_angle_rad is None
         self._injection_complete = False
 
     @property
@@ -213,6 +221,20 @@ class OrbitalInjectionGuidance(Guidance):
         tangent = np.cross(orbit_normal, radial)
         return tangent / np.linalg.norm(tangent)
 
+    def _injection_speed(self, radius: float) -> float:
+        semi_major_axis = (radius + self._target_orbit_radius) / 2.0
+        return float(np.sqrt(self.reference_planet.mu * (2.0 / radius - 1.0 / semi_major_axis)))
+
+    def _ignition_fraction(self, position: NDArray, relative_velocity: NDArray) -> float | None:
+        """Fraction of the current step left once the start angle is reached, None if it is not reached during this step."""
+        if self.start_angle_rad is None:
+            return 1.0
+        angular_step = float(np.cross(position, relative_velocity)[2] / np.dot(position, position)) * self.dt
+        if angular_step <= 0.0:
+            return None
+        remaining = (self.start_angle_rad - np.arctan2(position[1], position[0])) % (2.0 * np.pi)
+        return 1.0 - remaining / angular_step if remaining <= angular_step else None
+
     def _compute_guidance(self, missile: GuidableObj, t: float = 0.0) -> GuidanceResults:
         position = missile.position - self.reference_planet.position
         position_norm = np.linalg.norm(position)
@@ -220,18 +242,40 @@ class OrbitalInjectionGuidance(Guidance):
             raise ValueError("missile must be outside the reference planet")
 
         tangent = self._prograde_direction(position)
-        semi_major_axis = (position_norm + self._target_orbit_radius) / 2.0
-        injection_speed = float(np.sqrt(self.reference_planet.mu * (2.0 / position_norm - 1.0 / semi_major_axis)))
+        injection_speed = self._injection_speed(position_norm)
         relative_velocity = missile.velocity - self.reference_planet.velocity
         speed = float(np.linalg.norm(relative_velocity))
 
-        if self._injection_complete or speed >= injection_speed:
+        if self._injection_complete or (self._burning and speed >= injection_speed - 0.05):
             self._injection_complete = True
             self.state = GuidanceStates.COASTING
             self.next_guidance = True
             return GuidanceResults(direction=np.zeros_like(missile.velocity), state=self.state, next_guidance=True)
 
-        return GuidanceResults(direction=tangent, state=self.state, next_guidance=self.next_guidance)
+        magnitude = None
+        if not self._burning:
+            ignition_fraction = self._ignition_fraction(position, relative_velocity)
+            if ignition_fraction is None:
+                # Waiting in the parking orbit: the engine is off and does not burn propellant.
+                return GuidanceResults(
+                    direction=np.zeros_like(missile.velocity), state=GuidanceStates.IDLE, next_guidance=False
+                )
+            self._burning = True
+            self.state = GuidanceStates.POWERED
+            magnitude = ignition_fraction * missile.thrust_acc
+        elif self.dt > 0.0 and speed > 0.0:
+            # Last step: scale the thrust so that the speed ends the step at the injection speed.
+            gravity = self.reference_planet.gravity(cast(Any, missile))
+            end_radius = float(np.linalg.norm(position + relative_velocity * self.dt))
+            speed_gain = (self._injection_speed(end_radius) - speed) / self.dt
+            along_track = float(np.dot(tangent, relative_velocity / speed))
+            required_acc = (speed_gain - float(np.dot(gravity, relative_velocity / speed))) / along_track
+            if required_acc < missile.thrust_acc:
+                magnitude = max(required_acc, 0.0)
+
+        return GuidanceResults(
+            direction=tangent, state=self.state, next_guidance=self.next_guidance, magnitude=magnitude
+        )
 
 
 class CircularOrbitAscent(_ProgradeTrackingGuidance):
@@ -245,7 +289,8 @@ class CircularOrbitAscent(_ProgradeTrackingGuidance):
     - The vertical part makes the vehicle climb along a vertical-speed profile
       ``vr = sqrt(2 * braking_acc * (orbit_altitude - altitude))`` that reaches zero at the orbit altitude,
       and then holds that altitude by cancelling gravity minus centrifugal acceleration.
-    - The rest of the thrust accelerates the vehicle horizontally.
+    - The rest of the thrust accelerates the vehicle horizontally. The thrust of the last step is scaled so that
+      the horizontal speed ends exactly at the circular speed, regardless of the simulation step.
 
     As the vertical part is computed from the available thrust acceleration, the law works for any thrust-to-weight ratio.
     """
@@ -273,7 +318,7 @@ class CircularOrbitAscent(_ProgradeTrackingGuidance):
         radial_speed = float(np.dot(missile.velocity, r_hat))
         horizontal_speed = float(np.dot(missile.velocity, t_hat))
 
-        if altitude > 0.5 * self.orbit_altitude_m and horizontal_speed >= np.sqrt(mu / radius):
+        if altitude > 0.5 * self.orbit_altitude_m and horizontal_speed >= np.sqrt(mu / radius) - 0.5:
             logger["Guidance"].info(
                 f"{t:<.2f}s - {missile.name} Circular orbit reached at altitude {altitude / 1e3:.1f} km, "
                 f"v_horiz = {horizontal_speed:.1f} m/s."
@@ -291,8 +336,17 @@ class CircularOrbitAscent(_ProgradeTrackingGuidance):
         radial_acc = float(np.clip(radial_acc, -0.9 * thrust_acc, 0.95 * thrust_acc))
         horizontal_acc = np.sqrt(thrust_acc**2 - radial_acc**2)
 
+        # Last step: scale the thrust so that the horizontal speed ends the step at the circular speed.
+        magnitude = None
+        if self.dt > 0.0:
+            required_acc = (np.sqrt(mu / radius) - horizontal_speed) / self.dt
+            if required_acc < horizontal_acc:
+                magnitude = thrust_acc * max(required_acc, 0.0) / horizontal_acc
+
         direction = (radial_acc * r_hat + horizontal_acc * t_hat) / thrust_acc
-        return GuidanceResults(direction=direction, state=self.state, next_guidance=self.next_guidance)
+        return GuidanceResults(
+            direction=direction, state=self.state, next_guidance=self.next_guidance, magnitude=magnitude
+        )
 
 
 def LEOAscentGuidance(
