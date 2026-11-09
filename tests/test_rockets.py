@@ -237,6 +237,27 @@ def test_trans_lunar_injection_uses_target_orbit_as_transfer_apoapsis():
     assert result.direction == pytest.approx([0.0, 0.0, 0.0])
 
 
+def test_trans_lunar_injection_counts_radial_velocity_toward_injection_speed():
+    earth = Planet(PlanetConfig(position=[0.0, 0.0, 0.0], radius=6_371_000.0, mass=5.972e24, name="Earth"))
+    moon = Planet(PlanetConfig(position=[384_400_000.0, 0.0, 0.0], radius=1_737_400.0, mass=7.346e22, name="Moon"))
+    parking_radius = 6_556_000.0
+    missile = GuidanceMissile(position=[parking_radius, 0.0, 0.0], velocity=[0.0, 0.0, 0.0], name="TLI")
+    guidance = OrbitalInjectionGuidance(earth, moon)
+
+    semi_major_axis = (parking_radius + np.linalg.norm(moon.position)) / 2.0
+    injection_speed = np.sqrt(earth.mu * (2.0 / parking_radius - 1.0 / semi_major_axis))
+
+    # A finite burn builds radial velocity: tangential speed alone is still short of the injection speed.
+    tangential_speed = 0.9 * injection_speed
+    radial_speed = np.sqrt(injection_speed**2 - tangential_speed**2) * 1.01
+    missile.velocity = np.array([radial_speed, tangential_speed, 0.0])
+
+    result = guidance.get_guidance(missile, t=1.0)
+
+    assert result.state == GuidanceStates.COASTING
+    assert result.next_guidance is True
+
+
 # ---------------------------------------------------------------------------
 # RocketStageConfig
 # ---------------------------------------------------------------------------

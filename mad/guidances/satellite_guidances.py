@@ -175,6 +175,10 @@ class OrbitalInjectionGuidance(Guidance):
     The target planet's current distance from ``reference_planet`` is used as the
     transfer apoapsis. This is a patched-conic approximation: it does not
     propagate the target planet or solve a Lambert problem.
+
+    The thrust is always prograde and the burn ends once the total speed relative to
+    the reference planet reaches the vis-viva speed of the transfer ellipse, so the
+    radial velocity built up during a finite burn is accounted for.
     """
 
     def __init__(
@@ -219,9 +223,9 @@ class OrbitalInjectionGuidance(Guidance):
         semi_major_axis = (position_norm + self._target_orbit_radius) / 2.0
         injection_speed = float(np.sqrt(self.reference_planet.mu * (2.0 / position_norm - 1.0 / semi_major_axis)))
         relative_velocity = missile.velocity - self.reference_planet.velocity
-        tangential_speed = float(np.dot(relative_velocity, tangent))
+        speed = float(np.linalg.norm(relative_velocity))
 
-        if self._injection_complete or tangential_speed >= injection_speed:
+        if self._injection_complete or speed >= injection_speed:
             self._injection_complete = True
             self.state = GuidanceStates.COASTING
             self.next_guidance = True
